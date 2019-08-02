@@ -1,4 +1,4 @@
-package cache
+package citop
 
 const CurrentSchema = `
 CREATE TABLE vcs_commit

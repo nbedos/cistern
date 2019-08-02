@@ -2,6 +2,8 @@
 
 .DEFAULT: usage
 
+export GO111MODULE=on
+
 usage:
 	@echo "Usage:"
 	@echo "    make tests           # Run unit tests"
