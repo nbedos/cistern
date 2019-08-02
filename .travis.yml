@@ -1,0 +1,11 @@
+language: go
+go:
+  - 1.11.x
+  - 1.12.x
+os:
+  - linux
+dist: trusty
+install: true
+script:
+  - make tests
+
