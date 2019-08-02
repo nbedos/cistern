@@ -1,0 +1,17 @@
+stages:
+  - test
+
+golang 1.12:
+  stage: test
+  image: golang:1.12
+  script:
+    - cd "$CI_PROJECT_DIR"
+    - make tests
+
+golang 1.11:
+  stage: test
+  image: golang:1.11
+  script:
+    - cd "$CI_PROJECT_DIR"
+    - make tests
+
