@@ -1,1 +1,1 @@
-[![Travis Build Status](https://travis-ci.org/nbedos/citop.svg?branch=master)](https://travis-ci.org/nbedos/citop) [![GitLab Build Status](https://gitlab.com/nbedos/citop/badges/master/pipeline.svg)](https://gitlab.com/nbedos/citop/)
+[![Travis Build Status](https://travis-ci.org/nbedos/citop.svg?branch=master)](https://travis-ci.org/nbedos/citop/builds) [![GitLab Build Status](https://gitlab.com/nbedos/citop/badges/master/pipeline.svg)](https://gitlab.com/nbedos/citop/pipelines)

@@ -1,9 +1,10 @@
-package citop
+package providers
 
 import (
 	"encoding/json"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/nbedos/citop/cache"
 	"io/ioutil"
 	"net/http"
 	"sync"
@@ -108,16 +109,16 @@ func (c *travisConfig) UnmarshalJSON(bytes []byte) (err error) {
 	return
 }
 
-func localToDb(builds travisJsonResponse) (cacheBuilds []Build) {
+func localToDb(builds travisJsonResponse) (cacheBuilds []cache.Build) {
 	for _, build := range builds.Builds {
-		var dbStages []Stage
+		var dbStages []cache.Stage
 		for _, stage := range build.Stages {
-			var dbJobs []Job
+			var dbJobs []cache.Job
 			for _, job := range stage.Jobs {
-				dbJob := Job{
+				dbJob := cache.Job{
 					Id:    job.Id,
 					State: job.State,
-					Config: Config{
+					Config: cache.Config{
 						Name:     job.Config.Name,
 						Os:       job.Config.Os,
 						Distrib:  job.Config.Distrib,
@@ -130,7 +131,7 @@ func localToDb(builds travisJsonResponse) (cacheBuilds []Build) {
 				}
 				dbJobs = append(dbJobs, dbJob)
 			}
-			dbStage := Stage{
+			dbStage := cache.Stage{
 				Id:     stage.Id,
 				Number: stage.Number,
 				Name:   stage.Name,
@@ -139,12 +140,12 @@ func localToDb(builds travisJsonResponse) (cacheBuilds []Build) {
 			}
 			dbStages = append(dbStages, dbStage)
 		}
-		dbBuild := Build{
+		dbBuild := cache.Build{
 			Id:              build.Id,
 			State:           build.State,
 			Repository:      build.Repository,
 			RepoBuildNumber: build.RepoBuildNumber,
-			Commit: Commit{
+			Commit: cache.Commit{
 				Id:         build.Commit.Id,
 				Sha:        build.Commit.Sha,
 				Ref:        build.Commit.Ref,
@@ -159,7 +160,7 @@ func localToDb(builds travisJsonResponse) (cacheBuilds []Build) {
 	return cacheBuilds
 }
 
-func (t Travis) FetchBuilds(count int) (builds []Build, err error) {
+func (t Travis) FetchBuilds(count int) (builds []cache.Build, err error) {
 	client := &http.Client{}
 
 	req, err := http.NewRequest("GET", "https://api.travis-ci.org/builds", nil)
