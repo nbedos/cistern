@@ -1,58 +1,76 @@
 package cache
 
+/*
+	TODO:
+		Add busy timeout as in https://github.com/mattn/go-sqlite3/issues/274#issuecomment-232942571
+		READ ONLY MODE for offline use
+
+*/
+
 import (
 	"database/sql"
+	"fmt"
 	_ "github.com/mattn/go-sqlite3"
-	"log"
 	"os"
 )
 
+type Inserter interface {
+	insert(transaction *sql.Tx) (sql.Result, error)
+}
+
+type Account struct {
+	Id       string
+	Url      string
+	UserId   string
+	Username string
+}
+
+type Repository struct {
+	AccountId string
+	Id        int
+	Name      string
+	Url       string
+}
+
 type Commit struct {
-	Id         int
-	Sha        string
-	Ref        string
-	Message    string
-	CompareUrl string
-}
-
-type Config struct {
-	Name     string
-	Os       string
-	Distrib  string
-	Language string
-	Env      string
-	Json     string
-}
-
-type Job struct {
-	Id     int
-	State  string
-	Config Config
-	Number string
-	Log    string
-}
-
-type Stage struct {
-	Id     int
-	Number int
-	Name   string
-	State  string
-	Jobs   []Job
+	AccountId    string
+	Id           string
+	RepositoryId int
+	Message      string
+	Builds       []Build
 }
 
 type Build struct {
+	AccountId       string
 	Id              int
+	CommitId        string
 	State           string
-	Repository      string
 	RepoBuildNumber string
-	Commit          Commit
-	Stages          []Stage
+}
+
+type Stage struct {
+	AccountId string
+	Id        int
+	BuildId   int
+	Number    int
+	Name      string
+	State     string
+}
+
+type Job struct {
+	AccountId string
+	Id        int
+	BuildId   int
+	StageId   *int
+	State     string
+	Number    string
+	Log       string
 }
 
 type Cache struct {
-	FilePath string
+	FilePath  string
 	connected bool
-	db sql.DB
+	db        sql.DB
 }
 
 func (c *Cache) connect(removeExisting bool) (err error) {
@@ -66,7 +84,9 @@ func (c *Cache) connect(removeExisting bool) (err error) {
 		}
 	}
 
-	db, err := sql.Open("sqlite3", c.FilePath)
+	// FIXME Properly escape filepaths
+	uri := fmt.Sprintf("%s?_foreign_keys=on", c.FilePath)
+	db, err := sql.Open("sqlite3", uri)
 	if err != nil {
 		return err
 	}
@@ -95,7 +115,6 @@ func (c *Cache) connect(removeExisting bool) (err error) {
 	return nil
 }
 
-
 func (c *Cache) Close() (err error) {
 	if c.connected {
 		err = c.db.Close()
@@ -104,7 +123,7 @@ func (c *Cache) Close() (err error) {
 	return
 }
 
-func (c *Cache) SaveBuild(build Build) (err error) {
+func (c *Cache) Save(i Inserter) (err error) {
 	if !c.connected {
 		err = c.connect(true)
 		if err != nil {
@@ -126,72 +145,79 @@ func (c *Cache) SaveBuild(build Build) (err error) {
 		}
 	}()
 
-	_, err = c.insertBuild(transaction, build)
+	_, err = i.insert(transaction)
 
 	return err
 }
 
-func (c Cache) SaveBuilds(builds <-chan Build) {
-	for {
-		if err := c.SaveBuild(<-builds); err != nil {
-			log.Fatal(err)
-		}
-	}
+func (a Account) insert(transaction *sql.Tx) (sql.Result, error) {
+	// TODO: Rely on autoincrement for the value of 'id'
+	return transaction.Exec(
+		"INSERT INTO account(id, url, user_id, username) VALUES (:id, :url, :user_id, :username);",
+		sql.Named("id", a.Id),
+		sql.Named("url", a.Url),
+		sql.Named("user_id", a.UserId),
+		sql.Named("username", a.Username),
+	)
 }
 
-func (Cache) insertCommit(transaction *sql.Tx, c Commit) (sql.Result, error) {
-	const insertQuery = "INSERT INTO vcs_commit(id, sha, ref, message, compare_url) VALUES (?, ?, ?, ?, ?);"
-	return transaction.Exec(insertQuery, c.Id, c.Sha, c.Ref, c.Message, c.CompareUrl)
+func (r Repository) insert(transaction *sql.Tx) (sql.Result, error) {
+	return transaction.Exec(
+		"INSERT INTO vcs_repository(account_id, id, name, url) VALUES (:account_id, :id, :name, :url);",
+		sql.Named("account_id", r.AccountId),
+		sql.Named("id", r.Id),
+		sql.Named("name", r.Name),
+		sql.Named("url", r.Url),
+	)
 }
 
-func (Cache) insertConfig(transaction *sql.Tx, c Config) (sql.Result, error) {
-	const insertQuery = `
-		INSERT OR IGNORE INTO job_config(name, os, os_distrib, lang, env, json) 
-		VALUES (?, ?, ?, ?, ?, ?);
-	`
-	return transaction.Exec(insertQuery, c.Name, c.Os, c.Distrib, c.Language, c.Env, c.Json)
+func (c Commit) insert(transaction *sql.Tx) (sql.Result, error) {
+	return transaction.Exec(
+		"INSERT INTO vcs_commit(account_id, id, repository_id, message) VALUES (:account_id, :id, :repository_id, :message);",
+		sql.Named("account_id", c.AccountId),
+		sql.Named("id", c.Id),
+		sql.Named("repository_id", c.RepositoryId),
+		sql.Named("message", c.Message),
+	)
 }
 
-func (c Cache) insertJob(transaction *sql.Tx, j Job, stageId int) (sql.Result, error) {
-	const insertQuery = `
-		INSERT INTO job(id, stage_id, state, repository, repo_job_number, log, config_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?);
-	`
-	res, err := c.insertConfig(transaction, j.Config)
-	if err != nil {
-		return res, err
-	}
-
-	configId, err := res.LastInsertId()
-	if err != nil {
-		return res, err
-	}
-	return transaction.Exec(insertQuery, j.Id, stageId, j.State, "", j.Number, j.Log, configId)
+func (b Build) insert(transaction *sql.Tx) (sql.Result, error) {
+	return transaction.Exec(
+		"INSERT INTO build(account_id, id, commit_id, repo_build_number, state) VALUES (:account_id, :id, :commit_id, :repo_build_number, :state);",
+		sql.Named("account_id", b.AccountId),
+		sql.Named("id", b.Id),
+		sql.Named("commit_id", b.CommitId),
+		sql.Named("repo_build_number", b.RepoBuildNumber),
+		sql.Named("state", b.State),
+	)
 }
 
-func (c Cache) insertStage(transaction *sql.Tx, s Stage, buildId int) (sql.Result, error) {
-	const insertQuery = "INSERT INTO stage(id, build_id, number, name, state) VALUES (?, ?, ?, ?, ?);"
-	for _, job := range s.Jobs {
-		res, err := c.insertJob(transaction, job, s.Id)
-		if err != nil {
-			return res, err
-		}
-	}
-
-	return transaction.Exec(insertQuery, s.Id, buildId, s.Number, s.Name, s.State)
+func (s Stage) insert(transaction *sql.Tx) (sql.Result, error) {
+	return transaction.Exec(
+		"INSERT INTO stage(account_id, id, build_id, number, name, state) VALUES (:account_id, :id, :build_id, :number, :name, :state);",
+		sql.Named("account_id", s.AccountId),
+		sql.Named("id", s.Id),
+		sql.Named("build_id", s.BuildId),
+		sql.Named("number", s.Number),
+		sql.Named("name", s.Name),
+		sql.Named("state", s.State),
+	)
 }
 
-func (c Cache) insertBuild(transaction *sql.Tx, b Build) (sql.Result, error) {
-	const insertQuery = "INSERT INTO build(id, state, repository, repo_build_number, commit_id) VALUES (?, ?, ?, ?, ?);"
-	res, err := c.insertCommit(transaction, b.Commit)
-	if err != nil {
-		return res, err
+func (j Job) insert(transaction *sql.Tx) (sql.Result, error) {
+	var stageId sql.NullInt64
+	if j.StageId != nil {
+		stageId.Valid = true
+		stageId.Int64 = int64(*j.StageId)
 	}
-	for _, stage := range b.Stages {
-		res, err := c.insertStage(transaction, stage, b.Id)
-		if err != nil {
-			return res, err
-		}
-	}
-	return transaction.Exec(insertQuery, b.Id, b.State, b.Repository, b.RepoBuildNumber, b.Commit.Id)
+	return transaction.Exec(
+		"INSERT INTO job(account_id, id, build_id, stage_id, state, repo_job_number, log) VALUES (:account_id, :id, :build_id, :stage_id, :state, :repo_job_number, :log);",
+		sql.Named("account_id", j.AccountId),
+		sql.Named("id", j.Id),
+		sql.Named("build_id", j.BuildId),
+		sql.Named("stage_id", stageId),
+		sql.Named("state", j.State),
+		sql.Named("repo_job_number", j.Number),
+		sql.Named("log", j.Log),
+	)
 }

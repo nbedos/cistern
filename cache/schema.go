@@ -1,56 +1,73 @@
 package cache
 
+/*
+	TODO url + user_id may be a good primary key for 'account'
+ */
+
 const CurrentSchema = `
-CREATE TABLE vcs_commit
+CREATE TABLE account
 (
-    id          INTEGER PRIMARY KEY,
-    sha         TEXT NOT NULL,
-    ref         TEXT,
-    message     TEXT NOT NULL,
-    compare_url TEXT NOT NULL
+    id       TEXT PRIMARY KEY,
+    url      TEXT NOT NULL,
+    user_id  TEXT NOT NULL,
+    username TEXT NOT NULL,
+    UNIQUE (url, user_id, username)
 );
 
-CREATE TABLE job_config
+CREATE TABLE vcs_repository
 (
-    id         INTEGER PRIMARY KEY,
-    name       TEXT,
-    os         TEXT,
-    os_distrib TEXT,
-    lang       TEXT,
-    env        TEXT,
-    json       TEXT NOT NULL UNIQUE
+    account_id TEXT NOT NULL,
+    id         INTEGER NOT NULL,
+    name       TEXT    NOT NULL,
+    url        TEXT    NOT NULL,
+    PRIMARY KEY (account_id, id),
+	FOREIGN KEY (account_id) REFERENCES account (id)
+);
+
+CREATE TABLE vcs_commit
+(
+    account_id    TEXT NOT NULL,
+    id            TEXT NOT NULL,
+    repository_id INTEGER NOT NULL,
+    message       TEXT    NOT NULL,
+    PRIMARY KEY (account_id, id),
+    FOREIGN KEY (account_id, repository_id) REFERENCES vcs_repository (account_id, id)
 );
 
 CREATE TABLE build
 (
-    id                INTEGER PRIMARY KEY,
-    state             TEXT    NOT NULL,
-    repository        TEXT    NOT NULL,
-    repo_build_number TEXT    NOT NULL,
+    account_id        TEXT NOT NULL,
+    id                INTEGER NOT NULL,
     commit_id         INTEGER NOT NULL,
-    FOREIGN KEY (commit_id) REFERENCES vcs_commit (id)
+    repo_build_number TEXT    NOT NULL,
+    state             TEXT    NOT NULL,
+    PRIMARY KEY (account_id, id),
+    FOREIGN KEY (account_id, commit_id) references vcs_commit (account_id, id)
 );
 
 CREATE TABLE stage
 (
-    id       INTEGER PRIMARY KEY,
-    build_id INTEGER NOT NULL,
-    number   TEXT    NOT NULL,
-    name     TEXT    NOT NULL,
-    state    TEXT    NOT NULL,
-    FOREIGN KEY (build_id) REFERENCES build (id)
+    account_id TEXT NOT NULL,
+    id         INTEGER NOT NULL,
+    build_id   INTEGER NOT NULL,
+    number     TEXT    NOT NULL,
+    name       TEXT    NOT NULL,
+    state      TEXT    NOT NULL,
+    PRIMARY KEY (account_id, id, build_id),
+    FOREIGN KEY (account_id, build_id) references build (account_id, id)
 );
 
 CREATE TABLE job
 (
-    id              INTEGER PRIMARY KEY,
-    stage_id        INTEGER NOT NULL,
+    account_id      TEXT NOT NULL,
+    id              INTEGER NOT NULL,
+    build_id        INTEGER NOT NULL,
+    stage_id        INTEGER,
     state           TEXT    NOT NULL,
-    repository      TEXT    NOT NULL,
     repo_job_number TEXT    NOT NULL,
     log             TEXT    NOT NULL,
-    config_id       INTEGER NOT NULL,
-    FOREIGN KEY (stage_id) REFERENCES stage (id),
-    FOREIGN KEY (config_id) REFERENCES job_config (id)
+    PRIMARY KEY (account_id, id),
+    FOREIGN KEY (account_id, build_id) references build (account_id, id),
+    FOREIGN KEY (account_id, stage_id, build_id) references stage (account_id, id, build_id)
 );
 `

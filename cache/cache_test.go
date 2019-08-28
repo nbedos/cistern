@@ -7,7 +7,7 @@ import (
 )
 
 func TestCache_connect(t *testing.T) {
-	dir, err := ioutil.TempDir("", "TestCacheDb")
+	dir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Error(err)
 	}
@@ -43,7 +43,7 @@ func TestCache_connect(t *testing.T) {
 			cache := Cache{FilePath: tc.filePath}
 			err := cache.connect(true)
 			if err != tc.err {
-				t.Errorf("TestCacheDb: test case '%s' failed (err='%s')", tc.name, err)
+				t.Errorf("test case '%s' failed (err='%s')", tc.name, err)
 			} else if err == nil {
 				defer func() {
 					if errClose := cache.Close(); err == nil && errClose != nil {
@@ -61,50 +61,11 @@ func TestCache_connect(t *testing.T) {
 	}
 }
 
-func TestCache_SaveBuild(t *testing.T) {
-	dir, err := ioutil.TempDir("", "TestLoadBuilds")
+func TestCache_Save(t *testing.T) {
+	dir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Error(err)
 	}
-
-	build := Build{
-		Id:              42,
-		State:           "passed",
-		Repository:      "citop",
-		RepoBuildNumber: "65",
-		Commit: Commit{
-			Id:         64,
-			Sha:        "azertyuiop",
-			Ref:        "feature/xxx",
-			Message:    "abcd",
-			CompareUrl: "https://example.com/commit",
-		},
-		Stages: []Stage{
-			{
-				Id:     54,
-				Number: 0,
-				Name:   "first stage",
-				State:  "passed",
-				Jobs: []Job{
-					{
-						Id:    62,
-						State: "passed",
-						Config: Config{
-							Name:     "config_1",
-							Os:       "linux",
-							Distrib:  "arch",
-							Language: "python",
-							Env:      "VARIABLE=value",
-							Json:     "{}",
-						},
-						Number: "362.1",
-						Log:    "loglogloglogloglogloglog",
-					},
-				},
-			},
-		},
-	}
-
 	cache := Cache{FilePath: path.Join(dir, "cache.db")}
 	err = cache.connect(true)
 	if err != nil {
@@ -116,8 +77,66 @@ func TestCache_SaveBuild(t *testing.T) {
 		}
 	}()
 
-	err = cache.SaveBuild(build)
-	if err != nil {
-		t.Error(err)
+	stageId := 123
+	inserters := []Inserter{
+		Account{
+			Id:       "gitlab account",
+			Url:      "http://api.example.com/v3",
+			UserId:   "F54E34EA",
+			Username: "username",
+		},
+		Repository{
+			Id:        42,
+			AccountId: "gitlab account",
+			Url:       "http://api.example.com/v3/repos/42",
+			Name:      "namespace/slug",
+		},
+		Commit{
+			AccountId:    "gitlab account",
+			Id:           "22f1e814995f60357b6dd82c8a43d03cd2a4a634",
+			RepositoryId: 42,
+			Message:      "Test GitLab API",
+		},
+		Build{
+			AccountId:       "gitlab account",
+			Id:              3,
+			CommitId:        "22f1e814995f60357b6dd82c8a43d03cd2a4a634",
+			State:           "passed",
+			RepoBuildNumber: "138",
+		},
+		Stage{
+			AccountId: "gitlab account",
+			Id: stageId,
+			BuildId: 3,
+			Number: 1,
+			Name: "tests",
+			State: "passed",
+		},
+		Job{
+			AccountId: "gitlab account",
+			Id: 5,
+			BuildId: 3,
+			StageId: &stageId,
+			State: "passed",
+			Number: "138.1",
+			Log: "<not retrieved>",
+		},
+		Job{
+			AccountId: "gitlab account",
+			Id: 6,
+			BuildId: 3,
+			StageId: nil,
+			State: "passed",
+			Number: "138.1",
+			Log: "<not retrieved>",
+		},
 	}
+
+	for _, item := range inserters {
+		err = cache.Save(item)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
 }
