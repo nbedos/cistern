@@ -37,7 +37,6 @@ type Commit struct {
 	Id           string
 	RepositoryId int
 	Message      string
-	Builds       []Build
 }
 
 type Build struct {

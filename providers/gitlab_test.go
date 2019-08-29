@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestGetUserBuilds(t *testing.T) {
+func TestGitLabGetUserBuilds(t *testing.T) {
 	token := os.Getenv("GITLAB_API_TOKEN")
 	if token == "" {
 		t.Fatal("Environment variable GITLAB_API_TOKEN is not set")

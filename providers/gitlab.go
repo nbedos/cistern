@@ -51,7 +51,6 @@ func (c GitLabClient) GetUserBuilds(token string, user string) ([]cache.Inserter
 				Id:           commit.ID,
 				RepositoryId: project.ID,
 				Message:      commit.Message,
-				Builds:       nil,
 			}
 			inserters = append(inserters, cacheCommit)
 			commitShaToId[cacheCommit.Id] = true
