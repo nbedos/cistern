@@ -41,3 +41,6 @@ steps:
 - script: go test -v ./...
   workingDirectory: '$(modulePath)'
   displayName: 'Run tests'
+  env:
+    TRAVIS_API_TOKEN: $(TRAVIS_API_TOKEN)
+    GITLAB_API_TOKEN: $(GITLAB_API_TOKEN)
