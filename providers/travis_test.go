@@ -36,7 +36,7 @@ func Test_RecentRepoBuilds(t *testing.T) {
 	}
 }
 
-func TestTravisclient_fetchRepository(t *testing.T) {
+func TestTravisclient_Repository(t *testing.T) {
 	token := os.Getenv("TRAVIS_API_TOKEN")
 	if token == "" {
 		t.Fatal("Environment variable TRAVIS_API_TOKEN is not set")
@@ -45,7 +45,7 @@ func TestTravisclient_fetchRepository(t *testing.T) {
 	client := NewTravisClient(TravisOrgURL, TravisPusherHost, token, "travis", time.Millisecond*time.Duration(50))
 
 	t.Run("repository found", func(t *testing.T) {
-		repo, err := client.fetchRepository(context.Background(), "nbedos/citop")
+		repo, err := client.Repository(context.Background(), "https://github.com/nbedos/citop")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -55,7 +55,7 @@ func TestTravisclient_fetchRepository(t *testing.T) {
 	})
 
 	t.Run("repository not found", func(t *testing.T) {
-		_, err := client.fetchRepository(context.Background(), "nbedos/citop-404")
+		_, err := client.Repository(context.Background(), "https://github.com/nbedos/citop-404")
 		switch e := err.(type) {
 		case HTTPError:
 			if e.Status != 404 {
@@ -66,40 +66,3 @@ func TestTravisclient_fetchRepository(t *testing.T) {
 		}
 	})
 }
-
-/*
-func Test_Monitor(t *testing.T) {
-	token := os.Getenv("TRAVIS_API_TOKEN")
-	if token == "" {
-		t.Fatal("Environment variable TRAVIS_API_TOKEN is not set")
-	}
-
-	client := NewTravisClient(TravisOrgURL, TravisPusherHost, token, "travis", time.Millisecond*time.Duration(50))
-
-	repositoryID := "25564643"
-
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	c := make(chan []cache.Inserter)
-	errc := make(chan error)
-
-	go func() {
-		errc <- client.Monitor(ctx, c, repositoryID, 20, 5)
-	}()
-
-forever:
-	for {
-		select {
-		case <-c:
-			t.Log("received inserters")
-		case err := <-errc:
-			switch {
-			case errors.Is(err, context.DeadlineExceeded):
-				break forever
-			case err == nil:
-				break forever
-			default:
-				t.Fatalf("received error %v", err)
-			}
-		}
-	}
-}*/

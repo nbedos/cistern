@@ -18,6 +18,7 @@ import (
 type Requester interface {
 	AccountID() string
 	Builds(ctx context.Context, repository Repository, duration time.Duration, inserters chan<- []Inserter) error
+	Repository(ctx context.Context, repositoryURL string) (Repository, error)
 }
 
 type Inserter interface {
@@ -152,29 +153,6 @@ func NewCache(filePath string, removeExisting bool, requesters []Requester) (Cac
 
 func (c Cache) Close() (err error) {
 	return c.db.Close()
-}
-
-func (c Cache) FindRepository(ctx context.Context, accountID string, URL string) (Repository, error) {
-	query := `
-		SELECT owner, name, remote_id
-		FROM vcs_repository
-		WHERE account_id = :account_id AND url = :url
-	`
-
-	repository := Repository{
-		AccountID: accountID,
-		URL:       URL,
-	}
-
-	err := c.db.
-		QueryRowContext(ctx, query, sql.Named("account_id", accountID), sql.Named("url", URL)).
-		Scan(&repository.Owner, &repository.Name, &repository.RemoteID)
-
-	if err != nil && err != sql.ErrNoRows {
-		return repository, err
-	}
-
-	return repository, nil
 }
 
 // Serialize write operations for safe use across multiple goroutines

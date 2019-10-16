@@ -58,6 +58,12 @@ func RunWidgetApp() (err error) {
 		return
 	}
 
+	circleciToken := os.Getenv("CIRCLECI_API_TOKEN")
+	if gitlabToken == "" {
+		err = errors.New("environment variable CIRCLECI_API_TOKEN is not set")
+		return
+	}
+
 	tmpDir, err := ioutil.TempDir("", "citop")
 	if err != nil {
 		return err
@@ -84,6 +90,12 @@ func RunWidgetApp() (err error) {
 			"gitlab",
 			gitlabToken,
 			100*time.Millisecond),
+
+		providers.NewCircleCIClient(
+			providers.CircleCIURL,
+			"circleci",
+			circleciToken,
+			100*time.Millisecond),
 	}
 
 	inserters := []cache.Inserter{
@@ -96,6 +108,12 @@ func RunWidgetApp() (err error) {
 		cache.Account{
 			ID:       "gitlab",
 			URL:      "http://gitlab.example.com/v3",
+			UserID:   "F54E34EA",
+			Username: "username",
+		},
+		cache.Account{
+			ID:       "circleci",
+			URL:      "http://circleci.example.com/v3",
 			UserID:   "F54E34EA",
 			Username: "username",
 		},

@@ -23,11 +23,16 @@ func TestGitLabGetUserBuilds(t *testing.T) {
 
 	c := make(chan []cache.Inserter)
 	errc := make(chan error)
+	ctx := context.Background()
 	go func() {
-		repository := cache.Repository{
-			URL: "https://gitlab.com/nbedos/citop",
+		repository, err := client.Repository(ctx, "https://gitlab.com/nbedos/citop")
+		if err != nil {
+			close(c)
+			errc <- err
+			return
 		}
-		err := client.LastBuilds(context.Background(), repository, 20, c)
+		c <- []cache.Inserter{repository}
+		err = client.LastBuilds(ctx, repository, 20, c)
 		close(c)
 		errc <- err
 	}()

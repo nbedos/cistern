@@ -344,67 +344,12 @@ func NewTravisClient(URL url.URL, pusherHost string, token string, accountID str
 	}
 }
 
-func (t TravisClient) pusherClient(ctx context.Context, repositoryID int) (p utils.PusherClient, err error) {
-	pusherKey, private, err := t.fetchPusherConfig(ctx)
-	if err != nil {
-		return p, err
-	}
-
-	wsURL := utils.PusherUrl(t.pusherHost, pusherKey)
-	authURL := t.baseURL
-	authURL.Path += "/pusher/auth"
-	authHeader := map[string]string{
-		"Authorization": fmt.Sprintf("token %s", t.token),
-	}
-
-	// FIXME Requests to "/pusher/auth" should be rate limited too
-	if p, err = utils.NewPusherClient(ctx, wsURL, authURL.String(), authHeader); err != nil {
-		return p, err
-	}
-
-	// FIXME Meh. There must be a better way.
-	if _, err = p.Expect(ctx, utils.ConnectionEstablished); err != nil {
-		return p, err
-	}
-
-	chanFmt := "repo-%d"
-	if private {
-		chanFmt = "private-" + chanFmt
-	}
-	if err := p.Subscribe(ctx, fmt.Sprintf(chanFmt, repositoryID)); err != nil {
-		return p, err
-	}
-
-	if _, err = p.Expect(ctx, utils.SubscriptionSucceeded); err != nil {
-		return p, err
-	}
-
-	return p, nil
-}
-
 func (t TravisClient) AccountID() string {
 	return t.accountID
 }
 
 // FIXME Pass list of builds already cached with update date
 func (t TravisClient) Builds(ctx context.Context, repository cache.Repository, maxAge time.Duration, inserters chan<- []cache.Inserter) error {
-	// Get repository object
-	if repository.RemoteID == 0 {
-		id, err := RepositorySlugFromURL(repository.URL)
-		if err != nil {
-			return err
-		}
-		repository, err = t.fetchRepository(ctx, id)
-		if err != nil {
-			return err
-		}
-		select {
-		case inserters <- []cache.Inserter{repository}:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-
 	// Create Pusher client
 	// FIXME Requests to "/pusher/auth" should be rate limited too
 	p, err := t.pusherClient(ctx, repository.RemoteID)
@@ -425,7 +370,6 @@ func (t TravisClient) Builds(ctx context.Context, repository cache.Repository, m
 		if err != nil {
 			return err
 		}
-		//fmt.Printf("received event %s (%s)\n", event.Event, string(event.Data))
 
 		switch event.Event {
 		case "build:created":
@@ -450,6 +394,30 @@ func (t TravisClient) Builds(ctx context.Context, repository cache.Repository, m
 	}
 
 	return nil
+}
+
+func (t TravisClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
+	slug, err := utils.RepositorySlugFromURL(repositoryURL)
+	if err != nil {
+		return cache.Repository{}, err
+	}
+
+	var reqURL = t.baseURL
+	buildPathFormat := "/repo/%s"
+	reqURL.Path += fmt.Sprintf(buildPathFormat, slug)
+	reqURL.RawPath += fmt.Sprintf(buildPathFormat, url.PathEscape(slug))
+
+	body, err := t.get(ctx, reqURL)
+	if err != nil {
+		return cache.Repository{}, err
+	}
+
+	travisRepo := travisRepository{}
+	if err = json.Unmarshal(body.Bytes(), &travisRepo); err != nil {
+		return cache.Repository{}, err
+	}
+
+	return travisRepo.ToInserter(t.accountID), nil
 }
 
 // Rate-limited HTTP GET request with custom headers
@@ -482,12 +450,10 @@ func (t TravisClient) get(ctx context.Context, resourceURL url.URL) (*bytes.Buff
 			ErrorType    string `json:"error_type"`
 			ErrorMessage string `json:"error_message"`
 		}
-
 		message := ""
 		if jsonErr := json.Unmarshal(body.Bytes(), &errResp); jsonErr == nil {
 			message = errResp.ErrorMessage
 		}
-
 		err = HTTPError{
 			Method:  req.Method,
 			URL:     req.URL.String(),
@@ -511,29 +477,10 @@ func (err HTTPError) Error() string {
 		err.Method, err.URL, err.Status, err.Message)
 }
 
-func (t TravisClient) fetchRepository(ctx context.Context, id string) (cache.Repository, error) {
-	var reqURL = t.baseURL
-	buildPathFormat := "/repo/%s"
-	reqURL.Path += fmt.Sprintf(buildPathFormat, id)
-	reqURL.RawPath += fmt.Sprintf(buildPathFormat, url.PathEscape(id))
-
-	body, err := t.get(ctx, reqURL)
-	if err != nil {
-		return cache.Repository{}, err
-	}
-
-	travisRepo := travisRepository{}
-	if err = json.Unmarshal(body.Bytes(), &travisRepo); err != nil {
-		return cache.Repository{}, err
-	}
-
-	return travisRepo.ToInserter(t.accountID), nil
-}
-
 func (t TravisClient) fetchBuild(ctx context.Context, repositoryURL string, buildID int, webURL string) ([]cache.Inserter, error) {
 	buildURL := t.baseURL
 	buildURL.Path += fmt.Sprintf("/build/%d", buildID)
-	parameters := url.Values{}
+	parameters := buildURL.Query()
 	parameters.Add("include", "build.jobs,build.commit,job.config")
 	buildURL.RawQuery = parameters.Encode()
 
@@ -552,25 +499,16 @@ func (t TravisClient) fetchBuild(ctx context.Context, repositoryURL string, buil
 	return build.ToInserters(t.accountID, repositoryURL, webURL)
 }
 
-func RepositorySlugFromURL(repositoryURL string) (string, error) {
-	URL, err := url.Parse(repositoryURL)
-	if err != nil {
-		return "", err
-	}
-
-	return strings.Trim(URL.Path, "/"), nil
-}
-
 func (t TravisClient) fetchBuilds(ctx context.Context, repositoryURL string, offset int, pageSize int, c chan<- []cache.Inserter) error {
 	var buildsURL = t.baseURL
 	buildPathFormat := "/repo/%v/builds"
-	repositorySlug, err := RepositorySlugFromURL(repositoryURL)
+	repositorySlug, err := utils.RepositorySlugFromURL(repositoryURL)
 	if err != nil {
 		return err
 	}
 	buildsURL.Path += fmt.Sprintf(buildPathFormat, repositorySlug)
 	buildsURL.RawPath += fmt.Sprintf(buildPathFormat, url.PathEscape(repositorySlug))
-	parameters := url.Values{}
+	parameters := buildsURL.Query()
 	parameters.Add("limit", strconv.Itoa(pageSize))
 	parameters.Add("offset", strconv.Itoa(offset))
 	buildsURL.RawQuery = parameters.Encode()
@@ -716,6 +654,44 @@ func (t TravisClient) fetchJobLog(ctx context.Context, job travisJob) (travisJob
 	}
 
 	return job, nil
+}
+
+func (t TravisClient) pusherClient(ctx context.Context, repositoryID int) (p utils.PusherClient, err error) {
+	pusherKey, private, err := t.fetchPusherConfig(ctx)
+	if err != nil {
+		return p, err
+	}
+
+	wsURL := utils.PusherUrl(t.pusherHost, pusherKey)
+	authURL := t.baseURL
+	authURL.Path += "/pusher/auth"
+	authHeader := map[string]string{
+		"Authorization": fmt.Sprintf("token %s", t.token),
+	}
+
+	// FIXME Requests to "/pusher/auth" should be rate limited too
+	if p, err = utils.NewPusherClient(ctx, wsURL, authURL.String(), authHeader); err != nil {
+		return p, err
+	}
+
+	// FIXME Meh. There must be a better way.
+	if _, err = p.Expect(ctx, utils.ConnectionEstablished); err != nil {
+		return p, err
+	}
+
+	chanFmt := "repo-%d"
+	if private {
+		chanFmt = "private-" + chanFmt
+	}
+	if err := p.Subscribe(ctx, fmt.Sprintf(chanFmt, repositoryID)); err != nil {
+		return p, err
+	}
+
+	if _, err = p.Expect(ctx, utils.SubscriptionSucceeded); err != nil {
+		return p, err
+	}
+
+	return p, nil
 }
 
 func (t TravisClient) fetchPusherConfig(ctx context.Context) (string, bool, error) {

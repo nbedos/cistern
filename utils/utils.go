@@ -1,8 +1,12 @@
 package utils
 
 import (
+	"database/sql"
+	"fmt"
 	"github.com/mattn/go-runewidth"
+	"net/url"
 	"strings"
+	"time"
 )
 
 func MaxInt(a, b int) int {
@@ -94,4 +98,48 @@ func depthFirstTraversalPrefixing(node TreeNode, indent string, last bool) {
 			depthFirstTraversalPrefixing(children[i], indent+childIndent, i == len(children)-1)
 		}
 	}
+}
+
+func Coalesce(times ...sql.NullTime) sql.NullTime {
+	for _, t := range times {
+		if t.Valid {
+			return t
+		}
+	}
+
+	return sql.NullTime{}
+}
+
+func RepositorySlugFromURL(repositoryURL string) (string, error) {
+	u, err := url.Parse(repositoryURL)
+	if err != nil {
+		return "", err
+	}
+
+	components := strings.Split(u.Path, "/")
+	if len(components) < 3 {
+		return "", fmt.Errorf("invalid repository path: '%s' (expected at least three components)",
+			u.Path)
+	}
+
+	return strings.Join(components[1:3], "/"), nil
+}
+
+func NullTimeFrom(t *time.Time) sql.NullTime {
+	if t == nil {
+		return sql.NullTime{}
+	}
+	return sql.NullTime{
+		Time:  *t,
+		Valid: true,
+	}
+}
+
+func Prefix(s string, prefix string) string {
+	builder := strings.Builder{}
+	for _, line := range strings.Split(s, "\n") {
+		builder.WriteString(fmt.Sprintf("%s%s\n", prefix, line))
+	}
+
+	return builder.String()
 }

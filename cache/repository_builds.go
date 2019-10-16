@@ -131,13 +131,14 @@ func (s *RepositoryBuilds) FetchData(ctx context.Context, updates chan time.Time
 		go func(r Requester) {
 			defer wg.Done()
 
-			repo, err := s.cache.FindRepository(subCtx, r.AccountID(), s.repositoryURL)
+			repository, err := r.Repository(subCtx, s.repositoryURL)
 			if err != nil {
 				errc <- err
 				return
 			}
-			// FIXME Dynamically check if repository cached or not
-			if err := r.Builds(subCtx, repo, 0, insertersChannel); err != nil {
+			insertersChannel <- []Inserter{repository}
+
+			if err := r.Builds(subCtx, repository, 0, insertersChannel); err != nil {
 				errc <- err
 				return
 			}

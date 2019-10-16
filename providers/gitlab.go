@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/nbedos/citop/cache"
+	"github.com/nbedos/citop/utils"
 	"github.com/xanzy/go-gitlab"
 	"strconv"
 	"strings"
@@ -35,14 +36,29 @@ func (c GitLabClient) Builds(ctx context.Context, repository cache.Repository, d
 	return c.LastBuilds(ctx, repository, 20, inserters)
 }
 
-func NullTimeFrom(t *time.Time) sql.NullTime {
-	if t == nil {
-		return sql.NullTime{}
+func (c GitLabClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
+	repositorySlug, err := utils.RepositorySlugFromURL(repositoryURL)
+	if err != nil {
+		return cache.Repository{}, err
 	}
-	return sql.NullTime{
-		Time:  *t,
-		Valid: true,
+
+	select {
+	case <-c.rateLimiter:
+	case <-ctx.Done():
+		return cache.Repository{}, ctx.Err()
 	}
+	project, _, err := c.remote.Projects.GetProject(repositorySlug, nil, gitlab.WithContext(ctx))
+	if err != nil {
+		return cache.Repository{}, err
+	}
+
+	return cache.Repository{
+		Owner:     project.Owner.Username,
+		Name:      project.Name,
+		URL:       project.WebURL,
+		AccountID: c.accountID,
+		RemoteID:  project.ID,
+	}, nil
 }
 
 func FromGitLabState(s string) cache.State {
@@ -65,36 +81,6 @@ func FromGitLabState(s string) cache.State {
 }
 
 func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repository, limit int, insertersc chan<- []cache.Inserter) error {
-	if repository.RemoteID == 0 {
-		// TODO Bundle all this into a function
-		repositorySlug, err := RepositorySlugFromURL(repository.URL)
-		if err != nil {
-			return err
-		}
-		select {
-		case <-c.rateLimiter:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-		project, _, err := c.remote.Projects.GetProject(repositorySlug, nil, gitlab.WithContext(ctx))
-		if err != nil {
-			return err
-		}
-
-		repository = cache.Repository{
-			Owner:     project.Owner.Username,
-			Name:      project.Name,
-			URL:       project.WebURL,
-			AccountID: c.accountID,
-			RemoteID:  project.ID,
-		}
-		select {
-		case insertersc <- []cache.Inserter{repository}:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-
 	opt := gitlab.ListProjectPipelinesOptions{
 		ListOptions: gitlab.ListOptions{PerPage: limit},
 	}
@@ -136,7 +122,7 @@ func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repositor
 	}()
 
 	for e := range errc {
-		if err != nil {
+		if err == nil {
 			err = e
 		}
 	}
@@ -172,7 +158,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 		ID:            commit.ID,
 		RepositoryURL: repositoryURL,
 		Message:       commit.Message,
-		Date:          NullTimeFrom(commit.AuthoredDate),
+		Date:          utils.NullTimeFrom(commit.AuthoredDate),
 	}
 
 	inserters = append(inserters, cacheCommit)
@@ -189,9 +175,9 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 		IsTag:           pipeline.Tag,
 		RepoBuildNumber: strconv.Itoa(pipeline.ID),
 		State:           FromGitLabState(pipeline.Status),
-		CreatedAt:       NullTimeFrom(pipeline.CreatedAt),
-		StartedAt:       NullTimeFrom(pipeline.StartedAt),
-		FinishedAt:      NullTimeFrom(pipeline.FinishedAt),
+		CreatedAt:       utils.NullTimeFrom(pipeline.CreatedAt),
+		StartedAt:       utils.NullTimeFrom(pipeline.StartedAt),
+		FinishedAt:      utils.NullTimeFrom(pipeline.FinishedAt),
 		UpdatedAt:       *pipeline.UpdatedAt,
 		Duration:        sql.NullInt64{Int64: int64(pipeline.Duration), Valid: pipeline.Duration > 0},
 		WebURL:          pipeline.WebURL,
@@ -258,9 +244,9 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 				State:      FromGitLabState(job.Status),
 				Name:       job.Name,
 				Log:        buf.String(),
-				CreatedAt:  NullTimeFrom(job.CreatedAt),
-				StartedAt:  NullTimeFrom(job.StartedAt),
-				FinishedAt: NullTimeFrom(job.FinishedAt),
+				CreatedAt:  utils.NullTimeFrom(job.CreatedAt),
+				StartedAt:  utils.NullTimeFrom(job.StartedAt),
+				FinishedAt: utils.NullTimeFrom(job.FinishedAt),
 				Duration:   sql.NullInt64{Int64: int64(job.Duration), Valid: int64(job.Duration) > 0},
 			}
 		}(job, jobIndex)
