@@ -120,10 +120,10 @@ func (c *Cache) NewRepositoryBuilds(repositoryURL string, updates chan time.Time
 }
 
 func (s *RepositoryBuilds) FetchData(ctx context.Context, updates chan time.Time) error {
-	insertersChannel := make(chan []Inserter)
 	errc := make(chan error)
 
 	subCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	wg := sync.WaitGroup{}
 	for _, requester := range s.cache.requesters {
@@ -131,43 +131,52 @@ func (s *RepositoryBuilds) FetchData(ctx context.Context, updates chan time.Time
 		go func(r Requester) {
 			defer wg.Done()
 
+			// Update cache with repository
 			repository, err := r.Repository(subCtx, s.repositoryURL)
 			if err != nil {
 				errc <- err
 				return
 			}
-			insertersChannel <- []Inserter{repository}
-
-			if err := r.Builds(subCtx, repository, 0, insertersChannel); err != nil {
+			if err := s.cache.Save(subCtx, []Inserter{repository}); err != nil {
 				errc <- err
 				return
 			}
-		}(requester)
-	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case inserters := <-insertersChannel:
-				if err := s.cache.Save(subCtx, inserters); err != nil {
-					errc <- err
+			// Save each build returned by the Requester to the cache
+			buildc := make(chan Build)
+			buildErrc := make(chan error)
+			go func() {
+				buildErrc <- r.Builds(subCtx, repository, 0, buildc)
+			}()
+
+			for {
+				select {
+				case build := <-buildc:
+					if err := s.cache.Save(subCtx, []Inserter{build}); err != nil {
+						errc <- err
+						return
+					}
+					wg.Add(1)
+					// Signal database change on update channel but don't block current goroutine
+					go func() {
+						defer wg.Done()
+						select {
+						case updates <- time.Now():
+						case <-subCtx.Done():
+						}
+					}()
+				case err := <-buildErrc:
+					if err != nil {
+						errc <- err
+					}
+					return
+				case <-subCtx.Done():
+					errc <- subCtx.Err()
 					return
 				}
-				// Signal database update without blocking the current goroutine
-				go func() {
-					select {
-					case updates <- time.Now():
-					case <-subCtx.Done():
-					}
-				}()
-			case <-subCtx.Done():
-				errc <- subCtx.Err()
-				return
 			}
-		}
-	}()
+		}(requester)
+	}
 
 	go func() {
 		wg.Wait()
@@ -177,8 +186,7 @@ func (s *RepositoryBuilds) FetchData(ctx context.Context, updates chan time.Time
 
 	var err error
 	for e := range errc {
-		// Cancel all goroutines on first error
-		if err == nil && e != nil {
+		if err != nil && e != nil {
 			err = e
 			cancel()
 		}

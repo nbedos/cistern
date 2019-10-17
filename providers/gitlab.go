@@ -32,8 +32,8 @@ func (c GitLabClient) AccountID() string {
 	return c.accountID
 }
 
-func (c GitLabClient) Builds(ctx context.Context, repository cache.Repository, duration time.Duration, inserters chan<- []cache.Inserter) error {
-	return c.LastBuilds(ctx, repository, 20, inserters)
+func (c GitLabClient) Builds(ctx context.Context, repository cache.Repository, duration time.Duration, buildc chan<- cache.Build) error {
+	return c.LastBuilds(ctx, repository, 20, buildc)
 }
 
 func (c GitLabClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
@@ -80,7 +80,7 @@ func FromGitLabState(s string) cache.State {
 	}
 }
 
-func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repository, limit int, insertersc chan<- []cache.Inserter) error {
+func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repository, limit int, buildc chan<- cache.Build) error {
 	opt := gitlab.ListProjectPipelinesOptions{
 		ListOptions: gitlab.ListOptions{PerPage: limit},
 	}
@@ -102,13 +102,13 @@ func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repositor
 		wg.Add(1)
 		go func(pipelineID int) {
 			defer wg.Done()
-			buildInserters, err := c.fetchBuild(ctx, repository.RemoteID, repository.URL, pipelineID)
+			build, err := c.fetchBuild(ctx, repository.RemoteID, repository.URL, pipelineID)
 			if err != nil {
 				errc <- err
 				return
 			}
 			select {
-			case insertersc <- buildInserters:
+			case buildc <- build:
 			case <-ctx.Done():
 				errc <- ctx.Err()
 			}
@@ -130,27 +130,25 @@ func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repositor
 	return err
 }
 
-func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryURL string, pipelineID int) ([]cache.Inserter, error) {
-	inserters := make([]cache.Inserter, 0)
-
+func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryURL string, pipelineID int) (build cache.Build, err error) {
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return build, ctx.Err()
 	}
 	pipeline, _, err := c.remote.Pipelines.GetPipeline(projectID, pipelineID, gitlab.WithContext(ctx))
 	if err != nil {
-		return inserters, err
+		return build, err
 	}
 
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return build, ctx.Err()
 	}
 	commit, _, err := c.remote.Commits.GetCommit(projectID, pipeline.SHA, gitlab.WithContext(ctx))
 	if err != nil {
-		return inserters, err
+		return build, err
 	}
 
 	cacheCommit := cache.Commit{
@@ -161,16 +159,14 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 		Date:          utils.NullTimeFrom(commit.AuthoredDate),
 	}
 
-	inserters = append(inserters, cacheCommit)
-
 	if pipeline.UpdatedAt == nil {
-		return inserters, fmt.Errorf("missing UpdatedAt data for pipeline #%d", pipeline.ID)
+		return build, fmt.Errorf("missing UpdatedAt data for pipeline #%d", pipeline.ID)
 	}
-	cacheBuild := cache.Build{
+	build = cache.Build{
 		AccountID:       c.accountID,
 		ID:              pipeline.ID,
 		RepositoryURL:   repositoryURL,
-		CommitID:        pipeline.SHA,
+		Commit:          cacheCommit,
 		Ref:             pipeline.Ref,
 		IsTag:           pipeline.Tag,
 		RepoBuildNumber: strconv.Itoa(pipeline.ID),
@@ -182,29 +178,30 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 		Duration:        sql.NullInt64{Int64: int64(pipeline.Duration), Valid: pipeline.Duration > 0},
 		WebURL:          pipeline.WebURL,
 	}
-	inserters = append(inserters, cacheBuild)
 
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return build, ctx.Err()
 	}
 	jobs, _, err := c.remote.Jobs.ListPipelineJobs(projectID, pipeline.ID, nil, gitlab.WithContext(ctx))
 	if err != nil {
-		return inserters, nil
+		return build, nil
 	}
 
-	stages := make(map[string]cache.Stage)
+	stagesByName := make(map[string]*cache.Stage)
+	stagesById := make(map[int]*cache.Stage)
 	for _, job := range jobs {
-		if _, exists := stages[job.Stage]; !exists {
-			stages[job.Stage] = cache.Stage{
-				AccountID: cacheBuild.AccountID,
-				BuildID:   cacheBuild.ID,
-				ID:        len(stages) + 1,
+		if _, exists := stagesByName[job.Stage]; !exists {
+			stage := cache.Stage{
+				AccountID: build.AccountID,
+				BuildID:   build.ID,
+				ID:        len(stagesByName) + 1,
 				Name:      job.Stage,
 				State:     cache.Unknown,
 			}
-			inserters = append(inserters, stages[job.Stage])
+			stagesByName[job.Stage] = &stage
+			stagesById[stage.ID] = &stage
 		}
 	}
 
@@ -237,8 +234,8 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 			jobc <- cache.Job{
 				Key: cache.JobKey{
 					AccountID: c.accountID,
-					BuildID:   cacheBuild.ID,
-					StageID:   stages[job.Stage].ID,
+					BuildID:   build.ID,
+					StageID:   stagesByName[job.Stage].ID,
 					ID:        jobIndex + 1,
 				},
 				State:      FromGitLabState(job.Status),
@@ -259,8 +256,12 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 	}()
 
 	for job := range jobc {
-		inserters = append(inserters, job)
+		stagesById[job.Key.StageID].Jobs = append(stagesById[job.Key.StageID].Jobs, job)
 	}
 
-	return inserters, <-errc
+	for _, stage := range stagesById {
+		build.Stages = append(build.Stages, *stage)
+	}
+
+	return build, <-errc
 }

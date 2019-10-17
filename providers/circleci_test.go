@@ -16,7 +16,7 @@ func TestCircleCIClientFetchRepositoryBuilds(t *testing.T) {
 
 	client := NewCircleCIClient(CircleCIURL, "", token, 100*time.Millisecond)
 	ctx := context.Background()
-	c := make(chan []cache.Inserter)
+	buildc := make(chan cache.Build)
 	errc := make(chan error, 1)
 
 	repository, err := client.Repository(ctx, "https://github.com/nbedos/citop")
@@ -25,14 +25,14 @@ func TestCircleCIClientFetchRepositoryBuilds(t *testing.T) {
 	}
 
 	go func() {
-		if err := client.fetchRepositoryBuilds(ctx, repository, 20, c); err != nil {
+		if err := client.fetchRepositoryBuilds(ctx, repository, 20, buildc); err != nil {
 			errc <- err
 		}
-		close(c)
+		close(buildc)
 		close(errc)
 	}()
 
-	for range c {
+	for range buildc {
 	}
 
 	if err := <-errc; err != nil {

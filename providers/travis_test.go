@@ -19,16 +19,16 @@ func Test_RecentRepoBuilds(t *testing.T) {
 	client := NewTravisClient(TravisOrgURL, TravisPusherHost, token, "travis", time.Millisecond*time.Duration(50))
 
 	errc := make(chan error)
-	c := make(chan []cache.Inserter)
+	buildc := make(chan cache.Build)
 	go func() {
-		err := client.RepositoryBuilds(context.Background(), citopURL, 20, 5, c)
-		close(c)
+		err := client.RepositoryBuilds(context.Background(), citopURL, 20, 5, buildc)
+		close(buildc)
 		errc <- err
 	}()
 
-	inserters := make([]cache.Inserter, 0)
-	for is := range c {
-		inserters = append(inserters, is...)
+	builds := make([]cache.Build, 0)
+	for build := range buildc {
+		builds = append(builds, build)
 	}
 
 	if err := <-errc; err != nil {

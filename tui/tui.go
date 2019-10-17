@@ -98,6 +98,7 @@ func RunWidgetApp() (err error) {
 			100*time.Millisecond),
 	}
 
+	// FIXME Remove this last reference to Inserter outside of Cache
 	inserters := []cache.Inserter{
 		cache.Account{
 			ID:       "travis",
@@ -144,7 +145,9 @@ func RunWidgetApp() (err error) {
 	ctx := context.Background()
 
 	go func() {
-		errc <- source.FetchData(ctx, updates)
+		if err := source.FetchData(ctx, updates); err != nil {
+			errc <- err
+		}
 	}()
 
 	go func() {

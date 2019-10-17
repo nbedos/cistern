@@ -17,7 +17,7 @@ import (
 // FIXME Find a better name
 type Requester interface {
 	AccountID() string
-	Builds(ctx context.Context, repository Repository, duration time.Duration, inserters chan<- []Inserter) error
+	Builds(ctx context.Context, repository Repository, duration time.Duration, buildc chan<- Build) error
 	Repository(ctx context.Context, repositoryURL string) (Repository, error)
 }
 
@@ -68,7 +68,7 @@ type Build struct {
 	AccountID       string
 	ID              int
 	RepositoryURL   string
-	CommitID        string
+	Commit          Commit
 	Ref             string
 	IsTag           bool
 	RepoBuildNumber string
@@ -79,6 +79,8 @@ type Build struct {
 	UpdatedAt       time.Time
 	Duration        sql.NullInt64
 	WebURL          string
+	Stages          []Stage
+	Jobs            []Job
 }
 
 type Stage struct {
@@ -87,6 +89,7 @@ type Stage struct {
 	ID        int
 	Name      string
 	State     State
+	Jobs      []Job
 }
 
 type JobKey struct {
@@ -224,7 +227,7 @@ func (r Repository) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) 
 func (c Commit) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
 	return tx.ExecContext(
 		ctx,
-		`INSERT INTO vcs_commit(account_id, repository_url, id, message, date)
+		`INSERT OR REPLACE INTO vcs_commit(account_id, repository_url, id, message, date)
 		 VALUES (:account_id, :repository_url, :id, :message, :date)
 		 ON CONFLICT DO NOTHING ;`,
 		sql.Named("account_id", c.AccountID),
@@ -235,8 +238,12 @@ func (c Commit) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
 	)
 }
 
-func (b Build) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
-	return tx.ExecContext(
+func (b Build) insert(ctx context.Context, tx *sql.Tx) (res sql.Result, err error) {
+	if res, err = b.Commit.insert(ctx, tx); err != nil {
+		return
+	}
+
+	res, err = tx.ExecContext(
 		ctx,
 		`INSERT INTO build(
 			account_id,
@@ -272,7 +279,7 @@ func (b Build) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
 		sql.Named("account_id", b.AccountID),
 		sql.Named("id", b.ID),
 		sql.Named("repository_url", b.RepositoryURL),
-		sql.Named("commit_id", b.CommitID),
+		sql.Named("commit_id", b.Commit.ID),
 		sql.Named("ref", b.Ref),
 		sql.Named("is_tag", b.IsTag),
 		sql.Named("repo_build_number", b.RepoBuildNumber),
@@ -284,10 +291,27 @@ func (b Build) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
 		sql.Named("duration", b.Duration),
 		sql.Named("web_url", b.WebURL),
 	)
+	if err != nil {
+		return
+	}
+
+	for _, stage := range b.Stages {
+		if res, err = stage.insert(ctx, tx); err != nil {
+			return
+		}
+	}
+
+	for _, job := range b.Jobs {
+		if res, err = job.insert(ctx, tx); err != nil {
+			return
+		}
+	}
+
+	return
 }
 
-func (s Stage) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
-	return tx.ExecContext(
+func (s Stage) insert(ctx context.Context, tx *sql.Tx) (res sql.Result, err error) {
+	res, err = tx.ExecContext(
 		ctx,
 		`INSERT INTO stage(account_id, build_id, id, name, state)
 		 VALUES (:account_id, :build_id, :id, :name, :state);`,
@@ -297,6 +321,17 @@ func (s Stage) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
 		sql.Named("name", s.Name),
 		sql.Named("state", s.State),
 	)
+	if err != nil {
+		return
+	}
+
+	for _, job := range s.Jobs {
+		if res, err = job.insert(ctx, tx); err != nil {
+			return
+		}
+	}
+
+	return
 }
 
 func nullStringFromNullTime(t sql.NullTime) (s sql.NullString) {

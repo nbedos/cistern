@@ -157,9 +157,9 @@ func (c CircleCIClient) AccountID() string {
 	return c.accountID
 }
 
-func (c CircleCIClient) Builds(ctx context.Context, repository cache.Repository, duration time.Duration, inserters chan<- []cache.Inserter) error {
+func (c CircleCIClient) Builds(ctx context.Context, repository cache.Repository, duration time.Duration, buildc chan<- cache.Build) error {
 	// FIXME Do not hardcode limit
-	return c.fetchRepositoryBuilds(ctx, repository, 20, inserters)
+	return c.fetchRepositoryBuilds(ctx, repository, 20, buildc)
 }
 
 func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
@@ -213,7 +213,7 @@ func (c CircleCIClient) listRecentBuildIDs(ctx context.Context, projectEndpoint 
 	return ids, nil
 }
 
-func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository cache.Repository, limit int, inserters chan<- []cache.Inserter) error {
+func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository cache.Repository, limit int, buildc chan<- cache.Build) error {
 	projectEndpoint := c.projectEndpoint(repository.Owner, repository.Name)
 	buildIDs, err := c.listRecentBuildIDs(ctx, projectEndpoint, limit)
 	if err != nil {
@@ -231,7 +231,7 @@ func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository ca
 				errc <- err
 			}
 			select {
-			case inserters <- build:
+			case buildc <- build:
 			case <-ctx.Done():
 				errc <- ctx.Err()
 			}
@@ -253,16 +253,16 @@ func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository ca
 	return err
 }
 
-func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL, buildID int, repositoryURL string) ([]cache.Inserter, error) {
+func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL, buildID int, repositoryURL string) (build cache.Build, err error) {
 	projectEndpoint.Path += fmt.Sprintf("/%d", buildID)
 	body, err := c.get(ctx, projectEndpoint)
 	if err != nil {
-		return nil, err
+		return build, err
 	}
 
 	var circleCIBuild circleCIBuild
 	if err := json.Unmarshal(body.Bytes(), &circleCIBuild); err != nil {
-		return nil, err
+		return build, err
 	}
 
 	// FIXME Prefix each line by the name of the step in a way compatible with carriage returns
@@ -279,7 +279,7 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 			if action.LogURL != "" {
 				log, err := c.fetchLog(ctx, action.LogURL)
 				if err != nil {
-					return nil, err
+					return build, err
 				}
 
 				fullLog.WriteString(utils.Prefix(log, prefix))
@@ -287,38 +287,31 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 		}
 	}
 
-	commit, err := circleCIBuild.ToCacheCommit(c.accountID, repositoryURL)
+	build, err = circleCIBuild.ToCacheBuild(c.accountID, repositoryURL)
 	if err != nil {
-		return nil, err
-	}
-
-	build, err := circleCIBuild.ToCacheBuild(c.accountID, repositoryURL)
-	if err != nil {
-		return nil, err
+		return build, err
 	}
 
 	// FIXME Creating this job would not be necessary if we could store the log in the build
 	//  itself. Would that be better?
-	job := cache.Job{
-		Key: cache.JobKey{
-			AccountID: c.accountID,
-			BuildID:   buildID,
-			ID:        1,
+	build.Jobs = []cache.Job{
+		{
+			Key: cache.JobKey{
+				AccountID: c.accountID,
+				BuildID:   buildID,
+				ID:        1,
+			},
+			State:      build.State,
+			Name:       build.Commit.Message, // FIXME Jobs should have a specific name, not repeat the commit message
+			CreatedAt:  build.CreatedAt,
+			StartedAt:  build.StartedAt,
+			FinishedAt: build.FinishedAt,
+			Duration:   build.Duration,
+			Log:        fullLog.String(),
 		},
-		State:      build.State,
-		Name:       commit.Message, // FIXME Jobs should have a specific name, not repeat the commit message
-		CreatedAt:  build.CreatedAt,
-		StartedAt:  build.StartedAt,
-		FinishedAt: build.FinishedAt,
-		Duration:   build.Duration,
-		Log:        fullLog.String(),
 	}
 
-	return []cache.Inserter{
-		commit,
-		build,
-		job,
-	}, nil
+	return build, nil
 }
 
 type circleCIBuild struct {
@@ -347,19 +340,16 @@ type circleCIBuild struct {
 }
 
 func (b circleCIBuild) ToCacheBuild(accountID string, repositoryURL string) (cache.Build, error) {
-	isTag := b.Tag != ""
-	ref := b.Branch
-	if isTag {
-		ref = b.Tag
-	}
-
 	build := cache.Build{
-		AccountID:       accountID,
-		ID:              b.ID,
-		RepositoryURL:   repositoryURL,
-		CommitID:        b.Sha,
-		Ref:             ref,
-		IsTag:           isTag,
+		AccountID:     accountID,
+		ID:            b.ID,
+		RepositoryURL: repositoryURL,
+		Commit: cache.Commit{
+			AccountID:     accountID,
+			ID:            b.Sha,
+			RepositoryURL: repositoryURL,
+			Message:       b.Message,
+		},
 		RepoBuildNumber: strconv.Itoa(b.ID),
 		State:           fromCircleCIStatus(b.Lifecycle, b.Outcome),
 		WebURL:          b.WebURL,
@@ -389,25 +379,20 @@ func (b circleCIBuild) ToCacheBuild(accountID string, repositoryURL string) (cac
 	}
 	build.UpdatedAt = updatedAt.Time
 
-	return build, nil
-}
-
-func (b circleCIBuild) ToCacheCommit(accountID string, repositoryURL string) (commit cache.Commit, err error) {
-	commit = cache.Commit{
-		AccountID:     accountID,
-		ID:            b.Sha,
-		RepositoryURL: repositoryURL,
-		Message:       b.Message,
-	}
-
 	if b.CommittedAt != "" {
-		if commit.Date.Time, err = time.Parse(time.RFC3339, b.CommittedAt); err != nil {
-			return commit, err
+		if build.Commit.Date.Time, err = time.Parse(time.RFC3339, b.CommittedAt); err != nil {
+			return cache.Build{}, err
 		}
-		commit.Date.Valid = true
+		build.Commit.Date.Valid = true
 	}
 
-	return commit, err
+	if build.IsTag = b.Tag != ""; build.IsTag {
+		build.Ref = b.Tag
+	} else {
+		build.Ref = b.Branch
+	}
+
+	return build, nil
 }
 
 func fromCircleCIStatus(lifecycle string, outcome string) cache.State {

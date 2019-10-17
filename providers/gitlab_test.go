@@ -21,32 +21,25 @@ func TestGitLabGetUserBuilds(t *testing.T) {
 	}
 	client := NewGitLabClient(account.ID, token, 100*time.Millisecond)
 
-	c := make(chan []cache.Inserter)
+	buildc := make(chan cache.Build)
 	errc := make(chan error)
 	ctx := context.Background()
 	go func() {
 		repository, err := client.Repository(ctx, "https://gitlab.com/nbedos/citop")
 		if err != nil {
-			close(c)
+			close(buildc)
 			errc <- err
 			return
 		}
-		c <- []cache.Inserter{repository}
-		err = client.LastBuilds(ctx, repository, 20, c)
-		close(c)
+		err = client.LastBuilds(ctx, repository, 20, buildc)
+		close(buildc)
 		errc <- err
 	}()
 
-	inserters := []cache.Inserter{account}
-	for is := range c {
-		inserters = append(inserters, is...)
+	for range buildc {
 	}
 
 	if err := <-errc; err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := cache.TemporaryCache(context.Background(), "gitlab", inserters); err != nil {
 		t.Fatal(err)
 	}
 }
