@@ -125,6 +125,15 @@ func RepositorySlugFromURL(repositoryURL string) (string, error) {
 	return strings.Join(components[1:3], "/"), nil
 }
 
+func Prefix(s string, prefix string) string {
+	builder := strings.Builder{}
+	for _, line := range strings.Split(s, "\n") {
+		builder.WriteString(fmt.Sprintf("%s%s\n", prefix, line))
+	}
+
+	return builder.String()
+}
+
 func NullTimeFrom(t *time.Time) sql.NullTime {
 	if t == nil {
 		return sql.NullTime{}
@@ -135,11 +144,20 @@ func NullTimeFrom(t *time.Time) sql.NullTime {
 	}
 }
 
-func Prefix(s string, prefix string) string {
-	builder := strings.Builder{}
-	for _, line := range strings.Split(s, "\n") {
-		builder.WriteString(fmt.Sprintf("%s%s\n", prefix, line))
+func NullStringFromNullTime(t sql.NullTime) (s sql.NullString) {
+	if t.Valid {
+		s.String = t.Time.Format(time.RFC3339)
+		s.Valid = true
 	}
 
-	return builder.String()
+	return
+}
+
+func NullTimeFromString(s string) (t sql.NullTime, err error) {
+	if s != "" {
+		t.Time, err = time.Parse(time.RFC3339, s)
+		t.Valid = err == nil
+	}
+
+	return
 }

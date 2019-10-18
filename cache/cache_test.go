@@ -35,15 +35,15 @@ var inserters = []Inserter{
 		State:           Passed,
 		RepoBuildNumber: "138",
 		UpdatedAt:       time.Now(),
-		Stages: []Stage{
-			{
+		Stages: map[int]*Stage{
+			1: {
 				AccountID: "gitlab",
 				BuildID:   3,
 				ID:        1,
 				Name:      "tests",
 				State:     Passed,
-				Jobs: []Job{
-					{
+				Jobs: map[int]*Job{
+					1: {
 						Key: JobKey{
 							AccountID: "gitlab",
 							BuildID:   3,
@@ -54,7 +54,7 @@ var inserters = []Inserter{
 						Name:  "Python 3.5",
 						Log:   "log2",
 					},
-					{
+					2: {
 						Key: JobKey{
 							AccountID: "gitlab",
 							BuildID:   3,
@@ -68,8 +68,8 @@ var inserters = []Inserter{
 				},
 			},
 		},
-		Jobs: []Job{
-			{
+		Jobs: map[int]*Job{
+			1: {
 				Key: JobKey{
 					AccountID: "gitlab",
 					BuildID:   3,

@@ -294,8 +294,9 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 
 	// FIXME Creating this job would not be necessary if we could store the log in the build
 	//  itself. Would that be better?
-	build.Jobs = []cache.Job{
-		{
+	log := fullLog.String()
+	build.Jobs = map[int]*cache.Job{
+		1: {
 			Key: cache.JobKey{
 				AccountID: c.accountID,
 				BuildID:   buildID,
@@ -307,7 +308,7 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 			StartedAt:  build.StartedAt,
 			FinishedAt: build.FinishedAt,
 			Duration:   build.Duration,
-			Log:        fullLog.String(),
+			Log:        sql.NullString{String: log, Valid: log != ""},
 		},
 	}
 
@@ -363,13 +364,13 @@ func (b circleCIBuild) ToCacheBuild(accountID string, repositoryURL string) (cac
 	}
 
 	var err error
-	if build.CreatedAt, err = cache.NullTimeFromString(b.CreatedAt); err != nil {
+	if build.CreatedAt, err = utils.NullTimeFromString(b.CreatedAt); err != nil {
 		return build, err
 	}
-	if build.StartedAt, err = cache.NullTimeFromString(b.StartedAt); err != nil {
+	if build.StartedAt, err = utils.NullTimeFromString(b.StartedAt); err != nil {
 		return build, err
 	}
-	if build.FinishedAt, err = cache.NullTimeFromString(b.FinishedAt); err != nil {
+	if build.FinishedAt, err = utils.NullTimeFromString(b.FinishedAt); err != nil {
 		return build, err
 	}
 

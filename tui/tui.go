@@ -59,7 +59,7 @@ func RunWidgetApp() (err error) {
 	}
 
 	circleciToken := os.Getenv("CIRCLECI_API_TOKEN")
-	if gitlabToken == "" {
+	if circleciToken == "" {
 		err = errors.New("environment variable CIRCLECI_API_TOKEN is not set")
 		return
 	}

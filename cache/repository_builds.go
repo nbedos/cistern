@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/utils"
+	"sort"
 	"sync"
 	"time"
 )
@@ -119,6 +120,7 @@ func (c *Cache) NewRepositoryBuilds(repositoryURL string, updates chan time.Time
 	}
 }
 
+// FIXME Concurrency is getting too complex here. Find a way to simplify all of this.
 func (s *RepositoryBuilds) FetchData(ctx context.Context, updates chan time.Time) error {
 	errc := make(chan error)
 
@@ -133,6 +135,7 @@ func (s *RepositoryBuilds) FetchData(ctx context.Context, updates chan time.Time
 
 			// Update cache with repository
 			repository, err := r.Repository(subCtx, s.repositoryURL)
+
 			if err != nil {
 				errc <- err
 				return
@@ -145,8 +148,14 @@ func (s *RepositoryBuilds) FetchData(ctx context.Context, updates chan time.Time
 			// Save each build returned by the Requester to the cache
 			buildc := make(chan Build)
 			buildErrc := make(chan error)
+
+			wg.Add(1)
 			go func() {
-				buildErrc <- r.Builds(subCtx, repository, 0, buildc)
+				defer wg.Done()
+				select {
+				case buildErrc <- r.Builds(subCtx, repository, 0, buildc):
+				case <-subCtx.Done():
+				}
 			}()
 
 			for {
@@ -186,7 +195,7 @@ func (s *RepositoryBuilds) FetchData(ctx context.Context, updates chan time.Time
 
 	var err error
 	for e := range errc {
-		if err != nil && e != nil {
+		if err == nil && e != nil {
 			err = e
 			cancel()
 		}
@@ -410,6 +419,9 @@ func (s *RepositoryBuilds) FetchRows() (err error) {
 	if err != nil {
 		return
 	}
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i].updatedAt.Valid && rows[j].updatedAt.Valid && rows[i].updatedAt.Time.After(rows[j].updatedAt.Time)
+	})
 	s.rows, s.maxWidths = rows, maxWidths
 
 	s.treeIndex = make(map[buildRowKey]*buildRow)

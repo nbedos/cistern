@@ -56,7 +56,7 @@ CREATE TABLE build
 	created_at        TEXT,
 	started_at        TEXT,
 	finished_at       TEXT,
-	updated_at        TEXT,
+	updated_at        TEXT NOT NULL,
 	duration          INTEGER,
 	web_url           TEXT,
     PRIMARY KEY (account_id, id),
@@ -73,7 +73,7 @@ CREATE TABLE stage
     state      TEXT    NOT NULL,
     PRIMARY KEY (account_id, build_id, id),
 	FOREIGN KEY (state) references state(name),
-    FOREIGN KEY (account_id, build_id) references build (account_id, id)
+    FOREIGN KEY (account_id, build_id) references build (account_id, id) ON DELETE CASCADE
 );
 
 CREATE TABLE job
@@ -88,10 +88,10 @@ CREATE TABLE job
 	started_at      TEXT,
 	finished_at     TEXT,
 	duration        INTEGER,
-    log             TEXT    NOT NULL,
+    log             TEXT,
     PRIMARY KEY (account_id, build_id, stage_id, id),
 	FOREIGN KEY (state) references state(name),
-    FOREIGN KEY (account_id, build_id, stage_id) references stage (account_id, build_id, id)
+    FOREIGN KEY (account_id, build_id, stage_id) references stage (account_id, build_id, id)  ON DELETE CASCADE
 );
 
 -- FIXME Deduplicate job and build_job
@@ -106,10 +106,10 @@ CREATE TABLE build_job
 	started_at      TEXT,
 	finished_at     TEXT,
 	duration        INTEGER,
-    log             TEXT    NOT NULL,
+    log             TEXT,
     PRIMARY KEY (account_id, build_id, id),
 	FOREIGN KEY (state) references state(name),
-    FOREIGN KEY (account_id, build_id) references build (account_id, id)
+    FOREIGN KEY (account_id, build_id) references build (account_id, id)  ON DELETE CASCADE
 );
 
 `

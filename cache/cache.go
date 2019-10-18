@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/nbedos/citop/utils"
 	"io/ioutil"
 	"os"
 	"path"
@@ -79,8 +80,8 @@ type Build struct {
 	UpdatedAt       time.Time
 	Duration        sql.NullInt64
 	WebURL          string
-	Stages          []Stage
-	Jobs            []Job
+	Stages          map[int]*Stage
+	Jobs            map[int]*Job
 }
 
 type Stage struct {
@@ -89,7 +90,7 @@ type Stage struct {
 	ID        int
 	Name      string
 	State     State
-	Jobs      []Job
+	Jobs      map[int]*Job
 }
 
 type JobKey struct {
@@ -99,6 +100,7 @@ type JobKey struct {
 	ID        int
 }
 
+// FIXME Now that jobs are embedded in Build and Stage we might remove Key and only keep ID
 type Job struct {
 	Key        JobKey
 	State      State
@@ -107,7 +109,7 @@ type Job struct {
 	StartedAt  sql.NullTime
 	FinishedAt sql.NullTime
 	Duration   sql.NullInt64
-	Log        string
+	Log        sql.NullString
 }
 
 type Cache struct {
@@ -234,18 +236,20 @@ func (c Commit) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
 		sql.Named("repository_url", c.RepositoryURL),
 		sql.Named("id", c.ID),
 		sql.Named("message", c.Message),
-		sql.Named("date", nullStringFromNullTime(c.Date)),
+		sql.Named("date", utils.NullStringFromNullTime(c.Date)),
 	)
 }
 
 func (b Build) insert(ctx context.Context, tx *sql.Tx) (res sql.Result, err error) {
-	if res, err = b.Commit.insert(ctx, tx); err != nil {
-		return
+	if res, err := b.Commit.insert(ctx, tx); err != nil {
+		return res, err
 	}
 
+	// Should we delete an existing build only if it's older than the one to insert?
 	res, err = tx.ExecContext(
 		ctx,
-		`INSERT INTO build(
+		`DELETE FROM build WHERE account_id = :account_id AND id = :id;
+		INSERT INTO build(
 			account_id,
 			id,
 			repository_url,
@@ -278,40 +282,42 @@ func (b Build) insert(ctx context.Context, tx *sql.Tx) (res sql.Result, err erro
 	    );`,
 		sql.Named("account_id", b.AccountID),
 		sql.Named("id", b.ID),
+		sql.Named("account_id", b.AccountID),
+		sql.Named("id", b.ID),
 		sql.Named("repository_url", b.RepositoryURL),
 		sql.Named("commit_id", b.Commit.ID),
 		sql.Named("ref", b.Ref),
 		sql.Named("is_tag", b.IsTag),
 		sql.Named("repo_build_number", b.RepoBuildNumber),
 		sql.Named("state", b.State),
-		sql.Named("created_at", nullStringFromNullTime(b.CreatedAt)),
-		sql.Named("started_at", nullStringFromNullTime(b.StartedAt)),
-		sql.Named("finished_at", nullStringFromNullTime(b.FinishedAt)),
+		sql.Named("created_at", utils.NullStringFromNullTime(b.CreatedAt)),
+		sql.Named("started_at", utils.NullStringFromNullTime(b.StartedAt)),
+		sql.Named("finished_at", utils.NullStringFromNullTime(b.FinishedAt)),
 		sql.Named("updated_at", b.UpdatedAt.Format(time.RFC3339)),
 		sql.Named("duration", b.Duration),
 		sql.Named("web_url", b.WebURL),
 	)
 	if err != nil {
-		return
+		return res, err
 	}
 
 	for _, stage := range b.Stages {
 		if res, err = stage.insert(ctx, tx); err != nil {
-			return
+			return res, err
 		}
 	}
 
 	for _, job := range b.Jobs {
 		if res, err = job.insert(ctx, tx); err != nil {
-			return
+			return res, err
 		}
 	}
 
-	return
+	return res, err
 }
 
-func (s Stage) insert(ctx context.Context, tx *sql.Tx) (res sql.Result, err error) {
-	res, err = tx.ExecContext(
+func (s Stage) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
+	res, err := tx.ExecContext(
 		ctx,
 		`INSERT INTO stage(account_id, build_id, id, name, state)
 		 VALUES (:account_id, :build_id, :id, :name, :state);`,
@@ -322,34 +328,16 @@ func (s Stage) insert(ctx context.Context, tx *sql.Tx) (res sql.Result, err erro
 		sql.Named("state", s.State),
 	)
 	if err != nil {
-		return
+		return res, err
 	}
 
 	for _, job := range s.Jobs {
 		if res, err = job.insert(ctx, tx); err != nil {
-			return
+			return res, err
 		}
 	}
 
-	return
-}
-
-func nullStringFromNullTime(t sql.NullTime) (s sql.NullString) {
-	if t.Valid {
-		s.String = t.Time.Format(time.RFC3339)
-		s.Valid = true
-	}
-
-	return
-}
-
-func NullTimeFromString(s string) (t sql.NullTime, err error) {
-	if s != "" {
-		t.Time, err = time.Parse(time.RFC3339, s)
-		t.Valid = err == nil
-	}
-
-	return
+	return res, err
 }
 
 func (j Job) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
@@ -365,9 +353,9 @@ func (j Job) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
 			sql.Named("id", j.Key.ID),
 			sql.Named("state", j.State),
 			sql.Named("name", j.Name),
-			sql.Named("created_at", nullStringFromNullTime(j.CreatedAt)),
-			sql.Named("started_at", nullStringFromNullTime(j.StartedAt)),
-			sql.Named("finished_at", nullStringFromNullTime(j.FinishedAt)),
+			sql.Named("created_at", utils.NullStringFromNullTime(j.CreatedAt)),
+			sql.Named("started_at", utils.NullStringFromNullTime(j.StartedAt)),
+			sql.Named("finished_at", utils.NullStringFromNullTime(j.FinishedAt)),
 			sql.Named("log", j.Log),
 			sql.Named("duration", j.Duration),
 		)
@@ -385,9 +373,9 @@ func (j Job) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
 		sql.Named("id", j.Key.ID),
 		sql.Named("state", j.State),
 		sql.Named("name", j.Name),
-		sql.Named("created_at", nullStringFromNullTime(j.CreatedAt)),
-		sql.Named("started_at", nullStringFromNullTime(j.StartedAt)),
-		sql.Named("finished_at", nullStringFromNullTime(j.FinishedAt)),
+		sql.Named("created_at", utils.NullStringFromNullTime(j.CreatedAt)),
+		sql.Named("started_at", utils.NullStringFromNullTime(j.StartedAt)),
+		sql.Named("finished_at", utils.NullStringFromNullTime(j.FinishedAt)),
 		sql.Named("log", j.Log),
 		sql.Named("duration", j.Duration),
 	)
@@ -478,17 +466,19 @@ func WriteLogs(jobs []Job, dir string) (paths []string, err error) {
 	}()
 
 	for _, job := range jobs {
-		// FIXME Sanitize file name
-		relativeJobPath := fmt.Sprintf("job_%s-%d_%d_%d.log", job.Key.AccountID, job.Key.BuildID,
-			job.Key.StageID, job.Key.ID)
-		wg.Add(1)
-		go func(log string, logPath string) {
-			defer wg.Done()
-			fullPath := path.Join(dir, logPath)
-			preprocessedLog := []byte(preprocess(log))
-			errc <- ioutil.WriteFile(fullPath, preprocessedLog, 0440)
-		}(job.Log, relativeJobPath)
-		paths = append(paths, relativeJobPath)
+		if job.Log.Valid {
+			// FIXME Sanitize file name
+			relativeJobPath := fmt.Sprintf("job_%s-%d_%d_%d.log", job.Key.AccountID, job.Key.BuildID,
+				job.Key.StageID, job.Key.ID)
+			wg.Add(1)
+			go func(log string, logPath string) {
+				defer wg.Done()
+				fullPath := path.Join(dir, logPath)
+				preprocessedLog := []byte(preprocess(log))
+				errc <- ioutil.WriteFile(fullPath, preprocessedLog, 0440)
+			}(job.Log.String, relativeJobPath)
+			paths = append(paths, relativeJobPath)
+		}
 	}
 
 	go func() {

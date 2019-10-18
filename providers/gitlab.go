@@ -177,6 +177,8 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 		UpdatedAt:       *pipeline.UpdatedAt,
 		Duration:        sql.NullInt64{Int64: int64(pipeline.Duration), Valid: pipeline.Duration > 0},
 		WebURL:          pipeline.WebURL,
+		Stages:          make(map[int]*cache.Stage),
+		Jobs:            make(map[int]*cache.Job),
 	}
 
 	select {
@@ -190,7 +192,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 	}
 
 	stagesByName := make(map[string]*cache.Stage)
-	stagesById := make(map[int]*cache.Stage)
+	build.Stages = make(map[int]*cache.Stage)
 	for _, job := range jobs {
 		if _, exists := stagesByName[job.Stage]; !exists {
 			stage := cache.Stage{
@@ -199,9 +201,10 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 				ID:        len(stagesByName) + 1,
 				Name:      job.Stage,
 				State:     cache.Unknown,
+				Jobs:      make(map[int]*cache.Job),
 			}
 			stagesByName[job.Stage] = &stage
-			stagesById[stage.ID] = &stage
+			build.Stages[stage.ID] = &stage
 		}
 	}
 
@@ -231,6 +234,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 				return
 			}
 
+			log := buf.String()
 			jobc <- cache.Job{
 				Key: cache.JobKey{
 					AccountID: c.accountID,
@@ -240,7 +244,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 				},
 				State:      FromGitLabState(job.Status),
 				Name:       job.Name,
-				Log:        buf.String(),
+				Log:        sql.NullString{String: log, Valid: log != ""},
 				CreatedAt:  utils.NullTimeFrom(job.CreatedAt),
 				StartedAt:  utils.NullTimeFrom(job.StartedAt),
 				FinishedAt: utils.NullTimeFrom(job.FinishedAt),
@@ -256,11 +260,8 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repositoryU
 	}()
 
 	for job := range jobc {
-		stagesById[job.Key.StageID].Jobs = append(stagesById[job.Key.StageID].Jobs, job)
-	}
-
-	for _, stage := range stagesById {
-		build.Stages = append(build.Stages, *stage)
+		job := job
+		build.Stages[job.Key.StageID].Jobs[job.Key.ID] = &job
 	}
 
 	return build, <-errc
