@@ -24,12 +24,13 @@ func Test_RecentRepoBuilds(t *testing.T) {
 		"Authorization": fmt.Sprintf("token %s", token),
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer cancel()
-	p, err := NewPusherClient(ctx, wsURL, authUrl, authHeader)
+	p, err := NewPusherClient(ctx, wsURL, authUrl, authHeader, ticker.C)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer p.Close()
+	defer p.Close() // FIXME Check return value
 
 forever:
 	for {

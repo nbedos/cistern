@@ -15,18 +15,27 @@ type StatusBar struct {
 	inputPrefix  string
 }
 
-func NewStatusBar(width, height, bufferSize int) (StatusBar, error) {
-	if width < 0 || height < 0 || bufferSize < 0 {
-		return StatusBar{}, errors.New("width, height and bufferSize must be >= 0")
+func NewStatusBar(width, height int) (StatusBar, error) {
+	if width < 0 || height < 0 {
+		return StatusBar{}, errors.New("width and height must be >= 0")
 	}
 
 	return StatusBar{
 		width:        width,
 		height:       height,
-		outputBuffer: make([]string, bufferSize),
+		outputBuffer: make([]string, 0),
 		InputBuffer:  "",
 		inputPrefix:  "/",
 	}, nil
+}
+
+func (s *StatusBar) Write(p []byte) (int, error) {
+	s.outputBuffer = append(s.outputBuffer, string(p))
+	if len(s.outputBuffer) > s.height {
+		s.outputBuffer = s.outputBuffer[:s.height]
+	}
+
+	return len(p), nil
 }
 
 func (s StatusBar) Size() (int, int) {

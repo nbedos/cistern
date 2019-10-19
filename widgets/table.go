@@ -46,28 +46,6 @@ func NewTable(source cache.HierarchicalTabularDataSource, columns []string, widt
 	return table, nil
 }
 
-/*func (t *Table) Search(term string) error {
-	if len(t.Rows) > 0 {
-		rows, matchId, err := t.Source.Search(term, t.Rows[0].RowID(), t.Rows[t.ActiveLine].RowID(), utils.MaxInt(0, t.height-1))
-		if err != nil {
-			return err
-		}
-		if len(rows) > 0 {
-			t.setRows(rows)
-			// FIXME Meh. This information should be carried by TabularSourceRow
-			for i, row := range t.Rows {
-				if row.RowID() == matchId {
-					t.ActiveLine = i
-					break
-				}
-			}
-		} else {
-			// No result found
-		}
-	}
-	return nil
-}*/
-
 func (t Table) nbrRows() int {
 	return utils.MaxInt(0, t.height-1)
 }
@@ -96,18 +74,15 @@ func (t *Table) Refresh() error {
 	return nil
 }
 
-func (t *Table) SetFold(open bool, all bool) error {
+func (t *Table) SetFold(open bool, recursive bool) error {
 	if t.ActiveLine < 0 || t.ActiveLine >= len(t.Rows) {
 		return nil
 	}
 
 	activeKey := t.Rows[t.ActiveLine].Key()
-	if all {
-		t.Source.SetTraversable(nil, open)
-	} else {
-		t.Source.SetTraversable(activeKey, open)
+	if err := t.Source.SetTraversable(activeKey, open, recursive); err != nil {
+		return err
 	}
-
 	rows, activeline, err := t.Source.Select(activeKey, t.ActiveLine, t.nbrRows()-t.ActiveLine-1)
 	if err != nil {
 		return err

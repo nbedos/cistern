@@ -8,6 +8,7 @@ import (
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
 	"github.com/xanzy/go-gitlab"
+	"io"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +35,10 @@ func (c GitLabClient) AccountID() string {
 
 func (c GitLabClient) Builds(ctx context.Context, repository cache.Repository, duration time.Duration, buildc chan<- cache.Build) error {
 	return c.LastBuilds(ctx, repository, 20, buildc)
+}
+
+func (c GitLabClient) StreamLogs(ctx context.Context, writerByJobId map[int]io.WriteCloser) error {
+	return nil
 }
 
 func (c GitLabClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {

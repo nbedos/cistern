@@ -68,29 +68,31 @@ func UnmarshalPayload(data []byte, v interface{}) error {
 }
 
 type PusherClient struct {
-	conn       *websocket.Conn
-	httpClient *http.Client
-	authUrl    string
-	authHeader map[string]string
-	connected  bool
-	channels   map[string]bool
-	timeout    int
-	socketID   string
+	conn        *websocket.Conn
+	httpClient  *http.Client
+	authUrl     string
+	authHeader  map[string]string
+	authLimiter <-chan time.Time
+	connected   bool
+	channels    map[string]bool
+	timeout     int
+	socketID    string
 }
 
-func NewPusherClient(ctx context.Context, wsURL string, authURL string, authHeader map[string]string) (PusherClient, error) {
+func NewPusherClient(ctx context.Context, wsURL string, authURL string, authHeader map[string]string, authLimiter <-chan time.Time) (PusherClient, error) {
 	conn, _, err := websocket.Dial(ctx, wsURL, nil)
 	if err != nil {
 		return PusherClient{}, err
 	}
 
 	return PusherClient{
-		conn:       conn,
-		authUrl:    authURL,
-		authHeader: authHeader,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
-		connected:  false,
-		channels:   map[string]bool{},
+		conn:        conn,
+		authUrl:     authURL,
+		authHeader:  authHeader,
+		authLimiter: authLimiter,
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		connected:   false,
+		channels:    map[string]bool{},
 	}, nil
 }
 
@@ -227,10 +229,16 @@ func (p *PusherClient) Authenticate(ctx context.Context, channel string) (string
 		req.Header.Add(k, v)
 	}
 
+	select {
+	case <-p.authLimiter:
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("invalid response (status %d)", resp.StatusCode)

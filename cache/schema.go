@@ -89,6 +89,8 @@ CREATE TABLE job
 	finished_at     TEXT,
 	duration        INTEGER,
     log             TEXT,
+	web_url         TEXT,
+	remote_id       INTEGER,
     PRIMARY KEY (account_id, build_id, stage_id, id),
 	FOREIGN KEY (state) references state(name),
     FOREIGN KEY (account_id, build_id, stage_id) references stage (account_id, build_id, id)  ON DELETE CASCADE
@@ -107,6 +109,8 @@ CREATE TABLE build_job
 	finished_at     TEXT,
 	duration        INTEGER,
     log             TEXT,
+	web_url         TEXT,
+	remote_id       INTEGER,
     PRIMARY KEY (account_id, build_id, id),
 	FOREIGN KEY (state) references state(name),
     FOREIGN KEY (account_id, build_id) references build (account_id, id)  ON DELETE CASCADE

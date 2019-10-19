@@ -3,23 +3,25 @@ package cache
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nbedos/citop/utils"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
 
 // FIXME Find a better name
-type Requester interface {
+type Provider interface {
 	AccountID() string
 	Builds(ctx context.Context, repository Repository, duration time.Duration, buildc chan<- Build) error
 	Repository(ctx context.Context, repositoryURL string) (Repository, error)
+	StreamLogs(ctx context.Context, writerByJobId map[int]io.WriteCloser) error
 }
 
 type Inserter interface {
@@ -27,6 +29,10 @@ type Inserter interface {
 }
 
 type State string
+
+func (s State) isActive() bool {
+	return s == Pending || s == Running
+}
 
 const (
 	Unknown  State = "?"
@@ -82,6 +88,32 @@ type Build struct {
 	WebURL          string
 	Stages          map[int]*Stage
 	Jobs            map[int]*Job
+	RemoteID        int // FIXME Not in DB
+}
+
+func (b *Build) SetJobState(key JobKey, state State) error {
+	if key.AccountID != b.AccountID || key.BuildID != b.ID {
+		return errors.New("account id or build id mismatch between key and receiver")
+	}
+
+	var jobs map[int]*Job
+	if key.StageID == 0 {
+		jobs = b.Jobs
+	} else {
+		stage, exists := b.Stages[key.StageID]
+		if !exists {
+			return errors.New("stage not found")
+		}
+		jobs = stage.Jobs
+	}
+
+	job, exists := jobs[key.ID]
+	if !exists {
+		return errors.New("job not found")
+	}
+	job.State = state
+
+	return nil
 }
 
 type Stage struct {
@@ -100,6 +132,27 @@ type JobKey struct {
 	ID        int
 }
 
+// Return jobKey from string of dot separated numbers
+func NewJobKey(s string, accountID string) (JobKey, error) {
+	// 	"1.2"   => jobKey{BuildID: 1, ID: 2}
+	// 	"1.2.3" => jobKey{BuildID: 1, StageID: 2, ID: 3}
+	key := JobKey{AccountID: accountID}
+
+	n, err := fmt.Sscanf(s, "%d.%d.%d", &key.BuildID, &key.StageID, &key.ID)
+	if err != nil || n != 3 {
+		n, err = fmt.Sscanf(s, "%d.%d", &key.BuildID, &key.ID)
+		if err != nil {
+			return key, err
+		}
+		if n != 2 {
+			return key, fmt.Errorf("failed parsing jobKey from '%s'", s)
+		}
+		key.StageID = 0
+	}
+
+	return key, nil
+}
+
 // FIXME Now that jobs are embedded in Build and Stage we might remove Key and only keep ID
 type Job struct {
 	Key        JobKey
@@ -110,16 +163,18 @@ type Job struct {
 	FinishedAt sql.NullTime
 	Duration   sql.NullInt64
 	Log        sql.NullString
+	WebURL     string
+	RemoteID   int
 }
 
 type Cache struct {
 	filePath   string
 	db         *sql.DB
-	requesters []Requester
+	requesters map[string]Provider
 	mutex      *sync.Mutex
 }
 
-func NewCache(filePath string, removeExisting bool, requesters []Requester) (Cache, error) {
+func NewCache(filePath string, removeExisting bool, requesters []Provider) (Cache, error) {
 	if removeExisting {
 		if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 			return Cache{}, err
@@ -151,7 +206,12 @@ func NewCache(filePath string, removeExisting bool, requesters []Requester) (Cac
 		}
 	}
 
-	c := Cache{filePath, db, requesters, &sync.Mutex{}}
+	requesterByAccountID := make(map[string]Provider, len(requesters))
+	for _, requester := range requesters {
+		requesterByAccountID[requester.AccountID()] = requester
+	}
+
+	c := Cache{filePath, db, requesterByAccountID, &sync.Mutex{}}
 
 	return c, nil
 }
@@ -345,9 +405,9 @@ func (j Job) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
 		return tx.ExecContext(
 			ctx,
 			`INSERT INTO build_job(account_id, build_id, id, state, name, created_at, started_at,
-                                  finished_at, log, duration)
+                                  finished_at, log, duration, web_url, remote_id)
             VALUES (:account_id, :build_id, :id, :state, :name, :created_at, :started_at,
-                    :finished_at, :log, :duration);`,
+                    :finished_at, :log, :duration, :web_url, :remote_id);`,
 			sql.Named("account_id", j.Key.AccountID),
 			sql.Named("build_id", j.Key.BuildID),
 			sql.Named("id", j.Key.ID),
@@ -358,15 +418,17 @@ func (j Job) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
 			sql.Named("finished_at", utils.NullStringFromNullTime(j.FinishedAt)),
 			sql.Named("log", j.Log),
 			sql.Named("duration", j.Duration),
+			sql.Named("web_url", j.WebURL),
+			sql.Named("remote_id", j.RemoteID),
 		)
 	}
 
 	return tx.ExecContext(
 		ctx,
 		`INSERT INTO job(account_id, build_id, stage_id, id, state, name, created_at, started_at,
-                finished_at, log, duration)
+                finished_at, log, duration, web_url, remote_id)
 		 VALUES (:account_id, :build_id, :stage_id, :id, :state, :name, :created_at, :started_at,
-		         :finished_at, :log, :duration);`,
+		         :finished_at, :log, :duration, :web_url, :remote_id);`,
 		sql.Named("account_id", j.Key.AccountID),
 		sql.Named("build_id", j.Key.BuildID),
 		sql.Named("stage_id", j.Key.StageID),
@@ -378,6 +440,8 @@ func (j Job) insert(ctx context.Context, tx *sql.Tx) (sql.Result, error) {
 		sql.Named("finished_at", utils.NullStringFromNullTime(j.FinishedAt)),
 		sql.Named("log", j.Log),
 		sql.Named("duration", j.Duration),
+		sql.Named("web_url", j.WebURL),
+		sql.Named("remote_id", j.RemoteID),
 	)
 }
 
@@ -387,13 +451,13 @@ func (c Cache) FetchJobs(ctx context.Context, jobsKeys []JobKey) ([]Job, error) 
 	}
 
 	// FIXME Dates attributes are missing
-	queryFmt := `SELECT account_id, build_id, stage_id, id, state, name, log
+	queryFmt := `SELECT account_id, build_id, stage_id, id, state, name, remote_id, log
  		         FROM job
 		         WHERE (account_id, build_id, stage_id, id) IN ( VALUES %s )
 
 				 UNION ALL
 
-				 SELECT account_id, build_id, 0, id, state, name, log
+				 SELECT account_id, build_id, 0, id, state, name, remote_id, log
  		         FROM build_job
 		         WHERE (account_id, build_id, 0, id) IN ( VALUES %s )`
 
@@ -424,6 +488,7 @@ func (c Cache) FetchJobs(ctx context.Context, jobsKeys []JobKey) ([]Job, error) 
 			&job.Key.ID,
 			&job.State,
 			&job.Name,
+			&job.RemoteID,
 			&job.Log); err != nil {
 			return nil, err
 		}
@@ -441,43 +506,32 @@ func (c Cache) FetchJobs(ctx context.Context, jobsKeys []JobKey) ([]Job, error) 
 	return orderedJobs, nil
 }
 
-var deleteEraseInLine = regexp.MustCompile(".*\x1b\\[0K")
-var deleteUntilCarriageReturn = regexp.MustCompile(`.*\r([^\r\n])`)
-
-// Is this specific to Travis?
-func preprocess(log string) string {
-	tmp := deleteEraseInLine.ReplaceAllString(log, "")
-	return deleteUntilCarriageReturn.ReplaceAllString(tmp, "$1")
-}
-
-func WriteLogs(jobs []Job, dir string) (paths []string, err error) {
-	paths = make([]string, 0)
+func WriteLogs(writerByJob map[Job]io.WriteCloser) error {
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
-
-	defer func() {
-		if err != nil {
-			for _, name := range paths {
-				// Ignore error since we're already failing. Not ideal.
-				_ = os.Remove(name)
-			}
-			paths = nil
-		}
-	}()
-
-	for _, job := range jobs {
+	for job, writer := range writerByJob {
 		if job.Log.Valid {
-			// FIXME Sanitize file name
-			relativeJobPath := fmt.Sprintf("job_%s-%d_%d_%d.log", job.Key.AccountID, job.Key.BuildID,
-				job.Key.StageID, job.Key.ID)
 			wg.Add(1)
-			go func(log string, logPath string) {
+			go func(log string, writer io.WriteCloser) {
+				var err error
 				defer wg.Done()
-				fullPath := path.Join(dir, logPath)
-				preprocessedLog := []byte(preprocess(log))
-				errc <- ioutil.WriteFile(fullPath, preprocessedLog, 0440)
-			}(job.Log.String, relativeJobPath)
-			paths = append(paths, relativeJobPath)
+				defer func() {
+					// FIXME errClose is not reported if err != nil
+					if errClose := writer.Close(); errClose != nil && err == nil {
+						err = errClose
+					}
+					if err != nil {
+						errc <- err
+					}
+				}()
+				if !strings.HasSuffix(log, "\n") {
+					log = log + "\n"
+				}
+				preprocessedLog := utils.PostProcess(log)
+				if _, err = writer.Write([]byte(preprocessedLog)); err != nil {
+					return
+				}
+			}(job.Log.String, writer)
 		}
 	}
 
@@ -486,12 +540,13 @@ func WriteLogs(jobs []Job, dir string) (paths []string, err error) {
 		close(errc)
 	}()
 
+	var err error
 	for e := range errc {
 		// Return first error only. meh. FIXME
-		if err != nil {
+		if err == nil {
 			err = e
 		}
 	}
 
-	return
+	return err
 }

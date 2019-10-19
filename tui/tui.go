@@ -32,7 +32,8 @@ type ShowText struct {
 func (e ShowText) isOutputEvent() {}
 
 type ExecCmd struct {
-	cmd exec.Cmd
+	cmd    exec.Cmd
+	stream cache.Streamer
 }
 
 func (e ExecCmd) isOutputEvent() {}
@@ -73,12 +74,12 @@ func RunWidgetApp() (err error) {
 
 	defaultStyle := tcell.StyleDefault
 	styleSheet := map[widgets.Class]tcell.Style{
-		widgets.TableHeader:  defaultStyle.Bold(true),
+		widgets.TableHeader:  defaultStyle.Bold(true).Reverse(true),
 		widgets.ActiveRow:    defaultStyle.Reverse(true),
 		widgets.DefaultClass: defaultStyle,
 	}
 
-	requesters := []cache.Requester{
+	requesters := []cache.Provider{
 		providers.NewTravisClient(
 			providers.TravisOrgURL,
 			providers.TravisPusherHost,
@@ -239,7 +240,15 @@ func RunWidgetApp() (err error) {
 				// e.cmd.Stderr = os.Stderr FIXME?
 				e.cmd.Stdout = os.Stdout
 				// FIXME Show return value in status bar
+
+				subCtx, cancel := context.WithCancel(ctx)
+				if e.stream != nil {
+					go func() {
+						e.stream(subCtx)
+					}()
+				}
 				e.cmd.Run()
+				cancel()
 
 				screen, err = tcell.NewScreen()
 				if err != nil {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -28,7 +29,7 @@ type travisRepository struct {
 
 func FromTravisState(s string) cache.State {
 	switch strings.ToLower(s) {
-	case "created", "queued":
+	case "created", "queued", "received":
 		return cache.Pending
 	case "started":
 		return cache.Running
@@ -36,7 +37,7 @@ func FromTravisState(s string) cache.State {
 		return cache.Canceled
 	case "passed":
 		return cache.Passed
-	case "failed":
+	case "failed", "errored":
 		return cache.Failed
 	case "skipped":
 		return cache.Skipped
@@ -126,6 +127,7 @@ func (b travisBuild) ToInserters(accountID string, repositoryURL string, webURL 
 		Duration:      sql.NullInt64{Int64: int64(b.Duration), Valid: b.Duration > 0},
 		Stages:        make(map[int]*cache.Stage),
 		Jobs:          make(map[int]*cache.Job),
+		RemoteID:      b.ID,
 	}
 
 	if build.StartedAt, err = utils.NullTimeFromString(b.StartedAt); err != nil {
@@ -150,7 +152,7 @@ func (b travisBuild) ToInserters(accountID string, repositoryURL string, webURL 
 	build.WebURL = fmt.Sprintf("%s/builds/%d", webURL, b.ID)
 
 	for _, travisJob := range b.Jobs {
-		job, err := travisJob.ToInserter(build.AccountID, build.ID)
+		job, err := travisJob.ToInserter(build.AccountID, build.ID, webURL)
 		if err != nil {
 			return build, err
 		}
@@ -180,35 +182,15 @@ type travisJob struct {
 	Stage        travisStage
 	AllowFailure bool   `json:"allow_failure"`
 	Number       string `json:"number"`
-	Log          struct {
-		Content string
-	}
-	Config struct {
+	Log          string
+	Config       struct {
 		Os       string
 		Language string
 		Name     string
 	}
 }
 
-func DotDecimal(s string) ([]int, error) {
-	numbers := strings.Split(s, ".")
-	if len(numbers) == 0 {
-		return nil, fmt.Errorf("failed splitting string '%s'", s)
-	}
-
-	is := make([]int, 0, len(numbers))
-	for _, number := range numbers {
-		i, err := strconv.Atoi(number)
-		if err != nil {
-			return nil, err
-		}
-		is = append(is, i)
-	}
-
-	return is, nil
-}
-
-func (j travisJob) ToInserter(accountID string, buildID int) (cache.Job, error) {
+func (j travisJob) ToInserter(accountID string, buildID int, webURL string) (cache.Job, error) {
 	var err error
 	jobStartedAt := sql.NullTime{}
 	if j.StartedAt != "" {
@@ -236,24 +218,21 @@ func (j travisJob) ToInserter(accountID string, buildID int) (cache.Job, error) 
 		duration = int64(jobFinishedAt.Time.Sub(jobStartedAt.Time).Seconds())
 	}
 
-	ids, err := DotDecimal(j.Number)
+	jobKey, err := cache.NewJobKey(j.Number, accountID)
 	if err != nil {
 		return cache.Job{}, err
 	}
 	job := cache.Job{
-		Key: cache.JobKey{
-			AccountID: accountID,
-			BuildID:   buildID,
-			StageID:   j.Stage.Number,
-			ID:        ids[len(ids)-1],
-		},
+		Key:        jobKey,
 		State:      FromTravisState(j.State),
 		Name:       name,
 		CreatedAt:  sql.NullTime{},
 		StartedAt:  jobStartedAt,
 		FinishedAt: jobFinishedAt,
-		Log:        sql.NullString{String: j.Log.Content, Valid: j.Log.Content != ""},
+		Log:        sql.NullString{String: j.Log, Valid: j.Log != ""},
 		Duration:   sql.NullInt64{Int64: duration, Valid: duration > 0},
+		WebURL:     fmt.Sprintf("%s/jobs/%d", webURL, j.ID),
+		RemoteID:   j.ID,
 	}
 
 	return job, nil
@@ -308,7 +287,8 @@ func (c TravisClient) AccountID() string {
 func (c TravisClient) Builds(ctx context.Context, repository cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) error {
 	// Create Pusher client
 	// FIXME Requests to "/pusher/auth" should be rate limited too
-	p, err := c.pusherClient(ctx, repository.RemoteID)
+	repoChannel := fmt.Sprintf("repo-%d", repository.RemoteID)
+	p, err := c.pusherClient(ctx, []string{repoChannel})
 	if err != nil {
 		return err
 	}
@@ -320,106 +300,67 @@ func (c TravisClient) Builds(ctx context.Context, repository cache.Repository, m
 		return err
 	}
 
-	// Monitor active builds
+	errc := make(chan error)
+	eventc := make(chan travisEvent)
+	subCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	webURL := c.baseURL
-	webURL.Host = strings.TrimPrefix(webURL.Host, "api.")
-	webURL.Path, err = utils.RepositorySlugFromURL(repository.URL)
-	if err != nil {
-		return err
-	}
+	go func() {
+		errc <- c.events(subCtx, p, eventc)
+	}()
 
 	builds := make(map[int]*cache.Build)
+
+eventLoop:
 	for {
-		event, err := p.NextEvent(ctx)
-		if err != nil {
-			return err
-		}
-
-		switch {
-		// "build:created", "build:started", "build:finished"...
-		case strings.HasPrefix(event.Event, "build:"):
-			var s string
-			if err := json.Unmarshal(event.Data, &s); err != nil {
-				return err
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+		case errEvent := <-errc:
+			if err == nil {
+				err = errEvent
 			}
-			var data struct {
-				Build struct {
-					ID int `json:"id"`
-				} `json:"build"`
-			}
-			if err := json.Unmarshal([]byte(s), &data); err != nil {
-				return err
-			}
-
-			build, err := c.fetchBuild(ctx, repository.URL, data.Build.ID, webURL.String())
-			if err != nil {
-				return err
-			}
-			builds[data.Build.ID] = &build
-
-			select {
-			case buildc <- build:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		// "job:queued", "job:received", "job:created", "job:started", "job:finished", "job:log"...
-		case strings.HasPrefix(event.Event, "job:"):
-			var s string
-			if err := json.Unmarshal(event.Data, &s); err != nil {
-				return err
-			}
-			var data struct {
-				BuildID int    `json:"build_id"`
-				Number  string `json:"number"`
-				State   string `json:"state"`
-			}
-
-			if err := json.Unmarshal([]byte(s), &data); err != nil {
-				return err
-			}
-
-			ids, err := DotDecimal(data.Number)
-			if err != nil {
-				return err
-			}
-
-			if _, exists := builds[data.BuildID]; !exists {
-				b, err := c.fetchBuild(ctx, repository.URL, data.BuildID, webURL.String())
-				if err != nil {
-					return err
+			break eventLoop
+		case event := <-eventc:
+			switch event := event.(type) {
+			case travisBuildUpdate:
+				var build cache.Build
+				if build, err = c.fetchBuild(ctx, repository.URL, event.remoteID); err != nil {
+					cancel()
+					break
 				}
-				builds[data.BuildID] = &b
-
-			}
-			build := builds[data.BuildID]
-
-			var job *cache.Job
-			var exists bool
-			if len(ids) == 2 {
-				if job, exists = build.Jobs[ids[1]]; !exists {
-					return fmt.Errorf("job %d not found for build (account_id=%s, id=%d)", ids[1], build.AccountID, build.ID)
+				builds[build.RemoteID] = &build
+				select {
+				case buildc <- build:
+				case <-ctx.Done():
+					err = ctx.Err()
 				}
-			} else if len(ids) == 3 {
-				stage, exists := build.Stages[ids[1]]
-				if !exists {
-					return fmt.Errorf("stage %d not found for build (account_id=%s, id=%d)", ids[1], build.AccountID, build.ID)
+			case travisJobUpdate:
+				var exists bool
+				if _, exists = builds[event.buildRemoteID]; !exists {
+					var build cache.Build
+					if build, err = c.fetchBuild(ctx, repository.URL, event.buildRemoteID); err != nil {
+						cancel()
+						break
+					}
+					builds[build.RemoteID] = &build
+				} else {
+					if err = builds[event.buildRemoteID].SetJobState(event.jobKey, event.state); err != nil {
+						cancel()
+						break
+					}
 				}
-				if job, exists = stage.Jobs[ids[2]]; !exists {
-					return fmt.Errorf("job %d not found for build (account_id=%s, id=%d)", ids[2], build.AccountID, build.ID)
-				}
-			}
-			job.State = FromTravisState(data.State)
 
-			select {
-			case buildc <- *build:
-			case <-ctx.Done():
-				return ctx.Err()
+				select {
+				case buildc <- *builds[event.buildRemoteID]:
+				case <-ctx.Done():
+					err = ctx.Err()
+				}
 			}
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (c TravisClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
@@ -444,6 +385,15 @@ func (c TravisClient) Repository(ctx context.Context, repositoryURL string) (cac
 	}
 
 	return travisRepo.ToInserter(c.accountID), nil
+}
+
+func (c TravisClient) WebURL(repositoryURL string) (url.URL, error) {
+	var err error
+	webURL := c.baseURL
+	webURL.Host = strings.TrimPrefix(webURL.Host, "api.")
+	webURL.Path, err = utils.RepositorySlugFromURL(repositoryURL)
+
+	return webURL, err
 }
 
 // Rate-limited HTTP GET request with custom headers
@@ -503,7 +453,7 @@ func (err HTTPError) Error() string {
 		err.Method, err.URL, err.Status, err.Message)
 }
 
-func (c TravisClient) fetchBuild(ctx context.Context, repositoryURL string, buildID int, webURL string) (cache.Build, error) {
+func (c TravisClient) fetchBuild(ctx context.Context, repositoryURL string, buildID int) (cache.Build, error) {
 	buildURL := c.baseURL
 	buildURL.Path += fmt.Sprintf("/build/%d", buildID)
 	parameters := buildURL.Query()
@@ -518,11 +468,24 @@ func (c TravisClient) fetchBuild(ctx context.Context, repositoryURL string, buil
 	var build travisBuild
 	err = json.Unmarshal(body.Bytes(), &build)
 
-	if err = c.fetchBuildLogs(ctx, &build); err != nil {
+	// Fetch logs
+	jobIDs := make([]int, len(build.Jobs))
+	for i, job := range build.Jobs {
+		jobIDs[i] = job.ID
+	}
+	logs, err := c.fetchJobLogs(ctx, jobIDs)
+	if err != nil {
 		return cache.Build{}, err
 	}
+	for i := range build.Jobs {
+		build.Jobs[i].Log = logs[build.Jobs[i].ID].Content
+	}
 
-	return build.ToInserters(c.accountID, repositoryURL, webURL)
+	webURL, err := c.WebURL(repositoryURL)
+	if err != nil {
+		return cache.Build{}, err
+	}
+	return build.ToInserters(c.accountID, repositoryURL, webURL.String())
 }
 
 func (c TravisClient) fetchBuilds(ctx context.Context, repositoryURL string, offset int, pageSize int, buildc chan<- cache.Build) error {
@@ -555,16 +518,11 @@ func (c TravisClient) fetchBuilds(ctx context.Context, repositoryURL string, off
 
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
-
-	webURL := c.baseURL
-	webURL.Host = strings.TrimPrefix(webURL.Host, "api.")
-	webURL.Path = repositorySlug
-
 	for _, build := range response.Builds {
 		wg.Add(1)
 		go func(buildID int) {
 			defer wg.Done()
-			build, err := c.fetchBuild(ctx, repositoryURL, buildID, webURL.String())
+			build, err := c.fetchBuild(ctx, repositoryURL, buildID)
 			if err != nil {
 				errc <- err
 				return
@@ -627,63 +585,155 @@ func (c TravisClient) RepositoryBuilds(ctx context.Context, repositoryURL string
 	return err
 }
 
-func (c TravisClient) fetchBuildLogs(ctx context.Context, build *travisBuild) error {
-	jobc := make(chan travisJob)
-	errc := make(chan error, len(build.Jobs))
+type travisLog struct {
+	Content  string
+	NbrParts int
+}
 
-	var wg sync.WaitGroup
+func (c TravisClient) fetchJobLogs(ctx context.Context, jobIDs []int) (map[int]travisLog, error) {
+	errc := make(chan error)
+	wg := sync.WaitGroup{}
+	logs := make(map[int]travisLog)
+	logsMux := sync.Mutex{}
+	subCtx, cancel := context.WithCancel(ctx)
 
-	for _, job := range build.Jobs {
+	for _, ID := range jobIDs {
 		wg.Add(1)
-		go func(j travisJob) {
+		go func(ID int) {
 			defer wg.Done()
 
-			jobWithLog, err := c.fetchJobLog(ctx, j)
+			var err error
+			var log travisLog
+			log.NbrParts, log.Content, err = c.fetchJobLog(subCtx, ID)
 			if err != nil {
 				errc <- err
 				return
 			}
-			jobc <- jobWithLog
-		}(job)
+
+			logsMux.Lock()
+			defer logsMux.Unlock()
+			logs[ID] = log
+		}(ID)
 	}
 
 	go func() {
 		wg.Wait()
-		close(jobc)
 		close(errc)
 	}()
 
-	jobMap := make(map[int]travisJob)
-	for job := range jobc {
-		jobMap[job.ID] = job
+	// FIXME Report all errors
+	var err error
+	for e := range errc {
+		if e != nil {
+			cancel()
+			if err == nil {
+				err = e
+			}
+		}
 	}
 
-	for jobIndex := range build.Jobs {
-		id := build.Jobs[jobIndex].ID
-		build.Jobs[jobIndex] = jobMap[id]
-	}
-
-	return <-errc
+	return logs, err
 }
 
-func (c TravisClient) fetchJobLog(ctx context.Context, job travisJob) (travisJob, error) {
+func (c TravisClient) fetchJobLog(ctx context.Context, jobID int) (int, string, error) {
 	var reqURL = c.baseURL
-	reqURL.Path += fmt.Sprintf("/job/%d/log", job.ID)
+	reqURL.Path += fmt.Sprintf("/job/%d/log", jobID)
 
 	body, err := c.get(ctx, reqURL)
 	if err != nil {
-		return travisJob{}, err
+		return 0, "", err
 	}
 
-	err = json.Unmarshal(body.Bytes(), &job.Log)
+	var log struct {
+		Content string     `json:"content"`
+		Parts   []struct{} `json:"log_parts"`
+	}
+	err = json.Unmarshal(body.Bytes(), &log)
 	if err != nil {
-		return travisJob{}, err
+		return 0, "", err
 	}
 
-	return job, nil
+	return len(log.Parts), log.Content, nil
 }
 
-func (c TravisClient) pusherClient(ctx context.Context, repositoryID int) (p utils.PusherClient, err error) {
+func (c TravisClient) StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error {
+	defer func() {
+		for _, w := range writerByJobID {
+			_ = w.Close() // FIXME Report error
+		}
+	}()
+
+	channels := make([]string, 0, len(writerByJobID))
+	for id := range writerByJobID {
+		channels = append(channels, fmt.Sprintf("job-%d", id))
+	}
+	p, err := c.pusherClient(ctx, channels)
+	if err != nil {
+		return err
+	}
+	defer p.Close()
+
+	// Fetch first part of logs from REST API
+	jobIDs := make([]int, 0, len(writerByJobID))
+	for ID := range writerByJobID {
+		jobIDs = append(jobIDs, ID)
+	}
+	logsByID, err := c.fetchJobLogs(ctx, jobIDs)
+	if err != nil {
+		return err
+	}
+	receivedLogParts := make(map[int]int)
+	for ID, log := range logsByID {
+		if _, err = writerByJobID[ID].Write([]byte(log.Content)); err != nil {
+			return err
+		}
+		receivedLogParts[ID] = log.NbrParts
+	}
+
+	eventc := make(chan travisEvent)
+	errc := make(chan error)
+	subCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		errc <- c.events(subCtx, p, eventc)
+	}()
+
+eventLoop:
+	for {
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+		case e := <-errc:
+			if err == nil {
+				err = e
+			}
+			break eventLoop
+		case event := <-eventc:
+			switch event := event.(type) {
+			case travisPusherJobLog:
+				if event.Number >= receivedLogParts[event.RemoteID] {
+					var log string
+					log = utils.PostProcess(event.Log)
+					if _, err = writerByJobID[event.RemoteID].Write([]byte(log)); err != nil {
+						cancel()
+						break
+					}
+					if event.Final {
+						if err = writerByJobID[event.RemoteID].Close(); err != nil {
+							cancel()
+							break
+						}
+					}
+					receivedLogParts[event.RemoteID] += 1
+				}
+			}
+		}
+	}
+
+	return err
+}
+
+func (c TravisClient) pusherClient(ctx context.Context, channels []string) (p utils.PusherClient, err error) {
 	pusherKey, private, err := c.fetchPusherConfig(ctx)
 	if err != nil {
 		return p, err
@@ -697,25 +747,27 @@ func (c TravisClient) pusherClient(ctx context.Context, repositoryID int) (p uti
 	}
 
 	// FIXME Requests to "/pusher/auth" should be rate limited too
-	if p, err = utils.NewPusherClient(ctx, wsURL, authURL.String(), authHeader); err != nil {
+	if p, err = utils.NewPusherClient(ctx, wsURL, authURL.String(), authHeader, c.rateLimiter); err != nil {
 		return p, err
 	}
+	defer func() {
+		if err != nil {
+			p.Close()
+		}
+	}()
 
-	// FIXME Meh. There must be a better way.
 	if _, err = p.Expect(ctx, utils.ConnectionEstablished); err != nil {
 		return p, err
 	}
 
-	chanFmt := "repo-%d"
+	chanFmt := "%s"
 	if private {
 		chanFmt = "private-" + chanFmt
 	}
-	if err := p.Subscribe(ctx, fmt.Sprintf(chanFmt, repositoryID)); err != nil {
-		return p, err
-	}
-
-	if _, err = p.Expect(ctx, utils.SubscriptionSucceeded); err != nil {
-		return p, err
+	for _, channel := range channels {
+		if err = p.Subscribe(ctx, fmt.Sprintf(chanFmt, channel)); err != nil {
+			return p, err
+		}
 	}
 
 	return p, nil
@@ -740,4 +792,104 @@ func (c TravisClient) fetchPusherConfig(ctx context.Context) (string, bool, erro
 	}
 
 	return home.Config.Pusher.Key, home.Config.Pusher.Private, err
+}
+
+type travisEvent interface {
+	isTravisEvent()
+}
+
+type travisBuildUpdate struct {
+	remoteID int
+}
+
+func (travisBuildUpdate) isTravisEvent() {}
+
+type travisJobUpdate struct {
+	buildRemoteID int
+	jobKey        cache.JobKey
+	state         cache.State
+}
+
+type travisPusherJobLog struct {
+	RemoteID int    `json:"id"`
+	Log      string `json:"_log"`
+	Number   int    `json:"number"`
+	Final    bool   `json:"final"`
+}
+
+func (travisPusherJobLog) isTravisEvent() {}
+
+func (travisJobUpdate) isTravisEvent() {}
+
+func (c TravisClient) events(ctx context.Context, p utils.PusherClient, teventc chan<- travisEvent) error {
+	for {
+		event, err := p.NextEvent(ctx)
+		if err != nil {
+			return err
+		}
+
+		var s string
+		if err := json.Unmarshal(event.Data, &s); err != nil {
+			return err
+		}
+
+		switch {
+		// "build:created", "build:started", "build:finished"...
+		case strings.HasPrefix(event.Event, "build:"):
+			var data struct {
+				Build struct {
+					ID int `json:"id"`
+				} `json:"build"`
+			}
+			if err := json.Unmarshal([]byte(s), &data); err != nil {
+				return err
+			}
+
+			select {
+			case teventc <- travisBuildUpdate{remoteID: data.Build.ID}:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+
+		case event.Event == "job:log":
+			var tevent travisPusherJobLog
+			if err := json.Unmarshal([]byte(s), &tevent); err != nil {
+				return err
+			}
+			select {
+			case teventc <- tevent:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+
+		// "job:queued", "job:received", "job:created", "job:started", "job:finished", "job:log"...
+		case strings.HasPrefix(event.Event, "job:"):
+			var data struct {
+				BuildID int    `json:"build_id"`
+				Number  string `json:"number"`
+				State   string `json:"state"`
+			}
+
+			if err := json.Unmarshal([]byte(s), &data); err != nil {
+				return err
+			}
+
+			jobKey, err := cache.NewJobKey(data.Number, c.accountID)
+			if err != nil {
+				return err
+			}
+
+			tevent := travisJobUpdate{
+				buildRemoteID: data.BuildID,
+				jobKey:        jobKey,
+				state:         FromTravisState(data.State),
+			}
+
+			select {
+			case teventc <- tevent:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
 }

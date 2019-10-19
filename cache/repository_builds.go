@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/utils"
+	"io"
+	"os"
+	"path"
 	"sort"
 	"sync"
 	"time"
@@ -130,12 +133,11 @@ func (s *RepositoryBuilds) FetchData(ctx context.Context, updates chan time.Time
 	wg := sync.WaitGroup{}
 	for _, requester := range s.cache.requesters {
 		wg.Add(1)
-		go func(r Requester) {
+		go func(r Provider) {
 			defer wg.Done()
 
 			// Update cache with repository
 			repository, err := r.Repository(subCtx, s.repositoryURL)
-
 			if err != nil {
 				errc <- err
 				return
@@ -145,7 +147,7 @@ func (s *RepositoryBuilds) FetchData(ctx context.Context, updates chan time.Time
 				return
 			}
 
-			// Save each build returned by the Requester to the cache
+			// Save each build returned by the Provider to the cache
 			buildc := make(chan Build)
 			buildErrc := make(chan error)
 
@@ -208,20 +210,24 @@ func (s RepositoryBuilds) MaxWidths() map[string]int {
 	return s.maxWidths
 }
 
-func (s *RepositoryBuilds) SetTraversable(key interface{}, traversable bool) {
-	if key == nil {
-		for i := range s.rows {
-			s.rows[i].traversable = traversable
-		}
+func (s *RepositoryBuilds) SetTraversable(key interface{}, traversable bool, recursive bool) error {
+	buildKey, ok := key.(buildRowKey)
+	if !ok {
+		return fmt.Errorf("expected key of concrete type %T but got %v", buildKey, key)
+	}
+	if row, exists := s.treeIndex[buildKey]; exists {
+		row.traversable = traversable
 		s.dfsUpToDate = false
-	} else {
-		if buildKey, ok := key.(buildRowKey); ok {
-			if row, exists := s.treeIndex[buildKey]; exists {
-				row.traversable = traversable
-				s.dfsUpToDate = false
+		if recursive {
+			for _, child := range utils.DepthFirstTraversal(row, true) {
+				if child, ok := child.(*buildRow); ok {
+					child.traversable = traversable
+				}
 			}
 		}
 	}
+
+	return nil
 }
 
 func parse(rows *sql.Rows) (builds []buildRow, maxWidths map[string]int, err error) {
@@ -361,7 +367,7 @@ func (s *RepositoryBuilds) FetchRows() (err error) {
 			job.started_at,
 			job.finished_at,
 		    NULL,
-		    ''
+		    job.web_url
 		FROM build
 		JOIN stage ON
 			build.account_id = stage.account_id
@@ -385,7 +391,7 @@ func (s *RepositoryBuilds) FetchRows() (err error) {
 			build_job.started_at,
 			build_job.finished_at,
 		    NULL,
-		    ''
+		    build_job.web_url
 		FROM build
 		JOIN build_job ON
 			build.account_id = build_job.account_id
@@ -541,17 +547,17 @@ func (s *RepositoryBuilds) Select(key interface{}, nbrBefore int, nbrAfter int) 
 	return selectedRows, index, nil
 }
 
-func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{}, dir string) ([]string, error) {
+func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{}, dir string) ([]string, Streamer, error) {
 	// FIXME This should probably work with marks and open jobs of all marked rows + active row
 	// TODO Allow filtering for errored jobs
 	buildKey, ok := key.(buildRowKey)
 	if !ok {
-		return nil, fmt.Errorf("key conversion to buildRowKey failed: '%v'", key)
+		return nil, nil, fmt.Errorf("key conversion to buildRowKey failed: '%v'", key)
 	}
 
 	build, exists := s.treeIndex[buildKey]
 	if !exists {
-		return nil, fmt.Errorf("no row associated to key '%v'", key)
+		return nil, nil, fmt.Errorf("no row associated to key '%v'", key)
 	}
 
 	jobKeys := make([]JobKey, 0)
@@ -568,8 +574,84 @@ func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{},
 
 	jobs, err := s.cache.FetchJobs(ctx, jobKeys)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return WriteLogs(jobs, dir)
+	paths := make([]string, 0, len(jobs))
+	activeJobs := make(map[Job]io.WriteCloser, 0)
+	finishedJobs := make(map[Job]io.WriteCloser, 0)
+	for _, job := range jobs {
+		filename := fmt.Sprintf(
+			"%s-%d.%d.%d.log",
+			job.Key.AccountID, // FIXME Sanitize account ID
+			job.Key.BuildID,
+			job.Key.StageID,
+			job.Key.ID)
+		jobPath := path.Join(dir, filename)
+		paths = append(paths, jobPath)
+		file, err := os.Create(jobPath)
+		if err != nil {
+			return nil, nil, err
+		}
+		if job.State.isActive() {
+			activeJobs[job] = file
+		} else {
+			finishedJobs[job] = file
+		}
+	}
+
+	if err := WriteLogs(finishedJobs); err != nil {
+		return nil, nil, err
+	}
+
+	var stream Streamer
+	if len(activeJobs) > 0 {
+		stream = func(ctx context.Context) error {
+			return s.cache.StreamLogs(ctx, activeJobs)
+		}
+	}
+
+	return paths, stream, nil
+}
+
+func (c Cache) StreamLogs(ctx context.Context, writerByJob map[Job]io.WriteCloser) error {
+	argsByAccountID := make(map[string]map[int]io.WriteCloser)
+	for job, writer := range writerByJob {
+		if _, exists := argsByAccountID[job.Key.AccountID]; !exists {
+			argsByAccountID[job.Key.AccountID] = make(map[int]io.WriteCloser)
+		}
+
+		argsByAccountID[job.Key.AccountID][job.RemoteID] = writer
+	}
+
+	errc := make(chan error)
+	wg := sync.WaitGroup{}
+	subCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	for accountID, writerByJobID := range argsByAccountID {
+		wg.Add(1)
+		go func(accountID string, writerByJobID map[int]io.WriteCloser) {
+			defer wg.Done()
+
+			requester, exists := c.requesters[accountID]
+			if !exists {
+				errc <- fmt.Errorf("no matching requester found for account ID '%s'", accountID)
+				return
+			}
+			if err := requester.StreamLogs(subCtx, writerByJobID); err != nil {
+				errc <- err
+				return
+			}
+		}(accountID, writerByJobID)
+	}
+
+	var err error
+	for e := range errc {
+		if err == nil {
+			err = e
+		}
+		cancel()
+	}
+
+	return err
 }

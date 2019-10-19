@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -160,6 +161,10 @@ func (c CircleCIClient) AccountID() string {
 func (c CircleCIClient) Builds(ctx context.Context, repository cache.Repository, duration time.Duration, buildc chan<- cache.Build) error {
 	// FIXME Do not hardcode limit
 	return c.fetchRepositoryBuilds(ctx, repository, 20, buildc)
+}
+
+func (c CircleCIClient) StreamLogs(ctx context.Context, writerByJobId map[int]io.WriteCloser) error {
+	return nil
 }
 
 func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {

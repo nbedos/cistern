@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mattn/go-runewidth"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -62,7 +63,7 @@ func depthFirstTraversalPrefixing(node TreeNode, indent string, last bool) {
 	// Special behavior for the root node which is prefixed by "+" if its children are hidden
 	if indent == "" {
 		if len(node.Children()) == 0 || node.Traversable() {
-			prefix = " "
+			prefix = "-"
 		} else {
 			prefix = "+"
 		}
@@ -160,4 +161,14 @@ func NullTimeFromString(s string) (t sql.NullTime, err error) {
 	}
 
 	return
+}
+
+var deleteEraseInLine = regexp.MustCompile(".*\x1b\\[0K")
+var deleteUntilCarriageReturn = regexp.MustCompile(`.*\r([^\r\n])`)
+
+// Is this specific to Travis?
+// FIXME Does not work for streaming
+func PostProcess(log string) string {
+	tmp := deleteEraseInLine.ReplaceAllString(log, "")
+	return deleteUntilCarriageReturn.ReplaceAllString(tmp, "$1")
 }

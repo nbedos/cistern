@@ -31,8 +31,11 @@ func NewTableController(source cache.HierarchicalTabularDataSource, tempDir stri
 		return TableController{}, err
 	}
 
-	status, err := widgets.NewStatusBar(width, height, 1)
+	status, err := widgets.NewStatusBar(width, height)
 	if err != nil {
+		return TableController{}, err
+	}
+	if _, err := status.Write([]byte("j:Down  k:Up  v:Logs  b:Browser  oO:Open  cC:Close  q:Quit")); err != nil {
 		return TableController{}, err
 	}
 
@@ -157,7 +160,7 @@ func (l *TableController) Process(event tcell.Event) (OutputEvent, error) {
 
 				ctx := context.Background()
 				key := l.Table.Rows[l.Table.ActiveLine].Key()
-				paths, err := l.Table.Source.WriteToDirectory(ctx, key, workDirPath)
+				paths, stream, err := l.Table.Source.WriteToDirectory(ctx, key, workDirPath)
 				if err != nil {
 					return NoEvent{}, err
 				}
@@ -165,11 +168,20 @@ func (l *TableController) Process(event tcell.Event) (OutputEvent, error) {
 					// FIXME Display 'No matching (errored) jobs' message in status bar
 					return NoEvent{}, nil
 				}
-				paths = append([]string{"-R"}, paths...)
-				cmd := exec.Command("less", paths...)
-				cmd.Dir = workDirPath
 
-				return ExecCmd{cmd: *cmd}, nil
+				var cmd *exec.Cmd
+
+				if stream == nil {
+					paths = append([]string{"-R"}, paths...)
+					cmd = exec.Command("less", paths...)
+					cmd.Dir = workDirPath
+				} else {
+					paths = append([]string{"-f", "-R"}, paths...)
+					cmd = exec.Command("less", paths...)
+					cmd.Dir = workDirPath
+				}
+
+				return ExecCmd{cmd: *cmd, stream: stream}, nil
 			}
 		}
 	}
@@ -231,15 +243,15 @@ func ProcessDefaultTableEvents(table *widgets.Table, event tcell.Event) (bool, e
 			case 'k':
 				err = table.Scroll(-1)
 			case 'r':
-				// FIXME still useful?
+				// FIXME This is not useful anymore. Request update from... requesters
 				err = table.Refresh()
 			case 'c':
 				err = table.SetFold(false, false)
-			case 'C':
+			case 'C', '-':
 				err = table.SetFold(false, true)
 			case 'o':
 				err = table.SetFold(true, false)
-			case 'O':
+			case 'O', '+':
 				err = table.SetFold(true, true)
 			default:
 				processed = false
