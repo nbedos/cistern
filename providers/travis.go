@@ -283,10 +283,13 @@ func (c TravisClient) AccountID() string {
 	return c.accountID
 }
 
-// FIXME Pass list of builds already cached with update date
-func (c TravisClient) Builds(ctx context.Context, repository cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) error {
+func (c TravisClient) Builds(ctx context.Context, repositoryURL string, maxAge time.Duration, buildc chan<- cache.Build) error {
+	repository, err := c.Repository(ctx, repositoryURL)
+	if err != nil {
+		return err
+	}
+
 	// Create Pusher client
-	// FIXME Requests to "/pusher/auth" should be rate limited too
 	repoChannel := fmt.Sprintf("repo-%d", repository.RemoteID)
 	p, err := c.pusherClient(ctx, []string{repoChannel})
 	if err != nil {
@@ -724,7 +727,7 @@ eventLoop:
 							break
 						}
 					}
-					receivedLogParts[event.RemoteID] += 1
+					receivedLogParts[event.RemoteID]++
 				}
 			}
 		}
@@ -739,7 +742,7 @@ func (c TravisClient) pusherClient(ctx context.Context, channels []string) (p ut
 		return p, err
 	}
 
-	wsURL := utils.PusherUrl(c.pusherHost, pusherKey)
+	wsURL := utils.PusherURL(c.pusherHost, pusherKey)
 	authURL := c.baseURL
 	authURL.Path += "/pusher/auth"
 	authHeader := map[string]string{

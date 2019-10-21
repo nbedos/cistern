@@ -11,7 +11,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
 	"time"
 
 	"github.com/nbedos/citop/cache"
@@ -79,7 +78,7 @@ func RunWidgetApp() (err error) {
 		widgets.DefaultClass: defaultStyle,
 	}
 
-	requesters := []cache.Provider{
+	CIProviders := []cache.Provider{
 		providers.NewTravisClient(
 			providers.TravisOrgURL,
 			providers.TravisPusherHost,
@@ -99,54 +98,19 @@ func RunWidgetApp() (err error) {
 			100*time.Millisecond),
 	}
 
-	// FIXME Remove this last reference to Inserter outside of Cache
-	inserters := []cache.Inserter{
-		cache.Account{
-			ID:       "travis",
-			URL:      "http://travis.example.com/v3",
-			UserID:   "F54E34EA",
-			Username: "username",
-		},
-		cache.Account{
-			ID:       "gitlab",
-			URL:      "http://gitlab.example.com/v3",
-			UserID:   "F54E34EA",
-			Username: "username",
-		},
-		cache.Account{
-			ID:       "circleci",
-			URL:      "http://circleci.example.com/v3",
-			UserID:   "F54E34EA",
-			Username: "username",
-		},
-	}
-
-	cachePath := path.Join(tmpDir, "cache.db")
-	cacheDb, err := cache.NewCache(cachePath, true, requesters)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if errClose := cacheDb.Close(); err == nil {
-			err = errClose
-		}
-	}()
-
-	if err := cacheDb.Save(context.Background(), inserters); err != nil {
-		return err
-	}
+	cacheDB := cache.NewCache(CIProviders)
 
 	eventc := make(chan tcell.Event)
 	outc := make(chan OutputEvent)
 	errc := make(chan error)
 
 	updates := make(chan time.Time)
-	source := cacheDb.NewRepositoryBuilds("https://github.com/nbedos/citop", updates)
+	source := cacheDB.NewRepositoryBuilds("https://github.com/nbedos/citop")
 
 	ctx := context.Background()
 
 	go func() {
-		if err := source.FetchData(ctx, updates); err != nil {
+		if err := cacheDB.UpdateFromProviders(ctx, "https://github.com/nbedos/citop", updates); err != nil {
 			errc <- err
 		}
 	}()

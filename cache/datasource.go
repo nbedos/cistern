@@ -12,7 +12,7 @@ type TabularSourceRow interface {
 
 type HierarchicalTabularDataSource interface {
 	SetTraversable(key interface{}, traversable bool, recursive bool) error
-	FetchRows() error
+	FetchRows()
 	Select(key interface{}, nbrBefore int, nbrAfter int) ([]TabularSourceRow, int, error)
 	SelectFirst(limit int) ([]TabularSourceRow, error)
 	SelectLast(limit int) ([]TabularSourceRow, error)

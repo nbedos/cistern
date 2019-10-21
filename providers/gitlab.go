@@ -33,11 +33,15 @@ func (c GitLabClient) AccountID() string {
 	return c.accountID
 }
 
-func (c GitLabClient) Builds(ctx context.Context, repository cache.Repository, duration time.Duration, buildc chan<- cache.Build) error {
+func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, duration time.Duration, buildc chan<- cache.Build) error {
+	repository, err := c.Repository(ctx, repositoryURL)
+	if err != nil {
+		return err
+	}
 	return c.LastBuilds(ctx, repository, 20, buildc)
 }
 
-func (c GitLabClient) StreamLogs(ctx context.Context, writerByJobId map[int]io.WriteCloser) error {
+func (c GitLabClient) StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error {
 	return nil
 }
 

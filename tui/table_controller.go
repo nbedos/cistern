@@ -22,7 +22,7 @@ type TableController struct {
 
 func NewTableController(source cache.HierarchicalTabularDataSource, tempDir string) (TableController, error) {
 	// TODO Move this out of here
-	headers := []string{"ACCOUNT", "ID", "TYPE", "STATE", "UPDATED", " NAME"}
+	headers := []string{"ACCOUNT", "TYPE", "STATE", "UPDATED", " NAME"}
 
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := 10, 10
@@ -243,7 +243,7 @@ func ProcessDefaultTableEvents(table *widgets.Table, event tcell.Event) (bool, e
 			case 'k':
 				err = table.Scroll(-1)
 			case 'r':
-				// FIXME This is not useful anymore. Request update from... requesters
+				// FIXME This is not useful anymore. Request update from... providers
 				err = table.Refresh()
 			case 'c':
 				err = table.SetFold(false, false)

@@ -11,8 +11,6 @@ import (
 	"os"
 	"path"
 	"sort"
-	"sync"
-	"time"
 )
 
 type buildRowKey struct {
@@ -35,21 +33,6 @@ type buildRow struct {
 	children    []buildRow
 	traversable bool
 	url         string
-}
-
-// meh. Maybe working with build, stage job would be easier.
-func (b buildRow) IsParentOf(other buildRow) bool {
-	switch b.type_ {
-	case "P":
-		return b.key.accountID == other.key.accountID &&
-			b.key.buildID == other.key.buildID
-	case "S":
-		return b.key.accountID == other.key.accountID &&
-			b.key.buildID == other.key.buildID &&
-			b.key.stageID == other.key.stageID
-	}
-
-	return false
 }
 
 func (b buildRow) Traversable() bool {
@@ -110,100 +93,14 @@ type RepositoryBuilds struct {
 	dfsTraversal  []*buildRow
 	dfsIndex      map[buildRowKey]int
 	dfsUpToDate   bool
-	lastUpdate    time.Time
-	updates       chan time.Time
 }
 
-func (c *Cache) NewRepositoryBuilds(repositoryURL string, updates chan time.Time) RepositoryBuilds {
+func (c *Cache) NewRepositoryBuilds(repositoryURL string) RepositoryBuilds {
 	return RepositoryBuilds{
 		cache:         *c,
 		repositoryURL: repositoryURL,
-		updates:       make(chan time.Time),
 		maxWidths:     make(map[string]int),
 	}
-}
-
-// FIXME Concurrency is getting too complex here. Find a way to simplify all of this.
-func (s *RepositoryBuilds) FetchData(ctx context.Context, updates chan time.Time) error {
-	errc := make(chan error)
-
-	subCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	wg := sync.WaitGroup{}
-	for _, requester := range s.cache.requesters {
-		wg.Add(1)
-		go func(r Provider) {
-			defer wg.Done()
-
-			// Update cache with repository
-			repository, err := r.Repository(subCtx, s.repositoryURL)
-			if err != nil {
-				errc <- err
-				return
-			}
-			if err := s.cache.Save(subCtx, []Inserter{repository}); err != nil {
-				errc <- err
-				return
-			}
-
-			// Save each build returned by the Provider to the cache
-			buildc := make(chan Build)
-			buildErrc := make(chan error)
-
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				select {
-				case buildErrc <- r.Builds(subCtx, repository, 0, buildc):
-				case <-subCtx.Done():
-				}
-			}()
-
-			for {
-				select {
-				case build := <-buildc:
-					if err := s.cache.Save(subCtx, []Inserter{build}); err != nil {
-						errc <- err
-						return
-					}
-					wg.Add(1)
-					// Signal database change on update channel but don't block current goroutine
-					go func() {
-						defer wg.Done()
-						select {
-						case updates <- time.Now():
-						case <-subCtx.Done():
-						}
-					}()
-				case err := <-buildErrc:
-					if err != nil {
-						errc <- err
-					}
-					return
-				case <-subCtx.Done():
-					errc <- subCtx.Err()
-					return
-				}
-			}
-		}(requester)
-	}
-
-	go func() {
-		wg.Wait()
-		close(errc)
-		close(updates)
-	}()
-
-	var err error
-	for e := range errc {
-		if err == nil && e != nil {
-			err = e
-			cancel()
-		}
-	}
-
-	return err
 }
 
 func (s RepositoryBuilds) MaxWidths() map[string]int {
@@ -230,186 +127,74 @@ func (s *RepositoryBuilds) SetTraversable(key interface{}, traversable bool, rec
 	return nil
 }
 
-func parse(rows *sql.Rows) (builds []buildRow, maxWidths map[string]int, err error) {
-	// meh.
-	var parentBuild, parentStage *buildRow
-	maxWidths = make(map[string]int)
-
-	for key := range (buildRow{}).Tabular() {
-		maxWidths[key] = runewidth.StringWidth(key)
+func buildRowFromBuild(b Build) buildRow {
+	row := buildRow{
+		key: buildRowKey{
+			accountID: b.AccountID,
+			buildID:   b.ID,
+		},
+		type_:      "P",
+		state:      string(b.State),
+		name:       "",
+		startedAt:  b.StartedAt,
+		finishedAt: b.FinishedAt,
+		updatedAt:  sql.NullTime{Time: b.UpdatedAt, Valid: true},
+		url:        b.WebURL,
 	}
 
-	for rows.Next() {
-		build := buildRow{}
-
-		var startedAt, finishedAt, updatedAt sql.NullString
-		if err = rows.Scan(
-			&build.key.accountID,
-			&build.id,
-			&build.key.buildID,
-			&build.key.stageID,
-			&build.key.jobID,
-			&build.type_,
-			&build.state,
-			&build.name,
-			&startedAt,
-			&finishedAt,
-			&updatedAt,
-			&build.url,
-		); err != nil {
-			return nil, nil, err
-		}
-
-		dates := map[*sql.NullString]*sql.NullTime{
-			&startedAt:  &build.startedAt,
-			&finishedAt: &build.finishedAt,
-			&updatedAt:  &build.updatedAt,
-		}
-		for s, t := range dates {
-			if s.Valid {
-				if t.Time, err = time.Parse(time.RFC3339, s.String); err != nil {
-					return
-				}
-				t.Valid = true
-			}
-		}
-
-		if build.type_ == "P" {
-			builds = append(builds, build)
-			parentBuild = &builds[len(builds)-1]
-		} else {
-			if parentBuild == nil || len(builds) == 0 {
-				return nil, nil, errors.New("no previous build found for current stage")
-			}
-
-			if !parentBuild.IsParentOf(build) {
-				return nil, nil, errors.New("current build is not the parent of the current stage")
-			}
-
-			switch build.type_ {
-			case "S":
-				parentBuild.children = append(parentBuild.children, build)
-				parentStage = &parentBuild.children[len(parentBuild.children)-1]
-			case "J":
-				if build.key.stageID == 0 {
-					parentBuild.children = append(parentBuild.children, build)
-				} else {
-					if parentStage == nil {
-						return nil, nil, errors.New("no previous stage found for current job")
-					}
-
-					if !parentStage.IsParentOf(build) {
-						return nil, nil, errors.New("current stage is not the parent of the current job")
-					}
-
-					parentStage.children = append(parentStage.children, build)
-				}
-			}
-		}
-
-		for key, value := range build.Tabular() {
-			maxWidths[key] = utils.MaxInt(maxWidths[key], runewidth.StringWidth(value))
-		}
-
+	for _, job := range b.Jobs {
+		row.children = append(row.children, buildRowFromJob(*job))
 	}
 
-	return
+	for _, stage := range b.Stages {
+		row.children = append(row.children, buildRowFromStage(*stage))
+	}
+
+	return row
 }
 
-func (s *RepositoryBuilds) FetchRows() (err error) {
-	query := `
-		SELECT
-			build.account_id,
-			printf('#%d', build.id),
-			build.id,
-			0,
-			0,
-			'P',
-			build.state,
-		    build.account_id,
-			build.started_at,
-			build.finished_at,
-		    build.updated_at,
-		    build.web_url
-		FROM build
-
-		UNION ALL
-
-		SELECT
-			build.account_id,
-			printf('#%d.%d', build.id, stage.id),
-			build.id,
-			stage.id,
-			0,
-			'S',
-			stage.state,
-			stage.name,
-			NULL,
-			NULL,
-			NULL,
-		    ''
-		FROM build
-		JOIN stage ON
-			build.account_id = stage.account_id
-			AND build.id = stage.build_id
-		
-		UNION ALL
-
-		SELECT
-			build.account_id,
-			printf('#%d.%d.%d', build.id, stage.id ,job.id),
-			build.id,
-			stage.id,
-			job.id,
-			'J',
-			job.state,
-			job.name,
-			job.started_at,
-			job.finished_at,
-		    NULL,
-		    job.web_url
-		FROM build
-		JOIN stage ON
-			build.account_id = stage.account_id
-			AND build.id = stage.build_id
-		JOIN job ON
-			stage.account_id = job.account_id
-			AND stage.build_id = job.build_id
-			AND stage.id = job.stage_id
-			
-		UNION ALL
-
-		SELECT
-			build.account_id,
-			printf('#%d.0.%d', build.id, build_job.id), -- FIXME SECURELY remove the stage_id segment
-			build.id,
-			0,
-			build_job.id,
-			'J',
-			build_job.state,
-			build_job.name,
-			build_job.started_at,
-			build_job.finished_at,
-		    NULL,
-		    build_job.web_url
-		FROM build
-		JOIN build_job ON
-			build.account_id = build_job.account_id
-			AND build.id = build_job.build_id
-			
-	ORDER BY 3 DESC, 4 ASC, 5 ASC;`
-
-	ctx := context.Background()
-	sqlRows, err := s.cache.db.QueryContext(ctx, query)
-	if err != nil {
-		return
+func buildRowFromStage(s Stage) buildRow {
+	row := buildRow{
+		key: buildRowKey{
+			accountID: s.AccountID,
+			buildID:   s.BuildID,
+			stageID:   s.ID,
+		},
+		type_:      "S",
+		state:      string(s.State),
+		name:       s.Name,
+		startedAt:  sql.NullTime{},
+		finishedAt: sql.NullTime{},
+		updatedAt:  sql.NullTime{},
+		url:        "",
 	}
-	defer func() {
-		if errClose := sqlRows.Close(); err != nil {
-			err = errClose
-		}
-	}()
 
+	for _, job := range s.Jobs {
+		row.children = append(row.children, buildRowFromJob(*job))
+	}
+
+	return row
+}
+
+func buildRowFromJob(j Job) buildRow {
+	return buildRow{
+		key: buildRowKey{
+			accountID: j.Key.AccountID,
+			buildID:   j.Key.BuildID,
+			stageID:   j.Key.StageID,
+			jobID:     j.Key.ID,
+		},
+		type_:      "J",
+		state:      string(j.State),
+		name:       j.Name,
+		startedAt:  j.StartedAt,
+		finishedAt: j.FinishedAt,
+		updatedAt:  sql.NullTime{},
+		url:        j.WebURL,
+	}
+}
+
+func (s *RepositoryBuilds) FetchRows() {
 	// Save traversable state of current nodes
 	traversables := make(map[buildRowKey]bool)
 	for i := range s.rows {
@@ -421,31 +206,41 @@ func (s *RepositoryBuilds) FetchRows() (err error) {
 		}
 	}
 
-	rows, maxWidths, err := parse(sqlRows)
-	if err != nil {
-		return
+	rows := make([]buildRow, 0)
+	for _, build := range s.cache.Builds() {
+		rows = append(rows, buildRowFromBuild(build))
 	}
+
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i].updatedAt.Valid && rows[j].updatedAt.Valid && rows[i].updatedAt.Time.After(rows[j].updatedAt.Time)
 	})
-	s.rows, s.maxWidths = rows, maxWidths
 
-	s.treeIndex = make(map[buildRowKey]*buildRow)
-	for i := range s.rows {
-		traversal := utils.DepthFirstTraversal(&s.rows[i], true)
+	maxWidths := make(map[string]int)
+	for header := range (buildRow{}).Tabular() {
+		maxWidths[header] = runewidth.StringWidth(header)
+	}
+
+	treeIndex := make(map[buildRowKey]*buildRow)
+	for i := range rows {
+		traversal := utils.DepthFirstTraversal(&rows[i], true)
 		for j := range traversal {
 			row := traversal[j].(*buildRow)
-			s.treeIndex[row.key] = row
+			treeIndex[row.key] = row
 			// Restore traversable state of node
 			if value, exists := traversables[row.key]; exists {
 				row.traversable = value
 			}
+
+			for header, value := range row.Tabular() {
+				maxWidths[header] = utils.MaxInt(maxWidths[header], runewidth.StringWidth(value))
+			}
 		}
 	}
-	s.dfsUpToDate = false
-	s.lastUpdate = time.Now()
 
-	return
+	s.rows = rows
+	s.maxWidths = maxWidths
+	s.treeIndex = treeIndex
+	s.dfsUpToDate = false
 }
 
 func (s *RepositoryBuilds) prefixAndIndex() {
@@ -572,10 +367,7 @@ func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{},
 		}
 	}
 
-	jobs, err := s.cache.FetchJobs(ctx, jobKeys)
-	if err != nil {
-		return nil, nil, err
-	}
+	jobs := s.cache.FetchJobs(jobKeys)
 
 	paths := make([]string, 0, len(jobs))
 	activeJobs := make(map[Job]io.WriteCloser, 0)
@@ -612,46 +404,4 @@ func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{},
 	}
 
 	return paths, stream, nil
-}
-
-func (c Cache) StreamLogs(ctx context.Context, writerByJob map[Job]io.WriteCloser) error {
-	argsByAccountID := make(map[string]map[int]io.WriteCloser)
-	for job, writer := range writerByJob {
-		if _, exists := argsByAccountID[job.Key.AccountID]; !exists {
-			argsByAccountID[job.Key.AccountID] = make(map[int]io.WriteCloser)
-		}
-
-		argsByAccountID[job.Key.AccountID][job.RemoteID] = writer
-	}
-
-	errc := make(chan error)
-	wg := sync.WaitGroup{}
-	subCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	for accountID, writerByJobID := range argsByAccountID {
-		wg.Add(1)
-		go func(accountID string, writerByJobID map[int]io.WriteCloser) {
-			defer wg.Done()
-
-			requester, exists := c.requesters[accountID]
-			if !exists {
-				errc <- fmt.Errorf("no matching requester found for account ID '%s'", accountID)
-				return
-			}
-			if err := requester.StreamLogs(subCtx, writerByJobID); err != nil {
-				errc <- err
-				return
-			}
-		}(accountID, writerByJobID)
-	}
-
-	var err error
-	for e := range errc {
-		if err == nil {
-			err = e
-		}
-		cancel()
-	}
-
-	return err
 }

@@ -158,12 +158,16 @@ func (c CircleCIClient) AccountID() string {
 	return c.accountID
 }
 
-func (c CircleCIClient) Builds(ctx context.Context, repository cache.Repository, duration time.Duration, buildc chan<- cache.Build) error {
+func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, duration time.Duration, buildc chan<- cache.Build) error {
+	repository, err := c.Repository(ctx, repositoryURL)
+	if err != nil {
+		return err
+	}
 	// FIXME Do not hardcode limit
 	return c.fetchRepositoryBuilds(ctx, repository, 20, buildc)
 }
 
-func (c CircleCIClient) StreamLogs(ctx context.Context, writerByJobId map[int]io.WriteCloser) error {
+func (c CircleCIClient) StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error {
 	return nil
 }
 

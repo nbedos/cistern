@@ -26,7 +26,7 @@ const (
 )
 
 type ConnectionEstablishedPayload struct {
-	SocketId        string `json:"socket_id"`
+	SocketID        string `json:"socket_id"`
 	ActivityTimeout int    `json:"activity_timeout"`
 }
 
@@ -70,7 +70,7 @@ func UnmarshalPayload(data []byte, v interface{}) error {
 type PusherClient struct {
 	conn        *websocket.Conn
 	httpClient  *http.Client
-	authUrl     string
+	authURL     string
 	authHeader  map[string]string
 	authLimiter <-chan time.Time
 	connected   bool
@@ -87,7 +87,7 @@ func NewPusherClient(ctx context.Context, wsURL string, authURL string, authHead
 
 	return PusherClient{
 		conn:        conn,
-		authUrl:     authURL,
+		authURL:     authURL,
 		authHeader:  authHeader,
 		authLimiter: authLimiter,
 		httpClient:  &http.Client{Timeout: 10 * time.Second},
@@ -119,7 +119,7 @@ func (p *PusherClient) NextEvent(ctx context.Context) (event PusherEvent, err er
 
 		p.connected = true
 		p.timeout = payload.ActivityTimeout
-		p.socketID = payload.SocketId
+		p.socketID = payload.SocketID
 	case SubscriptionSucceeded, PublicSubscriptionSucceeded:
 		p.channels[event.Channel] = true
 	case Ping:
@@ -219,7 +219,7 @@ func (p *PusherClient) Authenticate(ctx context.Context, channel string) (string
 		return "", err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", p.authUrl, bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequestWithContext(ctx, "POST", p.authURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return "", err
 	}
@@ -259,7 +259,7 @@ func (p *PusherClient) Authenticate(ctx context.Context, channel string) (string
 	return m.Channels[channel], nil
 }
 
-func PusherUrl(host string, appKey string) string {
+func PusherURL(host string, appKey string) string {
 	parameters := url.Values{}
 	parameters.Add("protocol", "7")
 	parameters.Add("client", "citop") // FIXME

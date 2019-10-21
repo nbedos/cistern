@@ -51,11 +51,9 @@ func (t Table) nbrRows() int {
 }
 
 func (t *Table) Refresh() error {
-	err := t.Source.FetchRows()
-	if err != nil {
-		return err
-	}
+	t.Source.FetchRows()
 
+	var err error
 	var rows []cache.TabularSourceRow
 	activeLine := t.ActiveLine
 	if len(t.Rows) > 0 {

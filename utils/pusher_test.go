@@ -16,7 +16,7 @@ func Test_RecentRepoBuilds(t *testing.T) {
 	}
 
 	authUrl := "https://api.travis-ci.org/pusher/auth"
-	wsURL := PusherUrl("ws.pusherapp.com", "5df8ac576dcccf4fd076")
+	wsURL := PusherURL("ws.pusherapp.com", "5df8ac576dcccf4fd076")
 	//channel := "private-user-1842548"
 	channel := "repo-25564643"
 
