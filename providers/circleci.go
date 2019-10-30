@@ -186,7 +186,10 @@ func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (c
 
 	// Validate repository existence on CircleCI
 	endPoint := c.projectEndpoint(owner, name)
-	if _, err = c.listRecentBuildIDs(ctx, endPoint, 1); err != nil {
+	if _, _, err = c.listRecentBuildIDs(ctx, endPoint, 0, 1, time.Second); err != nil {
+		if err, ok := err.(HTTPError); ok && err.Status == 404 {
+			return cache.Repository{}, cache.ErrRepositoryNotFound
+		}
 		return cache.Repository{}, err
 	}
 
@@ -198,54 +201,78 @@ func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (c
 	}, nil
 }
 
-func (c CircleCIClient) listRecentBuildIDs(ctx context.Context, projectEndpoint url.URL, limit int) ([]int, error) {
+func (c CircleCIClient) listRecentBuildIDs(ctx context.Context, projectEndpoint url.URL, offset int, limit int, maxAge time.Duration) ([]int, bool, error) {
 	parameters := projectEndpoint.Query()
+	parameters.Add("offset", strconv.Itoa(offset))
 	parameters.Add("limit", strconv.Itoa(limit))
 	parameters.Add("shallow", "true")
 	projectEndpoint.RawQuery = parameters.Encode()
 
 	body, err := c.get(ctx, projectEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 
 	var builds []circleCIBuild
 	if err := json.Unmarshal(body.Bytes(), &builds); err != nil {
-		return nil, err
+		return nil, true, err
 	}
 
+	lastPage := false
 	ids := make([]int, 0, len(builds))
 	for _, build := range builds {
+		date, err := utils.NullTimeFromString(build.CreatedAt)
+		if err == nil && date.Valid && time.Since(date.Time) > maxAge {
+			lastPage = true
+		}
 		ids = append(ids, build.ID)
 	}
+	if len(builds) == 0 {
+		lastPage = true
+	}
 
-	return ids, nil
+	return ids, lastPage, nil
 }
 
-func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository cache.Repository, limit int, buildc chan<- cache.Build) error {
+func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) error {
 	projectEndpoint := c.projectEndpoint(repository.Owner, repository.Name)
-	buildIDs, err := c.listRecentBuildIDs(ctx, projectEndpoint, limit)
-	if err != nil {
-		return err
-	}
+	pageSize := 20
 
 	errc := make(chan error)
 	wg := sync.WaitGroup{}
-	for _, buildID := range buildIDs {
-		wg.Add(1)
-		go func(buildID int) {
-			defer wg.Done()
-			build, err := c.fetchBuild(ctx, projectEndpoint, buildID, repository.URL)
+	subCtx, cancel := context.WithCancel(ctx)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		var err error
+		var buildIDs []int
+		lastPage := false
+		for offset := 0; !lastPage; offset += pageSize {
+			buildIDs, lastPage, err = c.listRecentBuildIDs(subCtx, projectEndpoint, offset, pageSize, maxAge)
 			if err != nil {
 				errc <- err
+				return
 			}
-			select {
-			case buildc <- build:
-			case <-ctx.Done():
-				errc <- ctx.Err()
+
+			for _, buildID := range buildIDs {
+				wg.Add(1)
+				go func(buildID int) {
+					defer wg.Done()
+					build, err := c.fetchBuild(subCtx, projectEndpoint, buildID, &repository)
+					if err != nil {
+						errc <- err
+						return
+					}
+					select {
+					case buildc <- build:
+					case <-subCtx.Done():
+						errc <- subCtx.Err()
+					}
+				}(buildID)
 			}
-		}(buildID)
-	}
+		}
+	}()
 
 	go func() {
 		wg.Wait()
@@ -253,8 +280,10 @@ func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository ca
 	}()
 
 	// FIXME We probably want to report all errors
+	var err error
 	for e := range errc {
-		if err == nil {
+		if e != nil && err == nil {
+			cancel()
 			err = e
 		}
 	}
@@ -262,7 +291,7 @@ func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository ca
 	return err
 }
 
-func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL, buildID int, repositoryURL string) (build cache.Build, err error) {
+func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL, buildID int, repository *cache.Repository) (build cache.Build, err error) {
 	projectEndpoint.Path += fmt.Sprintf("/%d", buildID)
 	body, err := c.get(ctx, projectEndpoint)
 	if err != nil {
@@ -296,7 +325,7 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 		}
 	}
 
-	build, err = circleCIBuild.ToCacheBuild(c.accountID, repositoryURL)
+	build, err = circleCIBuild.ToCacheBuild(c.accountID, repository)
 	if err != nil {
 		return build, err
 	}
@@ -306,11 +335,9 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 	log := fullLog.String()
 	build.Jobs = map[int]*cache.Job{
 		1: {
-			Key: cache.JobKey{
-				AccountID: c.accountID,
-				BuildID:   buildID,
-				ID:        1,
-			},
+			Build:      &build,
+			Stage:      nil,
+			ID:         1,
 			State:      build.State,
 			Name:       build.Commit.Message, // FIXME Jobs should have a specific name, not repeat the commit message
 			CreatedAt:  build.CreatedAt,
@@ -349,16 +376,13 @@ type circleCIBuild struct {
 	} `json:"steps"`
 }
 
-func (b circleCIBuild) ToCacheBuild(accountID string, repositoryURL string) (cache.Build, error) {
+func (b circleCIBuild) ToCacheBuild(accountID string, repository *cache.Repository) (cache.Build, error) {
 	build := cache.Build{
-		AccountID:     accountID,
-		ID:            b.ID,
-		RepositoryURL: repositoryURL,
+		Repository: repository,
+		ID:         b.ID,
 		Commit: cache.Commit{
-			AccountID:     accountID,
-			ID:            b.Sha,
-			RepositoryURL: repositoryURL,
-			Message:       b.Message,
+			Sha:     b.Sha,
+			Message: b.Message,
 		},
 		RepoBuildNumber: strconv.Itoa(b.ID),
 		State:           fromCircleCIStatus(b.Lifecycle, b.Outcome),
@@ -389,11 +413,9 @@ func (b circleCIBuild) ToCacheBuild(accountID string, repositoryURL string) (cac
 	}
 	build.UpdatedAt = updatedAt.Time
 
-	if b.CommittedAt != "" {
-		if build.Commit.Date.Time, err = time.Parse(time.RFC3339, b.CommittedAt); err != nil {
-			return cache.Build{}, err
-		}
-		build.Commit.Date.Valid = true
+	build.Commit.Date, err = utils.NullTimeFromString(b.CommittedAt)
+	if err != nil {
+		return cache.Build{}, err
 	}
 
 	if build.IsTag = b.Tag != ""; build.IsTag {

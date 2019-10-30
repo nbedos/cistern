@@ -6,6 +6,7 @@ import (
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/encoding"
 	"github.com/nbedos/citop/providers"
+	"github.com/nbedos/citop/utils"
 	"github.com/nbedos/citop/widgets"
 	"io/ioutil"
 	"log"
@@ -105,20 +106,26 @@ func RunWidgetApp() (err error) {
 	errc := make(chan error)
 
 	updates := make(chan time.Time)
-	source := cacheDB.NewRepositoryBuilds("https://github.com/nbedos/citop")
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	originURL, err := utils.GitOriginURL(cwd)
+	if err != nil {
+		return err
+	}
+	source := cacheDB.NewRepositoryBuilds(originURL)
 
 	ctx := context.Background()
 
 	go func() {
-		if err := cacheDB.UpdateFromProviders(ctx, "https://github.com/nbedos/citop", updates); err != nil {
+		if err := cacheDB.UpdateFromProviders(ctx, originURL, 14*24*time.Hour, updates); err != nil {
 			errc <- err
 		}
 	}()
 
 	go func() {
-		var controller TableController
-
-		controller, err = NewTableController(&source, tmpDir)
+		controller, err := NewTableController(&source, tmpDir)
 		if err != nil {
 			errc <- err
 			return

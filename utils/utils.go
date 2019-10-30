@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/mattn/go-runewidth"
+	"gopkg.in/src-d/go-git.v4"
 	"net/url"
 	"regexp"
 	"strings"
@@ -112,6 +113,13 @@ func Coalesce(times ...sql.NullTime) sql.NullTime {
 }
 
 func RepositorySlugFromURL(repositoryURL string) (string, error) {
+	// Turn "git@host:path.git" into "host/path" so that it is compatible with url.Parse()
+	if strings.HasPrefix(repositoryURL, "git@") {
+		repositoryURL = strings.TrimPrefix(repositoryURL, "git@")
+		repositoryURL = strings.TrimSuffix(repositoryURL, ".git")
+		repositoryURL = strings.Replace(repositoryURL, ":", "/", 1)
+	}
+
 	u, err := url.Parse(repositoryURL)
 	if err != nil {
 		return "", err
@@ -145,15 +153,6 @@ func NullTimeFrom(t *time.Time) sql.NullTime {
 	}
 }
 
-func NullStringFromNullTime(t sql.NullTime) (s sql.NullString) {
-	if t.Valid {
-		s.String = t.Time.Format(time.RFC3339)
-		s.Valid = true
-	}
-
-	return
-}
-
 func NullTimeFromString(s string) (t sql.NullTime, err error) {
 	if s != "" {
 		t.Time, err = time.Parse(time.RFC3339, s)
@@ -171,4 +170,22 @@ var deleteUntilCarriageReturn = regexp.MustCompile(`.*\r([^\r\n])`)
 func PostProcess(log string) string {
 	tmp := deleteEraseInLine.ReplaceAllString(log, "")
 	return deleteUntilCarriageReturn.ReplaceAllString(tmp, "$1")
+}
+
+func GitOriginURL(path string) (string, error) {
+	r, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{DetectDotGit: true})
+	if err != nil {
+		return "", err
+	}
+
+	remote, err := r.Remote("origin")
+	if err != nil {
+		return "", err
+	}
+
+	if len(remote.Config().URLs) == 0 {
+		return "", fmt.Errorf("GIT repository '%s': remote 'origin' has not associated URL", path)
+	}
+
+	return remote.Config().URLs[0], nil
 }

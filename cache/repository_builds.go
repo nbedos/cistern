@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strings"
 )
 
 type buildRowKey struct {
@@ -128,26 +129,37 @@ func (s *RepositoryBuilds) SetTraversable(key interface{}, traversable bool, rec
 }
 
 func buildRowFromBuild(b Build) buildRow {
+	messageLines := strings.SplitN(b.Commit.Message, "\n", 2)
 	row := buildRow{
 		key: buildRowKey{
-			accountID: b.AccountID,
+			accountID: b.Repository.AccountID,
 			buildID:   b.ID,
 		},
 		type_:      "P",
 		state:      string(b.State),
-		name:       "",
+		name:       messageLines[0],
 		startedAt:  b.StartedAt,
 		finishedAt: b.FinishedAt,
 		updatedAt:  sql.NullTime{Time: b.UpdatedAt, Valid: true},
 		url:        b.WebURL,
 	}
 
-	for _, job := range b.Jobs {
-		row.children = append(row.children, buildRowFromJob(*job))
+	jobIDs := make([]int, 0, len(b.Jobs))
+	for ID := range b.Jobs {
+		jobIDs = append(jobIDs, ID)
+	}
+	sort.Ints(jobIDs)
+	for _, jobID := range jobIDs {
+		row.children = append(row.children, buildRowFromJob(*b.Jobs[jobID]))
 	}
 
-	for _, stage := range b.Stages {
-		row.children = append(row.children, buildRowFromStage(*stage))
+	stageIDs := make([]int, 0, len(b.Stages))
+	for stageID := range b.Stages {
+		stageIDs = append(stageIDs, stageID)
+	}
+	sort.Ints(stageIDs)
+	for _, stageID := range stageIDs {
+		row.children = append(row.children, buildRowFromStage(*b.Stages[stageID]))
 	}
 
 	return row
@@ -156,8 +168,8 @@ func buildRowFromBuild(b Build) buildRow {
 func buildRowFromStage(s Stage) buildRow {
 	row := buildRow{
 		key: buildRowKey{
-			accountID: s.AccountID,
-			buildID:   s.BuildID,
+			accountID: s.Build.Repository.AccountID,
+			buildID:   s.Build.ID,
 			stageID:   s.ID,
 		},
 		type_:      "S",
@@ -169,27 +181,36 @@ func buildRowFromStage(s Stage) buildRow {
 		url:        "",
 	}
 
-	for _, job := range s.Jobs {
-		row.children = append(row.children, buildRowFromJob(*job))
+	jobIDs := make([]int, 0, len(s.Jobs))
+	for ID := range s.Jobs {
+		jobIDs = append(jobIDs, ID)
+	}
+	sort.Ints(jobIDs)
+	for _, jobID := range jobIDs {
+		row.children = append(row.children, buildRowFromJob(*s.Jobs[jobID]))
 	}
 
 	return row
 }
 
 func buildRowFromJob(j Job) buildRow {
+	stageID := 0
+	if j.Stage != nil {
+		stageID = j.Stage.ID
+	}
 	return buildRow{
 		key: buildRowKey{
-			accountID: j.Key.AccountID,
-			buildID:   j.Key.BuildID,
-			stageID:   j.Key.StageID,
-			jobID:     j.Key.ID,
+			accountID: j.Build.Repository.AccountID,
+			buildID:   j.Build.ID,
+			stageID:   stageID,
+			jobID:     j.ID,
 		},
 		type_:      "J",
 		state:      string(j.State),
 		name:       j.Name,
 		startedAt:  j.StartedAt,
 		finishedAt: j.FinishedAt,
-		updatedAt:  sql.NullTime{},
+		updatedAt:  utils.Coalesce(j.FinishedAt, j.StartedAt, j.CreatedAt),
 		url:        j.WebURL,
 	}
 }
@@ -373,12 +394,16 @@ func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{},
 	activeJobs := make(map[Job]io.WriteCloser, 0)
 	finishedJobs := make(map[Job]io.WriteCloser, 0)
 	for _, job := range jobs {
+		stageID := 0
+		if job.Stage != nil {
+			stageID = job.Stage.ID
+		}
 		filename := fmt.Sprintf(
 			"%s-%d.%d.%d.log",
-			job.Key.AccountID, // FIXME Sanitize account ID
-			job.Key.BuildID,
-			job.Key.StageID,
-			job.Key.ID)
+			job.Build.Repository.AccountID, // FIXME Sanitize account ID
+			job.Build.ID,
+			stageID,
+			job.ID)
 		jobPath := path.Join(dir, filename)
 		paths = append(paths, jobPath)
 		file, err := os.Create(jobPath)

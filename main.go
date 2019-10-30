@@ -10,8 +10,8 @@ import (
 
 func main() {
 	signal.Ignore(syscall.SIGINT)
-	// FIXME Handle SIGSTOP/SIGCONT
-	signal.Ignore(syscall.SIGSTOP)
+	// FIXME Do not ignore SIGTSTP/SIGCONT
+	signal.Ignore(syscall.SIGTSTP)
 
 	if err := tui.RunWidgetApp(); err != nil {
 		fmt.Println(err)

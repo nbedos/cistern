@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-var citopURL = "https://github.com/nbedos/citop"
-
 func Test_RecentRepoBuilds(t *testing.T) {
 	token := os.Getenv("TRAVIS_API_TOKEN")
 	if token == "" {
@@ -18,10 +16,17 @@ func Test_RecentRepoBuilds(t *testing.T) {
 
 	client := NewTravisClient(TravisOrgURL, TravisPusherHost, token, "travis", time.Millisecond*time.Duration(50))
 
+	repository := cache.Repository{
+		AccountID: "travis",
+		URL:       "https://github.com/nbedos/citop",
+		Owner:     "nbedos",
+		Name:      "citop",
+		RemoteID:  0,
+	}
 	errc := make(chan error)
 	buildc := make(chan cache.Build)
 	go func() {
-		err := client.RepositoryBuilds(context.Background(), citopURL, 20, 5, buildc)
+		err := client.RepositoryBuilds(context.Background(), &repository, time.Hour*24*14, buildc)
 		close(buildc)
 		errc <- err
 	}()
@@ -56,13 +61,8 @@ func TestTravisclient_Repository(t *testing.T) {
 
 	t.Run("repository not found", func(t *testing.T) {
 		_, err := client.Repository(context.Background(), "https://github.com/nbedos/citop-404")
-		switch e := err.(type) {
-		case HTTPError:
-			if e.Status != 404 {
-				t.Fatalf("expected status 404 but got %d", e.Status)
-			}
-		default:
-			t.Fatal("expected HTTPError")
+		if err != cache.ErrRepositoryNotFound {
+			t.Fatal("expected cache.ErrRepositoryNotFound")
 		}
 	})
 }

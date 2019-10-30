@@ -12,15 +12,13 @@ import (
 	"time"
 )
 
-// FIXME Find a better name
+var ErrRepositoryNotFound = errors.New("repository not found")
+
 type Provider interface {
 	AccountID() string
+	// Builds should return err == ErrRepositoryNotFound when appropriate
 	Builds(ctx context.Context, repositoryURL string, duration time.Duration, buildc chan<- Build) error
 	StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error
-}
-
-type Inserter interface {
-	insert(ctx context.Context, transaction *sql.Tx) (sql.Result, error)
 }
 
 type State string
@@ -30,7 +28,7 @@ func (s State) isActive() bool {
 }
 
 const (
-	Unknown  State = "?"
+	Unknown  State = ""
 	Pending  State = "pending"
 	Running  State = "running"
 	Passed   State = "passed"
@@ -38,6 +36,31 @@ const (
 	Canceled State = "canceled"
 	Skipped  State = "skipped"
 )
+
+func StageState(jobs []Job) State {
+	precedence := map[State]int{
+		Unknown:  7,
+		Running:  6,
+		Pending:  5,
+		Canceled: 4,
+		Failed:   3,
+		Passed:   2,
+		Skipped:  1,
+	}
+	if len(jobs) == 0 {
+		return Unknown
+	}
+	state := jobs[0].State
+	for _, job := range jobs[1:] {
+		if !job.AllowFailure || (job.State != Canceled && job.State != Failed) {
+			if precedence[job.State] > precedence[state] {
+				state = job.State
+			}
+		}
+	}
+
+	return state
+}
 
 type Account struct {
 	ID       string
@@ -59,17 +82,14 @@ func (r Repository) Slug() string {
 }
 
 type Commit struct {
-	AccountID     string
-	ID            string
-	RepositoryURL string
-	Message       string
-	Date          sql.NullTime
+	Sha     string
+	Message string
+	Date    sql.NullTime
 }
 
 type Build struct {
-	AccountID       string
+	Repository      *Repository
 	ID              int
-	RepositoryURL   string
 	Commit          Commit
 	Ref             string
 	IsTag           bool
@@ -86,9 +106,9 @@ type Build struct {
 	RemoteID        int // FIXME Not in DB
 }
 
-func (b *Build) SetJobState(key JobKey, state State) error {
-	if key.AccountID != b.AccountID || key.BuildID != b.ID {
-		return errors.New("account id or build id mismatch between key and receiver")
+func (b Build) Get(key JobKey) (*Job, bool) {
+	if key.AccountID != b.Repository.AccountID || key.BuildID != b.ID {
+		return nil, false
 	}
 
 	var jobs map[int]*Job
@@ -97,27 +117,24 @@ func (b *Build) SetJobState(key JobKey, state State) error {
 	} else {
 		stage, exists := b.Stages[key.StageID]
 		if !exists {
-			return errors.New("stage not found")
+			return nil, false
 		}
 		jobs = stage.Jobs
 	}
 
 	job, exists := jobs[key.ID]
 	if !exists {
-		return errors.New("job not found")
+		return nil, false
 	}
-	job.State = state
-
-	return nil
+	return job, true
 }
 
 type Stage struct {
-	AccountID string
-	BuildID   int
-	ID        int
-	Name      string
-	State     State
-	Jobs      map[int]*Job
+	Build *Build
+	ID    int
+	Name  string
+	State State
+	Jobs  map[int]*Job
 }
 
 type JobKey struct {
@@ -127,39 +144,20 @@ type JobKey struct {
 	ID        int
 }
 
-// Return jobKey from string of dot separated numbers
-func NewJobKey(s string, accountID string) (JobKey, error) {
-	// 	"1.2"   => jobKey{BuildID: 1, ID: 2}
-	// 	"1.2.3" => jobKey{BuildID: 1, StageID: 2, ID: 3}
-	key := JobKey{AccountID: accountID}
-
-	n, err := fmt.Sscanf(s, "%d.%d.%d", &key.BuildID, &key.StageID, &key.ID)
-	if err != nil || n != 3 {
-		n, err = fmt.Sscanf(s, "%d.%d", &key.BuildID, &key.ID)
-		if err != nil {
-			return key, err
-		}
-		if n != 2 {
-			return key, fmt.Errorf("failed parsing jobKey from '%s'", s)
-		}
-		key.StageID = 0
-	}
-
-	return key, nil
-}
-
-// FIXME Now that jobs are embedded in Build and Stage we might remove Key and only keep ID
 type Job struct {
-	Key        JobKey
-	State      State
-	Name       string
-	CreatedAt  sql.NullTime
-	StartedAt  sql.NullTime
-	FinishedAt sql.NullTime
-	Duration   sql.NullInt64
-	Log        sql.NullString
-	WebURL     string
-	RemoteID   int
+	Build        *Build
+	Stage        *Stage // nil if the Job is only linked to a Build
+	ID           int
+	State        State
+	Name         string
+	CreatedAt    sql.NullTime
+	StartedAt    sql.NullTime
+	FinishedAt   sql.NullTime
+	Duration     sql.NullInt64
+	Log          sql.NullString
+	WebURL       string
+	RemoteID     int
+	AllowFailure bool
 }
 
 type buildKey struct {
@@ -190,7 +188,7 @@ func (c *Cache) Save(build *Build) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.builds[buildKey{
-		AccountID: build.AccountID,
+		AccountID: build.Repository.AccountID,
 		BuildID:   build.ID,
 	}] = build
 }
@@ -206,7 +204,7 @@ func (c Cache) Builds() []Build {
 	return builds
 }
 
-func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, updates chan time.Time) error {
+func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, maxAge time.Duration, updates chan time.Time) error {
 	subCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	wg := sync.WaitGroup{}
@@ -217,12 +215,10 @@ func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, u
 		wg.Add(1)
 		go func(p Provider) {
 			defer wg.Done()
-			select {
-			case errc <- p.Builds(subCtx, repositoryURL, 0, buildc):
-				return
-			case <-subCtx.Done():
-				errc <- subCtx.Err()
-				return
+			err := p.Builds(subCtx, repositoryURL, maxAge, buildc)
+			// FIXME We probably want to log this
+			if err != nil && err != ErrRepositoryNotFound {
+				errc <- err
 			}
 		}(provider)
 	}
@@ -346,11 +342,11 @@ func WriteLogs(writerByJob map[Job]io.WriteCloser) error {
 func (c Cache) StreamLogs(ctx context.Context, writerByJob map[Job]io.WriteCloser) error {
 	argsByAccountID := make(map[string]map[int]io.WriteCloser)
 	for job, writer := range writerByJob {
-		if _, exists := argsByAccountID[job.Key.AccountID]; !exists {
-			argsByAccountID[job.Key.AccountID] = make(map[int]io.WriteCloser)
+		if _, exists := argsByAccountID[job.Build.Repository.AccountID]; !exists {
+			argsByAccountID[job.Build.Repository.AccountID] = make(map[int]io.WriteCloser)
 		}
 
-		argsByAccountID[job.Key.AccountID][job.RemoteID] = writer
+		argsByAccountID[job.Build.Repository.AccountID][job.RemoteID] = writer
 	}
 
 	errc := make(chan error)

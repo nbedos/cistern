@@ -172,3 +172,14 @@ func TestDepthFirstTraversal(t *testing.T) {
 		}
 	}
 }
+
+func TestGitOriginURL(t *testing.T) {
+	u, err := GitOriginURL(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(u, "nbedos/citop") {
+		t.Fatalf("expected url to contain 'nbedos/citop' but got '%s'", u)
+	}
+}
