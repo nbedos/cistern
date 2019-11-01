@@ -85,8 +85,7 @@ func TestPrintFoldableTree(t *testing.T) {
 
 	}
 
-	expected := strings.Split(strings.Trim(`
- root
+	expected := strings.Split(`-root
  ├── a
  │   ├── aa
  │   │   ├── aaa
@@ -97,8 +96,7 @@ func TestPrintFoldableTree(t *testing.T) {
  ├─+ c
  └── d
      ├── da
-     └── db
-`, "\n"), "\n")
+     └── db`, "\n")
 
 	if !cmp.Equal(result, expected) {
 		for _, line := range result {

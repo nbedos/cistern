@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -18,31 +19,13 @@ func TestDumpTodir(t *testing.T) {
 
 	jobs := []Job{
 		{
-			Key: JobKey{
-				AccountID: "gitlab",
-				BuildID:   3,
-				StageID:   0,
-				ID:        1,
-			},
-			Log: sql.NullString{String: "log1", Valid: true},
+			Log: sql.NullString{String: "log1\n", Valid: true},
 		},
 		{
-			Key: JobKey{
-				AccountID: "gitlab",
-				BuildID:   3,
-				StageID:   1,
-				ID:        1,
-			},
-			Log: sql.NullString{String: "log2", Valid: true},
+			Log: sql.NullString{String: "log2\n", Valid: true},
 		},
 		{
-			Key: JobKey{
-				AccountID: "gitlab",
-				BuildID:   3,
-				StageID:   1,
-				ID:        2,
-			},
-			Log: sql.NullString{String: "log3", Valid: true},
+			Log: sql.NullString{String: "log3\n", Valid: true},
 		},
 	}
 
@@ -58,7 +41,8 @@ func TestDumpTodir(t *testing.T) {
 		paths[i] = filepath
 	}
 
-	if err := WriteLogs(writerByJob); err != nil {
+	cache := NewCache(nil)
+	if err := cache.WriteLogs(context.Background(), writerByJob); err != nil {
 		t.Fatal(err)
 	}
 

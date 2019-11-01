@@ -119,7 +119,7 @@ func RunWidgetApp() (err error) {
 	ctx := context.Background()
 
 	go func() {
-		if err := cacheDB.UpdateFromProviders(ctx, originURL, 14*24*time.Hour, updates); err != nil {
+		if err := cacheDB.UpdateFromProviders(ctx, originURL, 7*24*time.Hour, updates); err != nil {
 			errc <- err
 		}
 	}()
@@ -211,6 +211,7 @@ func RunWidgetApp() (err error) {
 				// e.cmd.Stderr = os.Stderr FIXME?
 				e.cmd.Stdout = os.Stdout
 				// FIXME Show return value in status bar
+
 
 				subCtx, cancel := context.WithCancel(ctx)
 				if e.stream != nil {

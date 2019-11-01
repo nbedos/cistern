@@ -65,11 +65,11 @@ func (c GitLabClient) Repository(ctx context.Context, repositoryURL string) (cac
 	}
 
 	return cache.Repository{
+		ID:        project.ID,
 		Owner:     project.Owner.Username,
 		Name:      project.Name,
 		URL:       project.WebURL,
 		AccountID: c.accountID,
-		RemoteID:  project.ID,
 	}, nil
 }
 
@@ -93,90 +93,74 @@ func FromGitLabState(s string) cache.State {
 }
 
 func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) error {
-	errc := make(chan error)
-	wg := sync.WaitGroup{}
-	subCtx, cancel := context.WithCancel(ctx)
+	opt := gitlab.ListProjectPipelinesOptions{
+		ListOptions: gitlab.ListOptions{
+			Page:    0,
+			PerPage: 20,
+		},
+	}
+	lastPage := false
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		opt := gitlab.ListProjectPipelinesOptions{
-			ListOptions: gitlab.ListOptions{
-				Page:    0,
-				PerPage: 20,
-			},
+pageLoop:
+	for opt.ListOptions.Page = 0; !lastPage; opt.ListOptions.Page++ {
+		select {
+		case <-c.rateLimiter:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
-		lastPage := false
-		lastPageMux := sync.Mutex{}
-		for opt.ListOptions.Page = 0; !lastPage; opt.ListOptions.Page++ {
-			select {
-			case <-c.rateLimiter:
-			case <-subCtx.Done():
-				errc <- subCtx.Err()
-				return
-			}
-			pipelines, _, err := c.remote.Pipelines.ListProjectPipelines(repository.RemoteID, &opt,
-				gitlab.WithContext(subCtx))
+
+		pipelines, _, err := c.remote.Pipelines.ListProjectPipelines(repository.ID, &opt,
+			gitlab.WithContext(ctx))
+		if err != nil {
+			return err
+		}
+		if len(pipelines) == 0 {
+			lastPage = true
+			continue
+		}
+
+		for _, minimalPipeline := range pipelines {
+			build, err := c.fetchBuild(ctx, &repository, minimalPipeline.ID)
 			if err != nil {
-				errc <- err
-				return
+				return err
 			}
-			if len(pipelines) == 0 {
+
+			// minimalPipeline is so minimal that it has no date attribute so we have to test
+			// the date of the full build.
+			if build.CreatedAt.Valid && time.Since(build.CreatedAt.Time) > maxAge {
 				lastPage = true
+				continue pageLoop
 			}
-
-			for _, minimalPipeline := range pipelines {
-				wg.Add(1)
-				go func(pipelineID int) {
-					defer wg.Done()
-					build, err := c.fetchBuild(subCtx, repository.RemoteID, &repository, pipelineID)
-					if err != nil {
-						errc <- err
-						return
-					}
-
-					// minimalPipeline is so minimal that is has no date attribute so we have to test
-					// the date of the full build.
-					if build.CreatedAt.Valid && time.Since(build.CreatedAt.Time) > maxAge {
-						lastPageMux.Lock()
-						lastPage = true
-						lastPageMux.Unlock()
-						return
-					}
-					select {
-					case buildc <- build:
-					case <-subCtx.Done():
-						errc <- subCtx.Err()
-					}
-				}(minimalPipeline.ID)
+			select {
+			case buildc <- build:
+			case <-ctx.Done():
+				return ctx.Err()
 			}
-		}
-	}()
-
-	go func() {
-		wg.Wait()
-		close(errc)
-	}()
-
-	var err error
-	for e := range errc {
-		if e != nil && err == nil {
-			cancel()
-			err = e
 		}
 	}
 
-	return err
+	return nil
 }
 
-func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repository *cache.Repository, pipelineID int) (build cache.Build, err error) {
+func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, error) {
+	trace, _, err := c.remote.Jobs.GetTraceFile(repository.ID, jobID, nil, gitlab.WithContext(ctx))
+	if err != nil {
+		return "", err
+	}
+	buf := new(bytes.Buffer)
+	if _, err := buf.ReadFrom(trace); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Repository, pipelineID int) (build cache.Build, err error) {
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
 		return build, ctx.Err()
 	}
-	pipeline, _, err := c.remote.Pipelines.GetPipeline(projectID, pipelineID, gitlab.WithContext(ctx))
+	pipeline, _, err := c.remote.Pipelines.GetPipeline(repository.ID, pipelineID, gitlab.WithContext(ctx))
 	if err != nil {
 		return build, err
 	}
@@ -186,7 +170,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repository 
 	case <-ctx.Done():
 		return build, ctx.Err()
 	}
-	commit, _, err := c.remote.Commits.GetCommit(projectID, pipeline.SHA, gitlab.WithContext(ctx))
+	commit, _, err := c.remote.Commits.GetCommit(repository.ID, pipeline.SHA, gitlab.WithContext(ctx))
 	if err != nil {
 		return build, err
 	}
@@ -223,7 +207,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repository 
 	case <-ctx.Done():
 		return build, ctx.Err()
 	}
-	jobs, _, err := c.remote.Jobs.ListPipelineJobs(projectID, pipeline.ID, nil, gitlab.WithContext(ctx))
+	jobs, _, err := c.remote.Jobs.ListPipelineJobs(repository.ID, pipeline.ID, nil, gitlab.WithContext(ctx))
 	if err != nil {
 		return build, nil
 	}
@@ -247,9 +231,9 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repository 
 	errc := make(chan error, len(jobs))
 	wg := sync.WaitGroup{}
 
-	for jobIndex, job := range jobs {
+	for _, job := range jobs {
 		wg.Add(1)
-		go func(job *gitlab.Job, jobIndex int) {
+		go func(job *gitlab.Job) {
 			defer wg.Done()
 			select {
 			case <-c.rateLimiter:
@@ -257,35 +241,22 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repository 
 				errc <- ctx.Err()
 				return
 			}
-			trace, _, err := c.remote.Jobs.GetTraceFile(projectID, job.ID, nil, gitlab.WithContext(ctx))
-			if err != nil {
-				errc <- err
-				return
-			}
-			buf := new(bytes.Buffer)
-			_, err = buf.ReadFrom(trace)
-			if err != nil {
-				errc <- err
-				return
-			}
 
-			log := buf.String()
 			jobc <- cache.Job{
 				Build:        &build,
 				Stage:        stagesByName[job.Stage],
-				ID:           jobIndex + 1,
+				ID:           job.ID,
 				State:        FromGitLabState(job.Status),
 				Name:         job.Name,
-				Log:          sql.NullString{String: log, Valid: log != ""},
+				Log:          sql.NullString{},
 				CreatedAt:    utils.NullTimeFrom(job.CreatedAt),
 				StartedAt:    utils.NullTimeFrom(job.StartedAt),
 				FinishedAt:   utils.NullTimeFrom(job.FinishedAt),
 				Duration:     sql.NullInt64{Int64: int64(job.Duration), Valid: int64(job.Duration) > 0},
 				WebURL:       job.WebURL,
 				AllowFailure: job.AllowFailure,
-				RemoteID:     job.ID,
 			}
-		}(job, jobIndex)
+		}(job)
 	}
 
 	go func() {
@@ -307,7 +278,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, projectID int, repository 
 		for _, job := range stage.Jobs {
 			previousJob, exists := jobsByName[job.Name]
 			// Dates may be NULL so we have to rely on IDs to find out which job is older. meh.
-			if !exists || previousJob.RemoteID < job.RemoteID {
+			if !exists || previousJob.ID < job.ID {
 				jobsByName[job.Name] = job
 			}
 		}

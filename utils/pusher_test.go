@@ -41,7 +41,6 @@ forever:
 		case err != nil:
 			t.Fatal(err)
 		}
-		fmt.Printf("received event %s (%s)\n", event.Event, string(event.Data))
 		switch event.Event {
 		case ConnectionEstablished:
 			err := p.Subscribe(ctx, channel)

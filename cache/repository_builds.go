@@ -417,7 +417,7 @@ func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{},
 		}
 	}
 
-	if err := WriteLogs(finishedJobs); err != nil {
+	if err := s.cache.WriteLogs(ctx, finishedJobs); err != nil {
 		return nil, nil, err
 	}
 

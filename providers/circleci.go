@@ -171,6 +171,23 @@ func (c CircleCIClient) StreamLogs(ctx context.Context, writerByJobID map[int]io
 	return nil
 }
 
+func (c CircleCIClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, error) {
+	endPoint := c.projectEndpoint(repository.Owner, repository.Name)
+	build, err := c.fetchBuild(ctx, endPoint, jobID, &repository, true)
+	if err != nil {
+		return "", err
+	}
+	job, exists := build.Jobs[jobID]
+	if !exists {
+		return "", fmt.Errorf("no matching job found for ID %d", jobID)
+	}
+	if !job.Log.Valid {
+		return "", nil
+	}
+
+	return job.Log.String, nil
+}
+
 func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
 	slug, err := utils.RepositorySlugFromURL(repositoryURL)
 	if err != nil {
@@ -193,6 +210,7 @@ func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (c
 		return cache.Repository{}, err
 	}
 
+	// FIXME What about Repository.ID?
 	return cache.Repository{
 		AccountID: c.accountID,
 		URL:       repositoryURL,
@@ -259,7 +277,7 @@ func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository ca
 				wg.Add(1)
 				go func(buildID int) {
 					defer wg.Done()
-					build, err := c.fetchBuild(subCtx, projectEndpoint, buildID, &repository)
+					build, err := c.fetchBuild(subCtx, projectEndpoint, buildID, &repository, false)
 					if err != nil {
 						errc <- err
 						return
@@ -291,7 +309,7 @@ func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository ca
 	return err
 }
 
-func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL, buildID int, repository *cache.Repository) (build cache.Build, err error) {
+func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL, buildID int, repository *cache.Repository, log bool) (build cache.Build, err error) {
 	projectEndpoint.Path += fmt.Sprintf("/%d", buildID)
 	body, err := c.get(ctx, projectEndpoint)
 	if err != nil {
@@ -303,26 +321,31 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 		return build, err
 	}
 
-	// FIXME Prefix each line by the name of the step in a way compatible with carriage returns
-	fullLog := strings.Builder{}
-	for _, step := range circleCIBuild.Steps {
-		for _, action := range step.Actions {
-			prefix := fmt.Sprintf("[%s] ", action.Name)
-			if action.BashCommand != "" {
-				// BashCommand contains the reason for failure when no configuration is found
-				// for the project so include it in the log output
-				fullLog.WriteString(utils.Prefix(action.BashCommand, prefix+"#"))
-				fullLog.WriteString(utils.Prefix("\n", prefix))
-			}
-			if action.LogURL != "" {
-				log, err := c.fetchLog(ctx, action.LogURL)
-				if err != nil {
-					return build, err
+	buildLog := sql.NullString{}
+	if log {
+		// FIXME Prefix each line by the name of the step in a way compatible with carriage returns
+		fullLog := strings.Builder{}
+		for _, step := range circleCIBuild.Steps {
+			for _, action := range step.Actions {
+				prefix := fmt.Sprintf("[%s] ", action.Name)
+				if action.BashCommand != "" {
+					// BashCommand contains the reason for failure when no configuration is found
+					// for the project so include it in the log output
+					fullLog.WriteString(utils.Prefix(action.BashCommand, prefix+"#"))
+					fullLog.WriteString(utils.Prefix("\n", prefix))
 				}
+				if action.LogURL != "" {
+					log, err := c.fetchLog(ctx, action.LogURL)
+					if err != nil {
+						return build, err
+					}
 
-				fullLog.WriteString(utils.Prefix(log, prefix))
+					fullLog.WriteString(utils.Prefix(log, prefix))
+				}
 			}
 		}
+		buildLog.Valid = true
+		buildLog.String = fullLog.String()
 	}
 
 	build, err = circleCIBuild.ToCacheBuild(c.accountID, repository)
@@ -332,7 +355,6 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 
 	// FIXME Creating this job would not be necessary if we could store the log in the build
 	//  itself. Would that be better?
-	log := fullLog.String()
 	build.Jobs = map[int]*cache.Job{
 		1: {
 			Build:      &build,
@@ -344,7 +366,7 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 			StartedAt:  build.StartedAt,
 			FinishedAt: build.FinishedAt,
 			Duration:   build.Duration,
-			Log:        sql.NullString{String: log, Valid: log != ""},
+			Log:        buildLog,
 		},
 	}
 

@@ -18,6 +18,7 @@ type Provider interface {
 	AccountID() string
 	// Builds should return err == ErrRepositoryNotFound when appropriate
 	Builds(ctx context.Context, repositoryURL string, duration time.Duration, buildc chan<- Build) error
+	Log(ctx context.Context, repository Repository, jobID int) (string, error)
 	StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error
 }
 
@@ -71,10 +72,10 @@ type Account struct {
 
 type Repository struct {
 	AccountID string
+	ID        int
 	URL       string
 	Owner     string
 	Name      string
-	RemoteID  int
 }
 
 func (r Repository) Slug() string {
@@ -156,7 +157,6 @@ type Job struct {
 	Duration     sql.NullInt64
 	Log          sql.NullString
 	WebURL       string
-	RemoteID     int
 	AllowFailure bool
 }
 
@@ -191,6 +191,21 @@ func (c *Cache) Save(build *Build) {
 		AccountID: build.Repository.AccountID,
 		BuildID:   build.ID,
 	}] = build
+}
+
+func (c *Cache) SaveJob(job *Job) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	key := buildKey{
+		AccountID: job.Build.Repository.AccountID,
+		BuildID:   job.Build.ID,
+	}
+	build, exists := c.builds[key]
+	if !exists {
+		return fmt.Errorf("no matching build found in cache for key %v", key)
+	}
+	build.Jobs[job.ID] = job
+	return nil
 }
 
 func (c Cache) Builds() []Build {
@@ -294,33 +309,52 @@ func (c *Cache) FetchJobs(jobsKeys []JobKey) []Job {
 	return jobs
 }
 
-func WriteLogs(writerByJob map[Job]io.WriteCloser) error {
+func (c *Cache) WriteLogs(ctx context.Context, writerByJob map[Job]io.WriteCloser) error {
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
+	subCtx, cancel := context.WithCancel(ctx)
 	for job, writer := range writerByJob {
-		if job.Log.Valid {
-			wg.Add(1)
-			go func(log string, writer io.WriteCloser) {
-				var err error
-				defer wg.Done()
-				defer func() {
-					// FIXME errClose is not reported if err != nil
-					if errClose := writer.Close(); errClose != nil && err == nil {
-						err = errClose
-					}
-					if err != nil {
-						errc <- err
-					}
-				}()
-				if !strings.HasSuffix(log, "\n") {
-					log = log + "\n"
+		wg.Add(1)
+		go func(job Job, writer io.WriteCloser) {
+			var err error
+			defer wg.Done()
+			defer func() {
+				// FIXME errClose is not reported if err != nil
+				if errClose := writer.Close(); errClose != nil && err == nil {
+					err = errClose
 				}
-				preprocessedLog := utils.PostProcess(log)
-				if _, err = writer.Write([]byte(preprocessedLog)); err != nil {
+				if err != nil {
+					errc <- err
+				}
+			}()
+
+			if !job.Log.Valid {
+				accountID := job.Build.Repository.AccountID
+				provider, exists := c.providers[accountID]
+				if !exists {
+					err = fmt.Errorf("no matching provider found in cache for account ID '%s'", accountID)
 					return
 				}
-			}(job.Log.String, writer)
-		}
+				log, err := provider.Log(subCtx, *job.Build.Repository, job.ID)
+				if err != nil {
+					return
+				}
+
+				job.Log = sql.NullString{String: log, Valid: true}
+				if err = c.SaveJob(&job); err != nil {
+					return
+				}
+			}
+
+			log := job.Log.String
+			if !strings.HasSuffix(log, "\n") {
+				log = log + "\n"
+			}
+			processedLog := utils.PostProcess(log)
+			if _, err = writer.Write([]byte(processedLog)); err != nil {
+				return
+			}
+		}(job, writer)
 	}
 
 	go func() {
@@ -333,6 +367,7 @@ func WriteLogs(writerByJob map[Job]io.WriteCloser) error {
 		// Return first error only. meh. FIXME
 		if err == nil {
 			err = e
+			cancel()
 		}
 	}
 
@@ -346,7 +381,7 @@ func (c Cache) StreamLogs(ctx context.Context, writerByJob map[Job]io.WriteClose
 			argsByAccountID[job.Build.Repository.AccountID] = make(map[int]io.WriteCloser)
 		}
 
-		argsByAccountID[job.Build.Repository.AccountID][job.RemoteID] = writer
+		argsByAccountID[job.Build.Repository.AccountID][job.ID] = writer
 	}
 
 	errc := make(chan error)

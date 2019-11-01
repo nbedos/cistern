@@ -21,7 +21,6 @@ func Test_RecentRepoBuilds(t *testing.T) {
 		URL:       "https://github.com/nbedos/citop",
 		Owner:     "nbedos",
 		Name:      "citop",
-		RemoteID:  0,
 	}
 	errc := make(chan error)
 	buildc := make(chan cache.Build)
