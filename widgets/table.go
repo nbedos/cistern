@@ -66,6 +66,11 @@ func (t *Table) Refresh() error {
 	if err != nil {
 		return err
 	}
+
+	if t.ActiveLine == 0 {
+		activeLine = 0
+	}
+
 	t.setRows(rows)
 	t.setActiveLine(activeLine)
 
