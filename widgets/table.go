@@ -101,6 +101,23 @@ func (t Table) Size() (int, int) {
 	return t.width, t.height
 }
 
+func (t *Table) NextMatch(s string, ascending bool) bool {
+	if len(t.Rows) == 0 {
+		return false
+	}
+
+	top := t.Rows[0].Key()
+	bottom := t.Rows[len(t.Rows)-1].Key()
+	active := t.Rows[t.ActiveLine].Key()
+	rows, i, err := t.Source.NextMatch(top, bottom, active, s, ascending)
+	if err == cache.ErrNoMatchFound {
+		return false
+	}
+	t.setRows(rows)
+	t.setActiveLine(i)
+	return true
+}
+
 func (t *Table) Resize(width int, height int) error {
 	if width < 0 || height < 0 {
 		return errors.New("width and height must be >= 0")

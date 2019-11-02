@@ -121,7 +121,7 @@ func RunWidgetApp() (err error) {
 	}()
 
 	go func() {
-		defaultStatus := "j:Down  k:Up  v:Logs  b:Browser  oO:Open  cC:Close  q:Quit"
+		defaultStatus := "j:Down  k:Up  /:Search  v:Logs  b:Browser  oO:Open  cC:Close  q:Quit"
 		controller, err := NewTableController(&source, tmpDir, defaultStatus)
 		if err != nil {
 			errc <- err

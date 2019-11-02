@@ -310,9 +310,7 @@ func (c *Cache) FetchJobs(jobsKeys []JobKey) []Job {
 }
 
 func (c *Cache) WriteLog(ctx context.Context, job Job, writer io.WriteCloser) error {
-	defer func() {
-		writer.Close() // FIXME Handle error
-	}()
+	defer writer.Close() // FIXME Handle error
 
 	if !job.Log.Valid {
 		accountID := job.Build.Repository.AccountID

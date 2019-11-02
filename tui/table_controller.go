@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/gdamore/tcell"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
@@ -115,6 +116,7 @@ func (c *TableController) SendShowText(ctx context.Context, outc chan OutputEven
 }
 
 func (c *TableController) Process(ctx context.Context, event tcell.Event, outc chan OutputEvent) error {
+	c.ClearStatus()
 	switch ev := event.(type) {
 	case *tcell.EventResize:
 		sx, sy := ev.Size()
@@ -137,9 +139,10 @@ func (c *TableController) Process(ctx context.Context, event tcell.Event, outc c
 				c.status.ShowInput = false
 			}
 			if c.status.InputBuffer != "" {
-				/*if err := c.table.Search(c.status.InputBuffer); err != nil {
-					return c, NoEvent{}, err
-				}*/
+				found := c.table.NextMatch(c.status.InputBuffer, true)
+				if !found {
+					c.SetStatus(fmt.Sprintf("No match found for %#v", c.status.InputBuffer))
+				}
 			}
 		case tcell.KeyCtrlU:
 			if c.inputMode {
@@ -169,6 +172,7 @@ func (c *TableController) Process(ctx context.Context, event tcell.Event, outc c
 			case '/':
 				c.inputMode = true
 				c.status.ShowInput = true
+				c.status.InputBuffer = ""
 			case 'e', 'v':
 				c.SetStatus("Fetching logs...")
 				if err := c.SendShowText(ctx, outc); err != nil {
@@ -214,14 +218,14 @@ func (c *TableController) Process(ctx context.Context, event tcell.Event, outc c
 		}
 	}
 
-	if err := ProcessDefaultTableEvents(c.table, event); err != nil {
+	if err := ProcessDefaultTableEvents(c.table, event, c.status.InputBuffer); err != nil {
 		return err
 	}
 
 	return c.SendShowText(ctx, outc)
 }
 
-func ProcessDefaultTableEvents(table *widgets.Table, event tcell.Event) error {
+func ProcessDefaultTableEvents(table *widgets.Table, event tcell.Event, search string) error {
 	switch ev := event.(type) {
 	case *tcell.EventKey:
 		switch ev.Key() {
@@ -273,6 +277,11 @@ func ProcessDefaultTableEvents(table *widgets.Table, event tcell.Event) error {
 				return table.SetFold(true, false)
 			case 'O', '+':
 				return table.SetFold(true, true)
+			case 'n', 'N':
+				// FIXME Return found status
+				if search != "" {
+					_ = table.NextMatch(search, ev.Rune() == 'n')
+				}
 			}
 		}
 	}

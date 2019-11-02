@@ -15,6 +15,8 @@ import (
 	"strings"
 )
 
+var ErrNoMatchFound = errors.New("no match found")
+
 type buildRowKey struct {
 	accountID string
 	buildID   int
@@ -284,6 +286,56 @@ func (s *RepositoryBuilds) prefixAndIndex() {
 	s.dfsUpToDate = true
 }
 
+func (s *RepositoryBuilds) NextMatch(top, bottom, active interface{}, search string, ascending bool) ([]TabularSourceRow, int, error) {
+	activeKey, ok := active.(buildRowKey)
+	if !ok {
+		return nil, 0, fmt.Errorf("casting key %v to buildRowKey failed", active)
+	}
+	topKey, ok := top.(buildRowKey)
+	if !ok {
+		return nil, 0, fmt.Errorf("casting key %v to buildRowKey failed", top)
+	}
+	bottomKey, ok := bottom.(buildRowKey)
+	if !ok {
+		return nil, 0, fmt.Errorf("casting key %v to buildRowKey failed", bottom)
+	}
+
+	var next func(int) int
+	var start int
+	if ascending {
+		start = utils.Modulo(s.dfsIndex[activeKey]+1, len(s.dfsTraversal))
+		next = func(i int) int {
+			return utils.Modulo(i+1, len(s.dfsTraversal))
+		}
+	} else {
+		start = utils.Modulo(s.dfsIndex[activeKey]-1, len(s.dfsTraversal))
+		next = func(i int) int {
+			return utils.Modulo(i-1, len(s.dfsTraversal))
+		}
+	}
+
+	for i := start; i != s.dfsIndex[activeKey]; i = next(i) {
+		row := s.dfsTraversal[i]
+		for _, value := range row.Tabular() {
+			if strings.Contains(value, search) {
+				nbrRows := s.dfsIndex[bottomKey] - s.dfsIndex[topKey] + 1
+				var maxIndex, minIndex int
+				if i > s.dfsIndex[activeKey] {
+					maxIndex = utils.MaxInt(s.dfsIndex[bottomKey], i)
+					minIndex = utils.MaxInt(s.dfsIndex[topKey], maxIndex-nbrRows+1)
+				} else {
+					minIndex = utils.MinInt(s.dfsIndex[topKey], i)
+					maxIndex = utils.MinInt(s.dfsIndex[bottomKey], minIndex+nbrRows-1)
+				}
+
+				return s.Select(row.key, i-minIndex, maxIndex-i)
+			}
+		}
+	}
+
+	return nil, 0, ErrNoMatchFound
+}
+
 func (s *RepositoryBuilds) SelectFirst(limit int) ([]TabularSourceRow, error) {
 	if !s.dfsUpToDate {
 		s.prefixAndIndex()
@@ -365,7 +417,6 @@ func (s *RepositoryBuilds) Select(key interface{}, nbrBefore int, nbrAfter int) 
 }
 
 func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{}, dir string) ([]string, Streamer, error) {
-	// FIXME This should probably work with marks and open jobs of all marked rows + active row
 	// TODO Allow filtering for errored jobs
 	buildKey, ok := key.(buildRowKey)
 	if !ok {

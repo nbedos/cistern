@@ -11,6 +11,15 @@ import (
 	"time"
 )
 
+func Modulo(a, b int) int {
+	result := a % b
+	if result < 0 {
+		result += b
+	}
+
+	return result
+}
+
 func MaxInt(a, b int) int {
 	if a > b {
 		return a
