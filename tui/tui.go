@@ -21,10 +21,6 @@ type OutputEvent interface {
 	isOutputEvent()
 }
 
-type NoEvent struct{}
-
-func (e NoEvent) isOutputEvent() {}
-
 type ShowText struct {
 	content []widgets.StyledText
 }
@@ -116,7 +112,7 @@ func RunWidgetApp() (err error) {
 	}
 	source := cacheDB.NewRepositoryBuilds(originURL)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
 		if err := cacheDB.UpdateFromProviders(ctx, originURL, 7*24*time.Hour, updates); err != nil {
@@ -125,7 +121,8 @@ func RunWidgetApp() (err error) {
 	}()
 
 	go func() {
-		controller, err := NewTableController(&source, tmpDir)
+		defaultStatus := "j:Down  k:Up  v:Logs  b:Browser  oO:Open  cC:Close  q:Quit"
+		controller, err := NewTableController(&source, tmpDir, defaultStatus)
 		if err != nil {
 			errc <- err
 			return
@@ -138,22 +135,14 @@ func RunWidgetApp() (err error) {
 				if err != nil {
 					errc <- err
 				}
-
 				outc <- ShowText{content}
 
 			case event := <-eventc:
-				outEv, err := controller.Process(event)
-				if err != nil {
+				if event == nil {
+					return
+				}
+				if err = controller.Process(ctx, event, outc); err != nil {
 					errc <- err
-				}
-
-				if _, isNoEvent := outEv.(NoEvent); !isNoEvent {
-					outc <- outEv
-				}
-
-				if _, isExit := outEv.(ExitEvent); isExit {
-					close(outc)
-					break
 				}
 			}
 		}
@@ -197,6 +186,10 @@ func RunWidgetApp() (err error) {
 				return nil
 			}
 			switch e := outEvent.(type) {
+			case ExitEvent:
+				cancel()
+				return
+
 			case ShowText:
 				screen.Clear()
 				if err = widgets.Draw(e.content, screen, styleSheet); err != nil {
@@ -211,7 +204,6 @@ func RunWidgetApp() (err error) {
 				// e.cmd.Stderr = os.Stderr FIXME?
 				e.cmd.Stdout = os.Stdout
 				// FIXME Show return value in status bar
-
 
 				subCtx, cancel := context.WithCancel(ctx)
 				if e.stream != nil {

@@ -29,13 +29,11 @@ func NewStatusBar(width, height int) (StatusBar, error) {
 	}, nil
 }
 
-func (s *StatusBar) Write(p []byte) (int, error) {
-	s.outputBuffer = append(s.outputBuffer, string(p))
-	if len(s.outputBuffer) > s.height {
-		s.outputBuffer = s.outputBuffer[:s.height]
+func (s *StatusBar) Write(status string) {
+	s.outputBuffer = append(s.outputBuffer, status)
+	if offset := len(s.outputBuffer) - s.height; offset > 0 {
+		s.outputBuffer = s.outputBuffer[offset : offset+s.height]
 	}
-
-	return len(p), nil
 }
 
 func (s StatusBar) Size() (int, int) {

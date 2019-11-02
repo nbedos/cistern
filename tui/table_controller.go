@@ -7,6 +7,7 @@ import (
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
 	"github.com/nbedos/citop/widgets"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -14,13 +15,14 @@ import (
 )
 
 type TableController struct {
-	Table     widgets.Table
-	Status    widgets.StatusBar
-	TempDir   string
-	InputMode bool
+	table         *widgets.Table
+	status        *widgets.StatusBar
+	tempDir       string
+	inputMode     bool
+	defaultStatus string
 }
 
-func NewTableController(source cache.HierarchicalTabularDataSource, tempDir string) (TableController, error) {
+func NewTableController(source cache.HierarchicalTabularDataSource, tempDir string, defaultStatus string) (TableController, error) {
 	// TODO Move this out of here
 	headers := []string{"ACCOUNT", "TYPE", "STATE", "UPDATED", " NAME"}
 
@@ -35,30 +37,37 @@ func NewTableController(source cache.HierarchicalTabularDataSource, tempDir stri
 	if err != nil {
 		return TableController{}, err
 	}
-	if _, err := status.Write([]byte("j:Down  k:Up  v:Logs  b:Browser  oO:Open  cC:Close  q:Quit")); err != nil {
-		return TableController{}, err
-	}
+	status.Write(defaultStatus)
 
 	return TableController{
-		Table:   table,
-		Status:  status,
-		TempDir: tempDir,
+		table:         &table,
+		status:        &status,
+		tempDir:       tempDir,
+		defaultStatus: defaultStatus,
 	}, nil
 }
 
-func (l *TableController) Refresh() ([]widgets.StyledText, error) {
-	if err := l.Table.Refresh(); err != nil {
+func (c *TableController) SetStatus(s string) {
+	c.status.Write(s)
+}
+
+func (c *TableController) ClearStatus() {
+	c.SetStatus(c.defaultStatus)
+}
+
+func (c *TableController) Refresh() ([]widgets.StyledText, error) {
+	if err := c.table.Refresh(); err != nil {
 		return nil, err
 	}
 
-	return l.Text()
+	return c.Text()
 }
 
-func (l TableController) Text() ([]widgets.StyledText, error) {
+func (c TableController) Text() ([]widgets.StyledText, error) {
 	texts := make([]widgets.StyledText, 0)
 	yOffset := 0
 
-	for _, child := range []widgets.Widget{&l.Table, &l.Status} {
+	for _, child := range []widgets.Widget{c.table, c.status} {
 		childTexts, err := child.Text()
 		if err != nil {
 			return texts, err
@@ -74,155 +83,169 @@ func (l TableController) Text() ([]widgets.StyledText, error) {
 	return texts, nil
 }
 
-func (l *TableController) Resize(width int, height int) error {
+func (c *TableController) Resize(width int, height int) error {
 	if width < 0 || height < 0 {
 		return errors.New("width and height must be >=0")
 	}
 	tableHeight := utils.MaxInt(0, height-1)
 	statusHeight := height - tableHeight
 
-	if err := l.Table.Resize(width, tableHeight); err != nil {
+	if err := c.table.Resize(width, tableHeight); err != nil {
 		return err
 	}
 
-	if err := l.Status.Resize(width, statusHeight); err != nil {
+	if err := c.status.Resize(width, statusHeight); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (l *TableController) Process(event tcell.Event) (OutputEvent, error) {
+func (c *TableController) SendShowText(ctx context.Context, outc chan OutputEvent) error {
+	texts, err := c.Text()
+	if err != nil {
+		return err
+	}
+	select {
+	case outc <- ShowText{content: texts}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	return nil
+}
+
+func (c *TableController) Process(ctx context.Context, event tcell.Event, outc chan OutputEvent) error {
 	switch ev := event.(type) {
 	case *tcell.EventResize:
 		sx, sy := ev.Size()
-		if err := l.Resize(sx, sy); err != nil {
+		if err := c.Resize(sx, sy); err != nil {
 			log.Fatal(err)
 		}
 
-		texts, err := l.Text()
-		return ShowText{content: texts}, err
+		return c.SendShowText(ctx, outc)
 
 	case *tcell.EventKey:
 		switch ev.Key() {
 		case tcell.KeyEsc:
-			if l.InputMode {
-				l.InputMode = false
-				l.Status.ShowInput = false
+			if c.inputMode {
+				c.inputMode = false
+				c.status.ShowInput = false
 			}
 		case tcell.KeyEnter:
-			if l.InputMode {
-				l.InputMode = false
-				l.Status.ShowInput = false
+			if c.inputMode {
+				c.inputMode = false
+				c.status.ShowInput = false
 			}
-			if l.Status.InputBuffer != "" {
-				/*if err := l.Table.Search(l.Status.InputBuffer); err != nil {
-					return l, NoEvent{}, err
+			if c.status.InputBuffer != "" {
+				/*if err := c.table.Search(c.status.InputBuffer); err != nil {
+					return c, NoEvent{}, err
 				}*/
 			}
 		case tcell.KeyCtrlU:
-			if l.InputMode {
-				l.Status.InputBuffer = ""
+			if c.inputMode {
+				c.status.InputBuffer = ""
 			}
 
 		case tcell.KeyBackspace, tcell.KeyBackspace2:
-			if l.InputMode {
-				runes := []rune(l.Status.InputBuffer)
+			if c.inputMode {
+				runes := []rune(c.status.InputBuffer)
 				if len(runes) > 0 {
-					l.Status.InputBuffer = string(runes[:len(runes)-1])
+					c.status.InputBuffer = string(runes[:len(runes)-1])
 				}
 			}
 		case tcell.KeyRune:
-			if l.InputMode {
-				l.Status.InputBuffer += string(ev.Rune())
-
-				texts, err := l.Text()
-				return ShowText{content: texts}, err
+			if c.inputMode {
+				c.status.InputBuffer += string(ev.Rune())
+				return c.SendShowText(ctx, outc)
 			}
 			switch keyRune := ev.Rune(); keyRune {
 			case 'q':
-				return ExitEvent{}, nil
+				select {
+				case outc <- ExitEvent{}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				return nil
 			case '/':
-				l.InputMode = true
-				l.Status.ShowInput = true
+				c.inputMode = true
+				c.status.ShowInput = true
 			case 'e', 'v':
-				if l.Table.ActiveLine < 0 || l.Table.ActiveLine >= len(l.Table.Rows) {
-					return NoEvent{}, nil
+				c.SetStatus("Fetching logs...")
+				if err := c.SendShowText(ctx, outc); err != nil {
+					return err
 				}
-				workDirPath := path.Join(l.TempDir, "build_dump")
-				if err := os.RemoveAll(workDirPath); err != nil && !os.IsNotExist(err) {
-					return NoEvent{}, err
+				defer c.ClearStatus()
+
+				if c.table.ActiveLine < 0 || c.table.ActiveLine >= len(c.table.Rows) {
+					return nil
 				}
 
-				if err := os.Mkdir(workDirPath, 0750); err != nil {
-					return NoEvent{}, err
-				}
-
-				ctx := context.Background()
-				key := l.Table.Rows[l.Table.ActiveLine].Key()
-				paths, stream, err := l.Table.Source.WriteToDirectory(ctx, key, workDirPath)
+				workDirPath, err := ioutil.TempDir(c.tempDir, "logs_")
 				if err != nil {
-					return NoEvent{}, err
+					return err
+				}
+
+				key := c.table.Rows[c.table.ActiveLine].Key()
+				paths, stream, err := c.table.Source.WriteToDirectory(ctx, key, workDirPath)
+				if err != nil {
+					return err
 				}
 				if len(paths) == 0 {
-					// FIXME Display 'No matching (errored) jobs' message in status bar
-					return NoEvent{}, nil
+					return nil
 				}
 
 				var cmd *exec.Cmd
-
+				var args []string
 				if stream == nil {
-					paths = append([]string{"-R"}, paths...)
-					cmd = exec.Command("less", paths...)
-					cmd.Dir = workDirPath
+					args = []string{"-R"}
 				} else {
-					paths = append([]string{"-f", "-R"}, paths...)
-					cmd = exec.Command("less", paths...)
-					cmd.Dir = workDirPath
+					args = []string{"+F", "-R"}
 				}
+				cmd = exec.Command("less", append(args, paths...)...)
+				cmd.Dir = workDirPath
 
-				return ExecCmd{cmd: *cmd, stream: stream}, nil
+				select {
+				case outc <- ExecCmd{cmd: *cmd, stream: stream}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				return nil
 			}
 		}
 	}
 
-	_, err := ProcessDefaultTableEvents(&l.Table, event)
-	if err != nil {
-		return NoEvent{}, err
+	if err := ProcessDefaultTableEvents(c.table, event); err != nil {
+		return err
 	}
 
-	texts, err := l.Text()
-	return ShowText{content: texts}, err
+	return c.SendShowText(ctx, outc)
 }
 
-func ProcessDefaultTableEvents(table *widgets.Table, event tcell.Event) (bool, error) {
-	var err error
-	processed := true
-
+func ProcessDefaultTableEvents(table *widgets.Table, event tcell.Event) error {
 	switch ev := event.(type) {
 	case *tcell.EventKey:
 		switch ev.Key() {
 		case tcell.KeyDown:
-			err = table.Scroll(+1)
+			return table.Scroll(+1)
 		case tcell.KeyUp:
-			err = table.Scroll(-1)
+			return table.Scroll(-1)
 		case tcell.KeyPgDn:
 			_, height := table.Size()
-			err = table.Scroll(utils.MaxInt(1, height-2))
+			return table.Scroll(utils.MaxInt(1, height-2))
 		case tcell.KeyPgUp:
 			_, height := table.Size()
-			err = table.Scroll(-utils.MaxInt(1, height-2))
+			return table.Scroll(-utils.MaxInt(1, height-2))
 		case tcell.KeyHome:
-			err = table.Top()
+			return table.Top()
 		case tcell.KeyEnd:
-			err = table.Bottom()
+			return table.Bottom()
 		case tcell.KeyRune:
 			switch ev.Rune() {
 			case 'b':
 				if table.ActiveLine >= 0 && table.ActiveLine < len(table.Rows) {
 					browser := os.Getenv("BROWSER")
 					if browser == "" {
-						return false, errors.New("environment variable BROWSER not set")
+						return errors.New("environment variable BROWSER not set")
 					}
 					// FIXME If the URL is missing, 'b' should not be usable and this code path
 					//  should never be taken
@@ -230,36 +253,29 @@ func ProcessDefaultTableEvents(table *widgets.Table, event tcell.Event) (bool, e
 						argv := []string{path.Base(browser), url}
 						process, err := os.StartProcess(browser, argv, &os.ProcAttr{})
 						if err != nil {
-							return false, err
+							return err
 						}
 
 						if err := process.Release(); err != nil {
-							return false, err
+							return err
 						}
 					}
 				}
 			case 'j':
-				err = table.Scroll(+1)
+				return table.Scroll(+1)
 			case 'k':
-				err = table.Scroll(-1)
-			case 'r':
-				// FIXME This is not useful anymore. Request update from... providers
-				err = table.Refresh()
+				return table.Scroll(-1)
 			case 'c':
-				err = table.SetFold(false, false)
+				return table.SetFold(false, false)
 			case 'C', '-':
-				err = table.SetFold(false, true)
+				return table.SetFold(false, true)
 			case 'o':
-				err = table.SetFold(true, false)
+				return table.SetFold(true, false)
 			case 'O', '+':
-				err = table.SetFold(true, true)
-			default:
-				processed = false
+				return table.SetFold(true, true)
 			}
-		default:
-			processed = false
 		}
 	}
 
-	return processed, err
+	return nil
 }

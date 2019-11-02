@@ -8,8 +8,9 @@ import (
 	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/utils"
 	"io"
-	"os"
+	"io/ioutil"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -394,22 +395,14 @@ func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{},
 	activeJobs := make(map[Job]io.WriteCloser, 0)
 	finishedJobs := make(map[Job]io.WriteCloser, 0)
 	for _, job := range jobs {
-		stageID := 0
-		if job.Stage != nil {
-			stageID = job.Stage.ID
-		}
-		filename := fmt.Sprintf(
-			"%s-%d.%d.%d.log",
-			job.Build.Repository.AccountID, // FIXME Sanitize account ID
-			job.Build.ID,
-			stageID,
-			job.ID)
-		jobPath := path.Join(dir, filename)
-		paths = append(paths, jobPath)
-		file, err := os.Create(jobPath)
+		pattern := fmt.Sprintf("job_%d_*.log", job.ID)
+		file, err := ioutil.TempFile(dir, pattern)
 		if err != nil {
 			return nil, nil, err
 		}
+
+		logPath := path.Join(dir, filepath.Base(file.Name()))
+		paths = append(paths, logPath)
 		if job.State.isActive() {
 			activeJobs[job] = file
 		} else {

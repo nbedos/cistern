@@ -309,6 +309,37 @@ func (c *Cache) FetchJobs(jobsKeys []JobKey) []Job {
 	return jobs
 }
 
+func (c *Cache) WriteLog(ctx context.Context, job Job, writer io.WriteCloser) error {
+	defer func() {
+		writer.Close() // FIXME Handle error
+	}()
+
+	if !job.Log.Valid {
+		accountID := job.Build.Repository.AccountID
+		provider, exists := c.providers[accountID]
+		if !exists {
+			return fmt.Errorf("no matching provider found in cache for account ID '%s'", accountID)
+		}
+		log, err := provider.Log(ctx, *job.Build.Repository, job.ID)
+		if err != nil {
+			return err
+		}
+
+		job.Log = sql.NullString{String: log, Valid: true}
+		if err = c.SaveJob(&job); err != nil {
+			return err
+		}
+	}
+
+	log := job.Log.String
+	if !strings.HasSuffix(log, "\n") {
+		log = log + "\n"
+	}
+	processedLog := utils.PostProcess(log)
+	_, err := writer.Write([]byte(processedLog))
+	return err
+}
+
 func (c *Cache) WriteLogs(ctx context.Context, writerByJob map[Job]io.WriteCloser) error {
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
@@ -316,43 +347,9 @@ func (c *Cache) WriteLogs(ctx context.Context, writerByJob map[Job]io.WriteClose
 	for job, writer := range writerByJob {
 		wg.Add(1)
 		go func(job Job, writer io.WriteCloser) {
-			var err error
 			defer wg.Done()
-			defer func() {
-				// FIXME errClose is not reported if err != nil
-				if errClose := writer.Close(); errClose != nil && err == nil {
-					err = errClose
-				}
-				if err != nil {
-					errc <- err
-				}
-			}()
-
-			if !job.Log.Valid {
-				accountID := job.Build.Repository.AccountID
-				provider, exists := c.providers[accountID]
-				if !exists {
-					err = fmt.Errorf("no matching provider found in cache for account ID '%s'", accountID)
-					return
-				}
-				log, err := provider.Log(subCtx, *job.Build.Repository, job.ID)
-				if err != nil {
-					return
-				}
-
-				job.Log = sql.NullString{String: log, Valid: true}
-				if err = c.SaveJob(&job); err != nil {
-					return
-				}
-			}
-
-			log := job.Log.String
-			if !strings.HasSuffix(log, "\n") {
-				log = log + "\n"
-			}
-			processedLog := utils.PostProcess(log)
-			if _, err = writer.Write([]byte(processedLog)); err != nil {
-				return
+			if err := c.WriteLog(subCtx, job, writer); err != nil {
+				errc <- err
 			}
 		}(job, writer)
 	}
