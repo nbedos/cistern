@@ -72,9 +72,12 @@ func depthFirstTraversalPrefixing(node TreeNode, indent string, last bool) {
 	var prefix string
 	// Special behavior for the root node which is prefixed by "+" if its children are hidden
 	if indent == "" {
-		if len(node.Children()) == 0 || node.Traversable() {
+		switch {
+		case len(node.Children()) == 0:
+			prefix = " "
+		case node.Traversable():
 			prefix = "-"
-		} else {
+		default:
 			prefix = "+"
 		}
 	} else {
@@ -152,7 +155,7 @@ func Prefix(s string, prefix string) string {
 	return builder.String()
 }
 
-func NullTimeFrom(t *time.Time) sql.NullTime {
+func NullTimeFromTime(t *time.Time) sql.NullTime {
 	if t == nil {
 		return sql.NullTime{}
 	}
@@ -193,7 +196,7 @@ func GitOriginURL(path string) (string, error) {
 	}
 
 	if len(remote.Config().URLs) == 0 {
-		return "", fmt.Errorf("GIT repository '%s': remote 'origin' has not associated URL", path)
+		return "", fmt.Errorf("GIT repository '%s': remote 'origin' has no associated URL", path)
 	}
 
 	return remote.Config().URLs[0], nil

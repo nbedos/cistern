@@ -422,7 +422,6 @@ func (c TravisClient) WebURL(repository cache.Repository) (url.URL, error) {
 	webURL := c.baseURL
 	webURL.Host = strings.TrimPrefix(webURL.Host, "api.")
 	webURL.Path += fmt.Sprintf("/%s", repository.Slug())
-	webURL.RawPath += fmt.Sprintf("/%s", url.PathEscape(repository.Slug()))
 
 	return webURL, err
 }

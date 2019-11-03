@@ -178,7 +178,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 	cacheCommit := cache.Commit{
 		Sha:     commit.ID,
 		Message: commit.Message,
-		Date:    utils.NullTimeFrom(commit.AuthoredDate),
+		Date:    utils.NullTimeFromTime(commit.AuthoredDate),
 	}
 
 	if pipeline.UpdatedAt == nil {
@@ -192,9 +192,9 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 		IsTag:           pipeline.Tag,
 		RepoBuildNumber: strconv.Itoa(pipeline.ID),
 		State:           FromGitLabState(pipeline.Status),
-		CreatedAt:       utils.NullTimeFrom(pipeline.CreatedAt),
-		StartedAt:       utils.NullTimeFrom(pipeline.StartedAt),
-		FinishedAt:      utils.NullTimeFrom(pipeline.FinishedAt),
+		CreatedAt:       utils.NullTimeFromTime(pipeline.CreatedAt),
+		StartedAt:       utils.NullTimeFromTime(pipeline.StartedAt),
+		FinishedAt:      utils.NullTimeFromTime(pipeline.FinishedAt),
 		UpdatedAt:       *pipeline.UpdatedAt,
 		Duration:        sql.NullInt64{Int64: int64(pipeline.Duration), Valid: pipeline.Duration > 0},
 		WebURL:          pipeline.WebURL,
@@ -249,9 +249,9 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 				State:        FromGitLabState(job.Status),
 				Name:         job.Name,
 				Log:          sql.NullString{},
-				CreatedAt:    utils.NullTimeFrom(job.CreatedAt),
-				StartedAt:    utils.NullTimeFrom(job.StartedAt),
-				FinishedAt:   utils.NullTimeFrom(job.FinishedAt),
+				CreatedAt:    utils.NullTimeFromTime(job.CreatedAt),
+				StartedAt:    utils.NullTimeFromTime(job.StartedAt),
+				FinishedAt:   utils.NullTimeFromTime(job.FinishedAt),
 				Duration:     sql.NullInt64{Int64: int64(job.Duration), Valid: int64(job.Duration) > 0},
 				WebURL:       job.WebURL,
 				AllowFailure: job.AllowFailure,
