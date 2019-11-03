@@ -158,13 +158,13 @@ func (c CircleCIClient) AccountID() string {
 	return c.accountID
 }
 
-func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, duration time.Duration, buildc chan<- cache.Build) error {
+func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, maxAge time.Duration, buildc chan<- cache.Build) error {
 	repository, err := c.Repository(ctx, repositoryURL)
 	if err != nil {
 		return err
 	}
-	// FIXME Do not hardcode limit
-	return c.fetchRepositoryBuilds(ctx, repository, 20, buildc)
+
+	return c.fetchRepositoryBuilds(ctx, repository, maxAge, buildc)
 }
 
 func (c CircleCIClient) StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error {
@@ -274,20 +274,20 @@ func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository ca
 			}
 
 			for _, buildID := range buildIDs {
-				wg.Add(1)
-				go func(buildID int) {
-					defer wg.Done()
-					build, err := c.fetchBuild(subCtx, projectEndpoint, buildID, &repository, false)
-					if err != nil {
-						errc <- err
-						return
-					}
+				build, err := c.fetchBuild(subCtx, projectEndpoint, buildID, &repository, false)
+				if err != nil {
+					errc <- err
+					return
+				}
+				if build.StartedAt.Valid && time.Since(build.StartedAt.Time) <= maxAge {
 					select {
 					case buildc <- build:
 					case <-subCtx.Done():
 						errc <- subCtx.Err()
 					}
-				}(buildID)
+				} else {
+					lastPage = true
+				}
 			}
 		}
 	}()
@@ -412,9 +412,9 @@ func (b circleCIBuild) ToCacheBuild(accountID string, repository *cache.Reposito
 	}
 
 	if b.DurationMilliseconds > 0 {
-		build.Duration = sql.NullInt64{
-			Int64: int64(b.DurationMilliseconds / 1000),
-			Valid: true,
+		build.Duration = cache.NullDuration{
+			Duration: time.Duration(b.DurationMilliseconds) * time.Millisecond,
+			Valid:    true,
 		}
 	}
 
@@ -429,7 +429,7 @@ func (b circleCIBuild) ToCacheBuild(accountID string, repository *cache.Reposito
 		return build, err
 	}
 
-	updatedAt := utils.Coalesce(build.FinishedAt, build.StartedAt, build.CreatedAt)
+	updatedAt := utils.MaxNullTime(build.FinishedAt, build.StartedAt, build.CreatedAt)
 	if !updatedAt.Valid {
 		return build, errors.New("updatedAt attribute cannot be null")
 	}

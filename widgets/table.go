@@ -12,6 +12,7 @@ type Table struct {
 	Source     cache.HierarchicalTabularDataSource
 	ActiveLine int
 	columns    []string
+	alignment  map[string]Alignment
 	Rows       []cache.TabularSourceRow
 	height     int
 	width      int
@@ -20,7 +21,7 @@ type Table struct {
 	scrolled   bool
 }
 
-func NewTable(source cache.HierarchicalTabularDataSource, columns []string, width int, height int, sep string) (Table, error) {
+func NewTable(source cache.HierarchicalTabularDataSource, columns []string, alignment map[string]Alignment, width int, height int, sep string) (Table, error) {
 	if width < 0 || height < 0 {
 		return Table{}, errors.New("table width and height must be >= 0")
 	}
@@ -30,6 +31,7 @@ func NewTable(source cache.HierarchicalTabularDataSource, columns []string, widt
 		height:    height,
 		width:     width,
 		columns:   columns,
+		alignment: alignment,
 		sep:       sep,
 		maxWidths: make(map[string]int),
 	}
@@ -234,10 +236,14 @@ func (t *Table) setActiveLine(activeLine int) {
 	t.ActiveLine = utils.Bounded(activeLine, 0, len(t.Rows)-1)
 }
 
-func (t Table) stringFromColumns(values map[string]string) string {
+func (t Table) stringFromColumns(values map[string]string, header bool) string {
 	paddedColumns := make([]string, len(t.columns))
 	for j, name := range t.columns {
-		paddedColumns[j] = align(values[name], t.maxWidths[name], Left)
+		alignment := Left
+		if !header {
+			alignment = t.alignment[name]
+		}
+		paddedColumns[j] = align(values[name], t.maxWidths[name], alignment)
 	}
 
 	return align(strings.Join(paddedColumns, t.sep), t.width, Left)
@@ -251,7 +257,7 @@ func (t *Table) Text() ([]StyledText, error) {
 		headers[header] = header
 	}
 	texts = append(texts, StyledText{
-		Content: t.stringFromColumns(headers),
+		Content: t.stringFromColumns(headers, true),
 		Class:   TableHeader,
 	})
 
@@ -259,7 +265,7 @@ func (t *Table) Text() ([]StyledText, error) {
 		text := StyledText{
 			X:       0,
 			Y:       i + 1,
-			Content: t.stringFromColumns(row.Tabular()),
+			Content: t.stringFromColumns(row.Tabular(), false),
 		}
 
 		if text.Y == t.ActiveLine+1 {

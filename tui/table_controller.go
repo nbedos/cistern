@@ -25,11 +25,20 @@ type TableController struct {
 
 func NewTableController(source cache.HierarchicalTabularDataSource, tempDir string, defaultStatus string) (TableController, error) {
 	// TODO Move this out of here
-	headers := []string{"ACCOUNT", "TYPE", "STATE", "UPDATED", " NAME"}
+	headers := []string{"ACCOUNT", "BUILD", "TYPE", "STATE", "UPDATED", "DURATION", "NAME"}
+	alignment := map[string]widgets.Alignment{
+		"ACCOUNT":  widgets.Left,
+		"BUILD":    widgets.Right,
+		"TYPE":     widgets.Left,
+		"STATE":    widgets.Left,
+		"UPDATED":  widgets.Left,
+		"DURATION": widgets.Right,
+		"NAME":     widgets.Left,
+	}
 
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := 10, 10
-	table, err := widgets.NewTable(source, headers, width, height, "   ")
+	table, err := widgets.NewTable(source, headers, alignment, width, height, "   ")
 	if err != nil {
 		return TableController{}, err
 	}
@@ -251,8 +260,6 @@ func ProcessDefaultTableEvents(table *widgets.Table, event tcell.Event, search s
 					if browser == "" {
 						return errors.New("environment variable BROWSER not set")
 					}
-					// FIXME If the URL is missing, 'b' should not be usable and this code path
-					//  should never be taken
 					if url := table.Rows[table.ActiveLine].URL(); url != "" {
 						argv := []string{path.Base(browser), url}
 						process, err := os.StartProcess(browser, argv, &os.ProcAttr{})

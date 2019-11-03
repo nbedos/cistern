@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 var ErrNoMatchFound = errors.New("no match found")
@@ -33,6 +34,7 @@ type buildRow struct {
 	startedAt   sql.NullTime
 	finishedAt  sql.NullTime
 	updatedAt   sql.NullTime
+	duration    NullDuration
 	children    []buildRow
 	traversable bool
 	url         string
@@ -59,7 +61,7 @@ func (b buildRow) Tabular() map[string]string {
 
 	nullTimeToString := func(t sql.NullTime) string {
 		if t.Valid {
-			return utils.ElapsedSince(t.Time)
+			return t.Time.Local().Truncate(time.Second).String()
 		}
 		return nullPlaceholder
 	}
@@ -67,7 +69,7 @@ func (b buildRow) Tabular() map[string]string {
 	return map[string]string{
 		"ACCOUNT":  b.key.accountID,
 		"STATE":    b.state,
-		" NAME":    fmt.Sprintf("%v%v", b.prefix, b.name),
+		"NAME":     fmt.Sprintf("%v%v", b.prefix, b.name),
 		"BUILD":    fmt.Sprintf("%d", b.key.buildID),
 		"STAGE":    fmt.Sprintf("%d", b.key.stageID),
 		"JOB":      fmt.Sprintf("%d", b.key.jobID),
@@ -76,6 +78,7 @@ func (b buildRow) Tabular() map[string]string {
 		"STARTED":  nullTimeToString(b.startedAt),
 		"FINISHED": nullTimeToString(b.finishedAt),
 		"UPDATED":  nullTimeToString(b.updatedAt),
+		"DURATION": b.duration.String(),
 	}
 }
 
@@ -138,6 +141,7 @@ func buildRowFromBuild(b Build) buildRow {
 		finishedAt: b.FinishedAt,
 		updatedAt:  sql.NullTime{Time: b.UpdatedAt, Valid: true},
 		url:        b.WebURL,
+		duration:   b.Duration,
 	}
 
 	jobIDs := make([]int, 0, len(b.Jobs))
@@ -168,19 +172,26 @@ func buildRowFromStage(s Stage) buildRow {
 			buildID:   s.Build.ID,
 			stageID:   s.ID,
 		},
-		type_:      "S",
-		state:      string(s.State),
-		name:       s.Name,
-		startedAt:  sql.NullTime{},
-		finishedAt: sql.NullTime{},
-		updatedAt:  sql.NullTime{},
-		url:        "",
+		type_: "S",
+		state: string(s.State),
+		name:  s.Name,
+		url:   s.Build.WebURL,
 	}
 
 	jobIDs := make([]int, 0, len(s.Jobs))
-	for ID := range s.Jobs {
+	for ID, job := range s.Jobs {
 		jobIDs = append(jobIDs, ID)
+		row.startedAt = utils.MinNullTime(row.startedAt, job.StartedAt)
+		row.finishedAt = utils.MaxNullTime(row.finishedAt, job.FinishedAt)
+		row.updatedAt = utils.MinNullTime(row.updatedAt, job.FinishedAt, job.StartedAt, job.CreatedAt)
 	}
+	if row.startedAt.Valid && row.finishedAt.Valid {
+		row.duration = NullDuration{
+			Valid:    true,
+			Duration: row.finishedAt.Time.Sub(row.startedAt.Time),
+		}
+	}
+
 	sort.Ints(jobIDs)
 	for _, jobID := range jobIDs {
 		row.children = append(row.children, buildRowFromJob(*s.Jobs[jobID]))
@@ -206,8 +217,9 @@ func buildRowFromJob(j Job) buildRow {
 		name:       j.Name,
 		startedAt:  j.StartedAt,
 		finishedAt: j.FinishedAt,
-		updatedAt:  utils.Coalesce(j.FinishedAt, j.StartedAt, j.CreatedAt),
+		updatedAt:  utils.MaxNullTime(j.FinishedAt, j.StartedAt, j.CreatedAt),
 		url:        j.WebURL,
+		duration:   j.Duration,
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/mattn/go-runewidth"
 	"gopkg.in/src-d/go-git.v4"
-	"math"
 	"net/url"
 	"regexp"
 	"strings"
@@ -115,16 +114,6 @@ func depthFirstTraversalPrefixing(node TreeNode, indent string, last bool) {
 	}
 }
 
-func Coalesce(times ...sql.NullTime) sql.NullTime {
-	for _, t := range times {
-		if t.Valid {
-			return t
-		}
-	}
-
-	return sql.NullTime{}
-}
-
 func RepositorySlugFromURL(repositoryURL string) (string, error) {
 	// Turn "git@host:path.git" into "host/path" so that it is compatible with url.Parse()
 	if strings.HasPrefix(repositoryURL, "git@") {
@@ -175,37 +164,32 @@ func NullTimeFromString(s string) (t sql.NullTime, err error) {
 	return
 }
 
-func ElapsedSince(t time.Time) string {
-	ago := func(duration time.Duration, unit time.Duration, unitName string) string {
-		format := fmt.Sprintf("%%d %s ago", unitName)
-		return fmt.Sprintf(format, int(math.Ceil(float64(duration)/float64(unit))))
-	}
-
-	today := time.Now().
-		Add(-time.Hour * time.Duration(t.Hour())).
-		Add(-time.Minute * time.Duration(t.Minute())).
-		Add(-time.Second * time.Duration(t.Second())).
-		Add(-time.Nanosecond * time.Duration(t.Nanosecond()))
-	yesterday := today.Add(-24 * time.Hour)
-
-	switch {
-	case t.Before(yesterday):
-		return ago(today.Sub(t), 24*time.Hour, "days")
-	case t.Before(today):
-		return "yesterday"
-	default:
-		elapsed := time.Since(t)
-		switch {
-		case elapsed >= 2*time.Hour:
-			return ago(elapsed, time.Hour, "hours")
-		case elapsed >= time.Hour:
-			return "an hour ago"
-		case elapsed >= 2*time.Minute:
-			return ago(elapsed, time.Minute, "minutes")
-		default:
-			return "just now"
+func MinNullTime(times ...sql.NullTime) sql.NullTime {
+	result := sql.NullTime{}
+	for _, t := range times {
+		if result.Valid {
+			if t.Valid && t.Time.Before(result.Time) {
+				result = t
+			}
+		} else {
+			result = t
 		}
 	}
+	return result
+}
+
+func MaxNullTime(times ...sql.NullTime) sql.NullTime {
+	result := sql.NullTime{}
+	for _, t := range times {
+		if result.Valid {
+			if t.Valid && t.Time.After(result.Time) {
+				result = t
+			}
+		} else {
+			result = t
+		}
+	}
+	return result
 }
 
 var deleteEraseInLine = regexp.MustCompile(".*\x1b\\[0K")

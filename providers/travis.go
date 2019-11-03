@@ -114,10 +114,14 @@ func (b travisBuild) ToInserters(accountID string, repository *cache.Repository,
 		IsTag:      b.Tag.Name != "",
 		State:      FromTravisState(b.State),
 		CreatedAt:  sql.NullTime{}, // FIXME We need this
-		Duration:   sql.NullInt64{Int64: int64(b.Duration), Valid: b.Duration > 0},
-		Stages:     make(map[int]*cache.Stage),
-		Jobs:       make(map[int]*cache.Job),
-		RemoteID:   b.ID,
+		Duration: cache.NullDuration{
+			Duration: time.Duration(b.Duration) * time.Second,
+			Valid:    b.Duration > 0,
+		},
+		Stages:          make(map[int]*cache.Stage),
+		Jobs:            make(map[int]*cache.Job),
+		RemoteID:        b.ID,
+		RepoBuildNumber: b.Number,
 	}
 
 	if build.StartedAt, err = utils.NullTimeFromString(b.StartedAt); err != nil {
@@ -237,16 +241,19 @@ func (j travisJob) ToInserter(build *cache.Build, stage *cache.Stage, webURL str
 	}
 
 	job := cache.Job{
-		Build:        build,
-		Stage:        stage,
-		ID:           j.ID,
-		State:        FromTravisState(j.State),
-		Name:         name,
-		CreatedAt:    sql.NullTime{},
-		StartedAt:    jobStartedAt,
-		FinishedAt:   jobFinishedAt,
-		Log:          sql.NullString{String: j.Log, Valid: j.Log != ""},
-		Duration:     sql.NullInt64{Int64: duration, Valid: duration > 0},
+		Build:      build,
+		Stage:      stage,
+		ID:         j.ID,
+		State:      FromTravisState(j.State),
+		Name:       name,
+		CreatedAt:  sql.NullTime{},
+		StartedAt:  jobStartedAt,
+		FinishedAt: jobFinishedAt,
+		Log:        sql.NullString{String: j.Log, Valid: j.Log != ""},
+		Duration: cache.NullDuration{
+			Duration: time.Duration(duration) * time.Second,
+			Valid:    duration > 0,
+		},
 		WebURL:       fmt.Sprintf("%s/jobs/%d", webURL, j.ID),
 		AllowFailure: j.AllowFailure,
 	}

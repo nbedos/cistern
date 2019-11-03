@@ -1,6 +1,8 @@
 package cache
 
-import "context"
+import (
+	"context"
+)
 
 type Streamer func(context.Context) error
 

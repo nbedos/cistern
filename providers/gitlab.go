@@ -101,7 +101,6 @@ func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repositor
 	}
 	lastPage := false
 
-pageLoop:
 	for opt.ListOptions.Page = 0; !lastPage; opt.ListOptions.Page++ {
 		select {
 		case <-c.rateLimiter:
@@ -129,12 +128,12 @@ pageLoop:
 			// the date of the full build.
 			if build.CreatedAt.Valid && time.Since(build.CreatedAt.Time) > maxAge {
 				lastPage = true
-				continue pageLoop
-			}
-			select {
-			case buildc <- build:
-			case <-ctx.Done():
-				return ctx.Err()
+			} else {
+				select {
+				case buildc <- build:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
 			}
 		}
 	}
@@ -196,10 +195,13 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 		StartedAt:       utils.NullTimeFromTime(pipeline.StartedAt),
 		FinishedAt:      utils.NullTimeFromTime(pipeline.FinishedAt),
 		UpdatedAt:       *pipeline.UpdatedAt,
-		Duration:        sql.NullInt64{Int64: int64(pipeline.Duration), Valid: pipeline.Duration > 0},
-		WebURL:          pipeline.WebURL,
-		Stages:          make(map[int]*cache.Stage),
-		Jobs:            make(map[int]*cache.Job),
+		Duration: cache.NullDuration{
+			Duration: time.Duration(pipeline.Duration) * time.Second,
+			Valid:    pipeline.Duration > 0,
+		},
+		WebURL: pipeline.WebURL,
+		Stages: make(map[int]*cache.Stage),
+		Jobs:   make(map[int]*cache.Job),
 	}
 
 	select {
@@ -243,16 +245,19 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 			}
 
 			jobc <- cache.Job{
-				Build:        &build,
-				Stage:        stagesByName[job.Stage],
-				ID:           job.ID,
-				State:        FromGitLabState(job.Status),
-				Name:         job.Name,
-				Log:          sql.NullString{},
-				CreatedAt:    utils.NullTimeFromTime(job.CreatedAt),
-				StartedAt:    utils.NullTimeFromTime(job.StartedAt),
-				FinishedAt:   utils.NullTimeFromTime(job.FinishedAt),
-				Duration:     sql.NullInt64{Int64: int64(job.Duration), Valid: int64(job.Duration) > 0},
+				Build:      &build,
+				Stage:      stagesByName[job.Stage],
+				ID:         job.ID,
+				State:      FromGitLabState(job.Status),
+				Name:       job.Name,
+				Log:        sql.NullString{},
+				CreatedAt:  utils.NullTimeFromTime(job.CreatedAt),
+				StartedAt:  utils.NullTimeFromTime(job.StartedAt),
+				FinishedAt: utils.NullTimeFromTime(job.FinishedAt),
+				Duration: cache.NullDuration{
+					Duration: time.Duration(job.Duration) * time.Second,
+					Valid:    int64(job.Duration) > 0,
+				},
 				WebURL:       job.WebURL,
 				AllowFailure: job.AllowFailure,
 			}

@@ -100,7 +100,7 @@ type Build struct {
 	StartedAt       sql.NullTime
 	FinishedAt      sql.NullTime
 	UpdatedAt       time.Time
-	Duration        sql.NullInt64
+	Duration        NullDuration
 	WebURL          string
 	Stages          map[int]*Stage
 	Jobs            map[int]*Job
@@ -145,6 +145,25 @@ type JobKey struct {
 	ID        int
 }
 
+type NullDuration struct {
+	Valid    bool
+	Duration time.Duration
+}
+
+func (d NullDuration) String() string {
+	if !d.Valid {
+		return "-"
+	}
+
+	minutes := d.Duration / time.Minute
+	seconds := (d.Duration - minutes*time.Minute) / time.Second
+
+	if minutes == 0 {
+		return fmt.Sprintf("%ds", seconds)
+	}
+	return fmt.Sprintf("%dm%02ds", minutes, seconds)
+}
+
 type Job struct {
 	Build        *Build
 	Stage        *Stage // nil if the Job is only linked to a Build
@@ -154,7 +173,7 @@ type Job struct {
 	CreatedAt    sql.NullTime
 	StartedAt    sql.NullTime
 	FinishedAt   sql.NullTime
-	Duration     sql.NullInt64
+	Duration     NullDuration
 	Log          sql.NullString
 	WebURL       string
 	AllowFailure bool
