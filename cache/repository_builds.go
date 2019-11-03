@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/utils"
 	"io"
 	"io/ioutil"
@@ -60,7 +59,7 @@ func (b buildRow) Tabular() map[string]string {
 
 	nullTimeToString := func(t sql.NullTime) string {
 		if t.Valid {
-			return t.Time.String()
+			return utils.ElapsedSince(t.Time)
 		}
 		return nullPlaceholder
 	}
@@ -92,7 +91,6 @@ type RepositoryBuilds struct {
 	cache         Cache
 	repositoryURL string
 	rows          []buildRow
-	maxWidths     map[string]int
 	treeIndex     map[buildRowKey]*buildRow
 	dfsTraversal  []*buildRow
 	dfsIndex      map[buildRowKey]int
@@ -103,12 +101,7 @@ func (c *Cache) NewRepositoryBuilds(repositoryURL string) RepositoryBuilds {
 	return RepositoryBuilds{
 		cache:         *c,
 		repositoryURL: repositoryURL,
-		maxWidths:     make(map[string]int),
 	}
-}
-
-func (s RepositoryBuilds) MaxWidths() map[string]int {
-	return s.maxWidths
 }
 
 func (s *RepositoryBuilds) SetTraversable(key interface{}, traversable bool, recursive bool) error {
@@ -239,11 +232,6 @@ func (s *RepositoryBuilds) FetchRows() {
 		return rows[i].updatedAt.Valid && rows[j].updatedAt.Valid && rows[i].updatedAt.Time.After(rows[j].updatedAt.Time)
 	})
 
-	maxWidths := make(map[string]int)
-	for header := range (buildRow{}).Tabular() {
-		maxWidths[header] = runewidth.StringWidth(header)
-	}
-
 	treeIndex := make(map[buildRowKey]*buildRow)
 	for i := range rows {
 		traversal := utils.DepthFirstTraversal(&rows[i], true)
@@ -254,15 +242,10 @@ func (s *RepositoryBuilds) FetchRows() {
 			if value, exists := traversables[row.key]; exists {
 				row.traversable = value
 			}
-
-			for header, value := range row.Tabular() {
-				maxWidths[header] = utils.MaxInt(maxWidths[header], runewidth.StringWidth(value))
-			}
 		}
 	}
 
 	s.rows = rows
-	s.maxWidths = maxWidths
 	s.treeIndex = treeIndex
 	s.dfsUpToDate = false
 }

@@ -17,6 +17,5 @@ type HierarchicalTabularDataSource interface {
 	SelectFirst(limit int) ([]TabularSourceRow, error)
 	SelectLast(limit int) ([]TabularSourceRow, error)
 	WriteToDirectory(ctx context.Context, key interface{}, tmpDir string) ([]string, Streamer, error)
-	MaxWidths() map[string]int
 	NextMatch(top, bottom, active interface{}, search string, ascending bool) ([]TabularSourceRow, int, error)
 }

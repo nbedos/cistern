@@ -2,6 +2,7 @@ package widgets
 
 import (
 	"errors"
+	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
 	"strings"
@@ -10,17 +11,13 @@ import (
 type Table struct {
 	Source     cache.HierarchicalTabularDataSource
 	ActiveLine int
-	Columns    []string
+	columns    []string
 	Rows       []cache.TabularSourceRow
 	height     int
 	width      int
-	Sep        string
-}
-
-// FIXME Remove this. There is no need for custom column names.
-type Mapping struct {
-	From string
-	To   string
+	sep        string
+	maxWidths  map[string]int
+	scrolled   bool
 }
 
 func NewTable(source cache.HierarchicalTabularDataSource, columns []string, width int, height int, sep string) (Table, error) {
@@ -29,11 +26,12 @@ func NewTable(source cache.HierarchicalTabularDataSource, columns []string, widt
 	}
 
 	table := Table{
-		Source:  source,
-		height:  height,
-		width:   width,
-		Columns: columns,
-		Sep:     sep,
+		Source:    source,
+		height:    height,
+		width:     width,
+		columns:   columns,
+		sep:       sep,
+		maxWidths: make(map[string]int),
 	}
 
 	res, err := table.Source.SelectFirst(table.nbrRows())
@@ -56,7 +54,7 @@ func (t *Table) Refresh() error {
 	var err error
 	var rows []cache.TabularSourceRow
 	activeLine := t.ActiveLine
-	if len(t.Rows) > 0 {
+	if len(t.Rows) > 0 && t.scrolled {
 		activeKey := t.Rows[t.ActiveLine].Key()
 		rows, activeLine, err = t.Source.Select(activeKey, t.ActiveLine, t.nbrRows()-t.ActiveLine-1)
 	} else {
@@ -125,15 +123,10 @@ func (t *Table) Resize(width int, height int) error {
 
 	var rows []cache.TabularSourceRow
 	var err error
-	if len(t.Rows) > 0 {
-		// FIXME Keep same row active after resize, ideally also preserve ratio t.ActiveLine / len(t.Rows)
-		var activeline int
+	var activeline int
+	if len(t.Rows) > 0 && t.scrolled {
 		key := t.Rows[t.ActiveLine].Key()
-		rows, activeline, err = t.Source.Select(key, t.ActiveLine, t.nbrRows()-1-t.ActiveLine)
-		if err != nil {
-			return err
-		}
-		t.setActiveLine(activeline)
+		rows, activeline, err = t.Source.Select(key, t.ActiveLine, height-2-t.ActiveLine)
 	} else {
 		rows, err = t.Source.SelectFirst(t.nbrRows())
 	}
@@ -143,6 +136,7 @@ func (t *Table) Resize(width int, height int) error {
 
 	t.width, t.height = width, height
 	t.setRows(rows)
+	t.setActiveLine(activeline)
 
 	return nil
 }
@@ -153,6 +147,7 @@ func (t *Table) Top() error {
 		return err
 	}
 
+	t.scrolled = false
 	t.setRows(res)
 	t.setActiveLine(0)
 	return nil
@@ -173,6 +168,7 @@ func (t *Table) Scroll(amount int) error {
 	if len(t.Rows) == 0 {
 		return nil
 	}
+	t.scrolled = true
 	activeLine := t.ActiveLine + amount
 
 	if activeLine < 0 {
@@ -220,43 +216,50 @@ func (t *Table) setRows(rows []cache.TabularSourceRow) {
 	}
 
 	t.setActiveLine(t.ActiveLine)
+	t.computeMaxWidths()
+}
+
+func (t *Table) computeMaxWidths() {
+	for _, header := range t.columns {
+		t.maxWidths[header] = utils.MaxInt(t.maxWidths[header], runewidth.StringWidth(header))
+	}
+	for _, row := range t.Rows {
+		for header, value := range row.Tabular() {
+			t.maxWidths[header] = utils.MaxInt(t.maxWidths[header], runewidth.StringWidth(value))
+		}
+	}
 }
 
 func (t *Table) setActiveLine(activeLine int) {
 	t.ActiveLine = utils.Bounded(activeLine, 0, len(t.Rows)-1)
 }
 
-func (t Table) stringFromColumns(values map[string]string, widths map[string]int) string {
-	paddedColumns := make([]string, len(t.Columns))
-	for j, name := range t.Columns {
-		paddedColumns[j] = align(values[name], widths[name], Left)
+func (t Table) stringFromColumns(values map[string]string) string {
+	paddedColumns := make([]string, len(t.columns))
+	for j, name := range t.columns {
+		paddedColumns[j] = align(values[name], t.maxWidths[name], Left)
 	}
 
-	return align(strings.Join(paddedColumns, t.Sep), t.width, Left)
+	return align(strings.Join(paddedColumns, t.sep), t.width, Left)
 }
 
 func (t *Table) Text() ([]StyledText, error) {
 	texts := make([]StyledText, 0, len(t.Rows))
-	maxWidths := t.Source.MaxWidths()
 
-	// FIXME meh.
 	headers := make(map[string]string)
-	for _, header := range t.Columns {
+	for _, header := range t.columns {
 		headers[header] = header
 	}
-
 	texts = append(texts, StyledText{
-		Content: t.stringFromColumns(headers, maxWidths),
+		Content: t.stringFromColumns(headers),
 		Class:   TableHeader,
 	})
 
-	for i, tableRow := range t.Rows {
-		columns := tableRow.Tabular()
-
+	for i, row := range t.Rows {
 		text := StyledText{
 			X:       0,
 			Y:       i + 1,
-			Content: t.stringFromColumns(columns, maxWidths),
+			Content: t.stringFromColumns(row.Tabular()),
 		}
 
 		if text.Y == t.ActiveLine+1 {
