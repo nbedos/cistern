@@ -18,7 +18,6 @@ type Table struct {
 	width      int
 	sep        string
 	maxWidths  map[string]int
-	scrolled   bool
 }
 
 func NewTable(source cache.HierarchicalTabularDataSource, columns []string, alignment map[string]Alignment, width int, height int, sep string) (Table, error) {
@@ -56,7 +55,7 @@ func (t *Table) Refresh() error {
 	var err error
 	var rows []cache.TabularSourceRow
 	activeLine := t.ActiveLine
-	if len(t.Rows) > 0 && t.scrolled {
+	if len(t.Rows) > 0 && t.ActiveLine > 0 {
 		activeKey := t.Rows[t.ActiveLine].Key()
 		rows, activeLine, err = t.Source.Select(activeKey, t.ActiveLine, t.nbrRows()-t.ActiveLine-1)
 	} else {
@@ -126,7 +125,7 @@ func (t *Table) Resize(width int, height int) error {
 	var rows []cache.TabularSourceRow
 	var err error
 	var activeline int
-	if len(t.Rows) > 0 && t.scrolled {
+	if len(t.Rows) > 0 && t.ActiveLine > 0 {
 		key := t.Rows[t.ActiveLine].Key()
 		rows, activeline, err = t.Source.Select(key, t.ActiveLine, height-2-t.ActiveLine)
 	} else {
@@ -149,7 +148,6 @@ func (t *Table) Top() error {
 		return err
 	}
 
-	t.scrolled = false
 	t.setRows(res)
 	t.setActiveLine(0)
 	return nil
@@ -170,7 +168,6 @@ func (t *Table) Scroll(amount int) error {
 	if len(t.Rows) == 0 {
 		return nil
 	}
-	t.scrolled = true
 	activeLine := t.ActiveLine + amount
 
 	if activeLine < 0 {

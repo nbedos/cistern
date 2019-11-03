@@ -38,24 +38,42 @@ const (
 	Skipped  State = "skipped"
 )
 
+var statePrecedence = map[State]int{
+	Unknown:  7,
+	Running:  6,
+	Pending:  5,
+	Canceled: 4,
+	Failed:   3,
+	Passed:   2,
+	Skipped:  1,
+}
+
 func StageState(jobs []Job) State {
-	precedence := map[State]int{
-		Unknown:  7,
-		Running:  6,
-		Pending:  5,
-		Canceled: 4,
-		Failed:   3,
-		Passed:   2,
-		Skipped:  1,
-	}
 	if len(jobs) == 0 {
 		return Unknown
 	}
 	state := jobs[0].State
 	for _, job := range jobs[1:] {
 		if !job.AllowFailure || (job.State != Canceled && job.State != Failed) {
-			if precedence[job.State] > precedence[state] {
+			if statePrecedence[job.State] > statePrecedence[state] {
 				state = job.State
+			}
+		}
+	}
+
+	return state
+}
+
+// FIXME Merge this with the preceding function by defining an interface (.State() .AllowedFailure())
+func BuildsState(builds []Build) State {
+	if len(builds) == 0 {
+		return Unknown
+	}
+	state := builds[0].State
+	for _, build := range builds[1:] {
+		if build.State != Canceled && build.State != Failed {
+			if statePrecedence[build.State] > statePrecedence[state] {
+				state = build.State
 			}
 		}
 	}
@@ -104,7 +122,6 @@ type Build struct {
 	WebURL          string
 	Stages          map[int]*Stage
 	Jobs            map[int]*Job
-	RemoteID        int // FIXME Not in DB
 }
 
 func (b Build) Get(key JobKey) (*Job, bool) {

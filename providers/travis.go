@@ -120,7 +120,6 @@ func (b travisBuild) ToInserters(accountID string, repository *cache.Repository,
 		},
 		Stages:          make(map[int]*cache.Stage),
 		Jobs:            make(map[int]*cache.Job),
-		RemoteID:        b.ID,
 		RepoBuildNumber: b.Number,
 	}
 
@@ -356,7 +355,7 @@ eventLoop:
 					cancel()
 					break
 				}
-				builds[build.RemoteID] = &build
+				builds[build.ID] = &build
 				select {
 				case buildc <- build:
 				case <-ctx.Done():
@@ -377,7 +376,7 @@ eventLoop:
 						cancel()
 						break
 					}
-					builds[build.RemoteID] = &build
+					builds[build.ID] = &build
 				}
 
 				select {
