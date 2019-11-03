@@ -1,6 +1,6 @@
 [![Travis Build Status](https://travis-ci.org/nbedos/citop.svg?branch=master)](https://travis-ci.org/nbedos/citop/builds) [![GitLab Build Status](https://gitlab.com/nbedos/citop/badges/master/pipeline.svg)](https://gitlab.com/nbedos/citop/pipelines)
 
-![User Interface](citop.png)
+![User Interface](citop.svg)
 
 # citop
 A UNIX program for accessing build information from continuous integration services inspired by the utility program top.

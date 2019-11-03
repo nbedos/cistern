@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/gdamore/tcell"
 	"github.com/nbedos/citop/cache"
+	"github.com/nbedos/citop/man"
 	"github.com/nbedos/citop/utils"
 	"github.com/nbedos/citop/widgets"
 	"io/ioutil"
@@ -181,6 +182,28 @@ func (c *TableController) Process(ctx context.Context, event tcell.Event, outc c
 				c.inputMode = true
 				c.status.ShowInput = true
 				c.status.InputBuffer = ""
+			case '?':
+				// FIXME Just write on stdin instead of using a temporary file
+				file, err := ioutil.TempFile(c.tempDir, "citop_")
+				if err != nil {
+					return err
+				}
+				_, err = file.Write([]byte(man.Section1))
+				if err != nil {
+					return err
+				}
+
+				var cmd *exec.Cmd
+				cmd = exec.Command("less", path.Join(c.tempDir, path.Base(file.Name())))
+				cmd.Dir = c.tempDir
+
+				select {
+				case outc <- ExecCmd{cmd: *cmd, stream: nil}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				return nil
+
 			case 'e', 'v':
 				c.SetStatus("Fetching logs...")
 				if err := c.SendShowText(ctx, outc); err != nil {
