@@ -237,7 +237,6 @@ func commitRowFromCommit(builds []Build) buildRow {
 		name:        fmt.Sprintf("[%s] %s", builds[0].Ref, messageLines[0]),
 		children:    make([]buildRow, 0, len(builds)),
 		traversable: false,
-		state:       string(BuildsState(builds)),
 	}
 
 	latestBuildByProvider := make(map[string]Build)
@@ -250,7 +249,9 @@ func commitRowFromCommit(builds []Build) buildRow {
 		}
 	}
 
+	latestBuilds := make([]Statuser, 0, len(latestBuildByProvider))
 	for _, build := range latestBuildByProvider {
+		latestBuilds = append(latestBuilds, build)
 		row.startedAt = utils.MinNullTime(row.startedAt, build.StartedAt)
 		row.finishedAt = utils.MaxNullTime(row.finishedAt, build.FinishedAt)
 		if !row.updatedAt.Valid || row.updatedAt.Time.Before(build.UpdatedAt) {
@@ -261,6 +262,8 @@ func commitRowFromCommit(builds []Build) buildRow {
 			row.duration = build.Duration
 		}
 	}
+
+	row.state = string(AggregateStatuses(latestBuilds))
 
 	return row
 }

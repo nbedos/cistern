@@ -48,32 +48,21 @@ var statePrecedence = map[State]int{
 	Skipped:  1,
 }
 
-func StageState(jobs []Job) State {
-	if len(jobs) == 0 {
-		return Unknown
-	}
-	state := jobs[0].State
-	for _, job := range jobs[1:] {
-		if !job.AllowFailure || (job.State != Canceled && job.State != Failed) {
-			if statePrecedence[job.State] > statePrecedence[state] {
-				state = job.State
-			}
-		}
-	}
-
-	return state
+type Statuser interface {
+	Status() State
+	AllowedFailure() bool
 }
 
-// FIXME Merge this with the preceding function by defining an interface (.State() .AllowedFailure())
-func BuildsState(builds []Build) State {
-	if len(builds) == 0 {
+func AggregateStatuses(ss []Statuser) State {
+	if len(ss) == 0 {
 		return Unknown
 	}
-	state := builds[0].State
-	for _, build := range builds[1:] {
-		if build.State != Canceled && build.State != Failed {
-			if statePrecedence[build.State] > statePrecedence[state] {
-				state = build.State
+
+	state := ss[0].Status()
+	for _, s := range ss {
+		if !s.AllowedFailure() || (s.Status() != Canceled && s.Status() != Failed) {
+			if statePrecedence[s.Status()] > statePrecedence[state] {
+				state = s.Status()
 			}
 		}
 	}
@@ -123,6 +112,9 @@ type Build struct {
 	Stages          map[int]*Stage
 	Jobs            map[int]*Job
 }
+
+func (b Build) Status() State        { return b.State }
+func (b Build) AllowedFailure() bool { return false }
 
 func (b Build) Get(key JobKey) (*Job, bool) {
 	if key.AccountID != b.Repository.AccountID || key.BuildID != b.ID {
@@ -195,6 +187,9 @@ type Job struct {
 	WebURL       string
 	AllowFailure bool
 }
+
+func (j Job) Status() State        { return j.State }
+func (j Job) AllowedFailure() bool { return j.AllowFailure }
 
 type buildKey struct {
 	AccountID string

@@ -287,11 +287,11 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 				jobsByName[job.Name] = job
 			}
 		}
-		jobs := make([]cache.Job, 0, len(jobsByName))
+		jobs := make([]cache.Statuser, 0, len(jobsByName))
 		for _, job := range jobsByName {
 			jobs = append(jobs, *job)
 		}
-		stage.State = cache.StageState(jobs)
+		stage.State = cache.AggregateStatuses(jobs)
 	}
 
 	return build, <-errc
