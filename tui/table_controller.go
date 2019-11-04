@@ -209,24 +209,22 @@ func (c *TableController) Process(ctx context.Context, event tcell.Event, outc c
 				if err := c.SendShowText(ctx, outc); err != nil {
 					return err
 				}
-				defer c.ClearStatus()
+				defer func() {
+					c.ClearStatus()
+					c.SendShowText(ctx, outc)
+				}()
 
 				if c.table.ActiveLine < 0 || c.table.ActiveLine >= len(c.table.Rows) {
 					return nil
 				}
 
-				workDirPath, err := ioutil.TempDir(c.tempDir, "logs_")
-				if err != nil {
-					return err
-				}
-
 				key := c.table.Rows[c.table.ActiveLine].Key()
-				paths, stream, err := c.table.Source.WriteToDirectory(ctx, key, workDirPath)
+				logPath, stream, err := c.table.Source.WriteToDirectory(ctx, key, c.tempDir)
 				if err != nil {
+					if err == cache.ErrNoLogHere {
+						return nil
+					}
 					return err
-				}
-				if len(paths) == 0 {
-					return nil
 				}
 
 				var cmd *exec.Cmd
@@ -236,8 +234,8 @@ func (c *TableController) Process(ctx context.Context, event tcell.Event, outc c
 				} else {
 					args = []string{"+F", "-R"}
 				}
-				cmd = exec.Command("less", append(args, paths...)...)
-				cmd.Dir = workDirPath
+				cmd = exec.Command("less", append(args, logPath)...)
+				cmd.Dir = c.tempDir
 
 				select {
 				case outc <- ExecCmd{cmd: *cmd, stream: stream}:

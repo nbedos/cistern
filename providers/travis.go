@@ -602,56 +602,6 @@ func (c TravisClient) RepositoryBuilds(ctx context.Context, repository *cache.Re
 	return err
 }
 
-type travisLog struct {
-	Content  string
-	NbrParts int
-}
-
-func (c TravisClient) fetchJobLogs(ctx context.Context, jobIDs []int) (map[int]travisLog, error) {
-	errc := make(chan error)
-	wg := sync.WaitGroup{}
-	logs := make(map[int]travisLog)
-	logsMux := sync.Mutex{}
-	subCtx, cancel := context.WithCancel(ctx)
-
-	for _, ID := range jobIDs {
-		wg.Add(1)
-		go func(ID int) {
-			defer wg.Done()
-
-			var err error
-			var log travisLog
-			log.NbrParts, log.Content, err = c.fetchJobLog(subCtx, ID)
-			if err != nil {
-				errc <- err
-				return
-			}
-
-			logsMux.Lock()
-			defer logsMux.Unlock()
-			logs[ID] = log
-		}(ID)
-	}
-
-	go func() {
-		wg.Wait()
-		close(errc)
-	}()
-
-	// FIXME Report all errors
-	var err error
-	for e := range errc {
-		if e != nil {
-			cancel()
-			if err == nil {
-				err = e
-			}
-		}
-	}
-
-	return logs, err
-}
-
 func (c TravisClient) fetchJobLog(ctx context.Context, jobID int) (int, string, error) {
 	var reqURL = c.baseURL
 	reqURL.Path += fmt.Sprintf("/job/%d/log", jobID)
@@ -673,41 +623,23 @@ func (c TravisClient) fetchJobLog(ctx context.Context, jobID int) (int, string, 
 	return len(log.Parts), log.Content, nil
 }
 
-func (c TravisClient) StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error {
-	closedWriters := make(map[int]struct{})
+func (c TravisClient) StreamLog(ctx context.Context, jobID int, writer io.Writer) error {
+	var err error
+
+	p, err := c.pusherClient(ctx, []string{fmt.Sprintf("job-%d", jobID)})
+	if err != nil {
+		return err
+	}
 	defer func() {
-		for id, w := range writerByJobID {
-			if _, isClosed := closedWriters[id]; !isClosed {
-				_ = w.Close() // FIXME Report error
-			}
+		if errClose := p.Close(); errClose != nil && err == nil {
+			err = errClose
 		}
 	}()
 
-	channels := make([]string, 0, len(writerByJobID))
-	for id := range writerByJobID {
-		channels = append(channels, fmt.Sprintf("job-%d", id))
-	}
-	p, err := c.pusherClient(ctx, channels)
-	if err != nil {
+	nbrParts, content, err := c.fetchJobLog(ctx, jobID)
+	log := utils.PostProcess(content)
+	if _, err = writer.Write([]byte(log)); err != nil {
 		return err
-	}
-	defer p.Close() // FIXME Return error
-
-	// Fetch first part of logs from REST API
-	jobIDs := make([]int, 0, len(writerByJobID))
-	for ID := range writerByJobID {
-		jobIDs = append(jobIDs, ID)
-	}
-	logsByID, err := c.fetchJobLogs(ctx, jobIDs)
-	if err != nil {
-		return err
-	}
-	receivedLogParts := make(map[int]int)
-	for ID, log := range logsByID {
-		if _, err = writerByJobID[ID].Write([]byte(log.Content)); err != nil {
-			return err
-		}
-		receivedLogParts[ID] = log.NbrParts
 	}
 
 	eventc := make(chan travisEvent)
@@ -731,24 +663,13 @@ eventLoop:
 			}
 			break eventLoop
 		case event := <-eventc:
-			switch event := event.(type) {
-			case travisPusherJobLog:
-				if event.Number >= receivedLogParts[event.RemoteID] {
-					var log string
-					log = utils.PostProcess(event.Log)
-					if _, err = writerByJobID[event.RemoteID].Write([]byte(log)); err != nil {
-						cancel()
-						break
-					}
-					if event.Final {
-						if err = writerByJobID[event.RemoteID].Close(); err != nil {
-							cancel()
-							break
-						}
-						closedWriters[event.RemoteID] = struct{}{}
-					}
-					receivedLogParts[event.RemoteID]++
+			if event, ok := event.(travisPusherJobLog); ok && event.Number >= nbrParts {
+				log := utils.PostProcess(event.Log)
+				if _, err = writer.Write([]byte(log)); err != nil || event.Final {
+					cancel()
+					break
 				}
+				nbrParts++
 			}
 		}
 	}

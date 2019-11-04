@@ -204,7 +204,7 @@ func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, maxAge
 	return nil
 }
 
-func (c CircleCIClient) StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error {
+func (c CircleCIClient) StreamLog(ctx context.Context, jobID int, writer io.Writer) error {
 	return nil
 }
 

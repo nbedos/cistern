@@ -50,7 +50,7 @@ func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, maxAge t
 	return nil
 }
 
-func (c GitLabClient) StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error {
+func (c GitLabClient) StreamLog(ctx context.Context, jobID int, writer io.Writer) error {
 	return nil
 }
 

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/nbedos/citop/utils"
-	"io"
 	"io/ioutil"
 	"path"
 	"path/filepath"
@@ -266,7 +265,17 @@ func commitRowFromBuilds(builds []Build) buildRow {
 	row.state = string(AggregateStatuses(latestBuilds))
 
 	sort.Slice(row.children, func(i, j int) bool {
-		return row.children[i].startedAt.Time.After(row.children[j].startedAt.Time)
+		ti := utils.MinNullTime(
+			row.children[i].startedAt,
+			row.children[i].updatedAt,
+			row.children[i].finishedAt)
+
+		tj := utils.MinNullTime(
+			row.children[j].startedAt,
+			row.children[j].updatedAt,
+			row.children[j].finishedAt)
+
+		return ti.Time.After(tj.Time)
 	})
 
 	return row
@@ -466,61 +475,49 @@ func (s *RepositoryBuilds) Select(key interface{}, nbrBefore int, nbrAfter int) 
 	return selectedRows, index, nil
 }
 
-func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{}, dir string) ([]string, Streamer, error) {
+var ErrNoLogHere = errors.New("no log is associated to this row")
+
+func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{}, dir string) (string, Streamer, error) {
 	// TODO Allow filtering for errored jobs
 	buildKey, ok := key.(buildRowKey)
 	if !ok {
-		return nil, nil, fmt.Errorf("key conversion to buildRowKey failed: '%v'", key)
+		return "", nil, fmt.Errorf("key conversion to buildRowKey failed: '%v'", key)
 	}
 
-	build, exists := s.treeIndex[buildKey]
+	row, exists := s.treeIndex[buildKey]
 	if !exists {
-		return nil, nil, fmt.Errorf("no row associated to key '%v'", key)
+		return "", nil, fmt.Errorf("no row associated to key '%v'", key)
 	}
 
-	jobKeys := make([]JobKey, 0)
-	for _, row := range utils.DepthFirstTraversal(build, true) {
-		if row := row.(*buildRow); row.type_ == "J" {
-			jobKeys = append(jobKeys, JobKey{
-				AccountID: row.key.accountID,
-				BuildID:   row.key.buildID,
-				StageID:   row.key.stageID,
-				ID:        row.key.jobID,
-			})
+	if row.type_ != "J" {
+		return "", nil, ErrNoLogHere
+	}
+
+	jobKey := JobKey{
+		AccountID: row.key.accountID,
+		BuildID:   row.key.buildID,
+		StageID:   row.key.stageID,
+		ID:        row.key.jobID,
+	}
+
+	pattern := fmt.Sprintf("job_%d_*.log", jobKey.ID)
+	file, err := ioutil.TempFile(dir, pattern)
+	if err != nil {
+		return "", nil, err
+	}
+	logPath := path.Join(dir, filepath.Base(file.Name()))
+
+	switch err := s.cache.WriteLog(ctx, jobKey, file); err {
+	case ErrIncompleteLog:
+		stream := func(ctx context.Context) error {
+			defer file.Close()
+			return s.cache.StreamLog(ctx, jobKey.AccountID, jobKey.ID, file)
 		}
+		return logPath, stream, nil
+	case nil:
+		return logPath, nil, file.Close()
+	default:
+		file.Close()
+		return logPath, nil, err
 	}
-
-	jobs := s.cache.FetchJobs(jobKeys)
-
-	paths := make([]string, 0, len(jobs))
-	activeJobs := make(map[Job]io.WriteCloser, 0)
-	finishedJobs := make(map[Job]io.WriteCloser, 0)
-	for _, job := range jobs {
-		pattern := fmt.Sprintf("job_%d_*.log", job.ID)
-		file, err := ioutil.TempFile(dir, pattern)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		logPath := path.Join(dir, filepath.Base(file.Name()))
-		paths = append(paths, logPath)
-		if job.State.IsActive() {
-			activeJobs[job] = file
-		} else {
-			finishedJobs[job] = file
-		}
-	}
-
-	if err := s.cache.WriteLogs(ctx, finishedJobs); err != nil {
-		return nil, nil, err
-	}
-
-	var stream Streamer
-	if len(activeJobs) > 0 {
-		stream = func(ctx context.Context) error {
-			return s.cache.StreamLogs(ctx, activeJobs)
-		}
-	}
-
-	return paths, stream, nil
 }

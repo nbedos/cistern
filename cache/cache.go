@@ -19,7 +19,7 @@ type Provider interface {
 	// Builds should return err == ErrRepositoryNotFound when appropriate
 	Builds(ctx context.Context, repositoryURL string, duration time.Duration, buildc chan<- Build) error
 	Log(ctx context.Context, repository Repository, jobID int) (string, error)
-	StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error
+	StreamLog(ctx context.Context, jobID int, writer io.Writer) error
 }
 
 type State string
@@ -309,39 +309,46 @@ func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, m
 	return err
 }
 
-func (c *Cache) FetchJobs(jobsKeys []JobKey) []Job {
-	jobs := make([]Job, 0, len(jobsKeys))
+var ErrNoJobFound = errors.New("no job found")
+
+func (c *Cache) fetchJob(key JobKey) (Job, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	for _, key := range jobsKeys {
-		build, exists := c.builds[buildKey{
-			AccountID: key.AccountID,
-			BuildID:   key.BuildID,
-		}]
-		if exists {
-			if key.StageID == 0 {
-				job, exists := build.Jobs[key.ID]
+	build, exists := c.builds[buildKey{
+		AccountID: key.AccountID,
+		BuildID:   key.BuildID,
+	}]
+	if exists {
+		if key.StageID == 0 {
+			job, exists := build.Jobs[key.ID]
+			if exists {
+				return *job, nil
+			}
+		} else {
+			stage, exists := build.Stages[key.StageID]
+			if exists {
+				job, exists := stage.Jobs[key.ID]
 				if exists {
-					jobs = append(jobs, *job)
-				}
-			} else {
-				stage, exists := build.Stages[key.StageID]
-				if exists {
-					job, exists := stage.Jobs[key.ID]
-					if exists {
-						jobs = append(jobs, *job)
-					}
+					return *job, nil
 				}
 			}
 		}
 	}
 
-	return jobs
+	return Job{}, ErrNoJobFound
 }
 
-func (c *Cache) WriteLog(ctx context.Context, job Job, writer io.WriteCloser) error {
-	defer writer.Close() // FIXME Handle error
+var ErrIncompleteLog = errors.New("log not complete")
+
+func (c *Cache) WriteLog(ctx context.Context, key JobKey, writer io.Writer) error {
+	job, err := c.fetchJob(key)
+	if err != nil {
+		return err
+	}
+	if job.State.IsActive() {
+		return ErrIncompleteLog
+	}
 
 	if !job.Log.Valid {
 		accountID := job.Build.Repository.AccountID
@@ -365,79 +372,15 @@ func (c *Cache) WriteLog(ctx context.Context, job Job, writer io.WriteCloser) er
 		log = log + "\n"
 	}
 	processedLog := utils.PostProcess(log)
-	_, err := writer.Write([]byte(processedLog))
+	_, err = writer.Write([]byte(processedLog))
 	return err
 }
 
-func (c *Cache) WriteLogs(ctx context.Context, writerByJob map[Job]io.WriteCloser) error {
-	wg := sync.WaitGroup{}
-	errc := make(chan error)
-	subCtx, cancel := context.WithCancel(ctx)
-	for job, writer := range writerByJob {
-		wg.Add(1)
-		go func(job Job, writer io.WriteCloser) {
-			defer wg.Done()
-			if err := c.WriteLog(subCtx, job, writer); err != nil {
-				errc <- err
-			}
-		}(job, writer)
+func (c Cache) StreamLog(ctx context.Context, accountID string, jobID int, writer io.WriteCloser) error {
+	provider, exists := c.providers[accountID]
+	if !exists {
+		return fmt.Errorf("no matching provider found for account ID '%s'", accountID)
 	}
 
-	go func() {
-		wg.Wait()
-		close(errc)
-	}()
-
-	var err error
-	for e := range errc {
-		// Return first error only. meh. FIXME
-		if err == nil {
-			err = e
-			cancel()
-		}
-	}
-
-	return err
-}
-
-func (c Cache) StreamLogs(ctx context.Context, writerByJob map[Job]io.WriteCloser) error {
-	argsByAccountID := make(map[string]map[int]io.WriteCloser)
-	for job, writer := range writerByJob {
-		if _, exists := argsByAccountID[job.Build.Repository.AccountID]; !exists {
-			argsByAccountID[job.Build.Repository.AccountID] = make(map[int]io.WriteCloser)
-		}
-
-		argsByAccountID[job.Build.Repository.AccountID][job.ID] = writer
-	}
-
-	errc := make(chan error)
-	wg := sync.WaitGroup{}
-	subCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	for accountID, writerByJobID := range argsByAccountID {
-		wg.Add(1)
-		go func(accountID string, writerByJobID map[int]io.WriteCloser) {
-			defer wg.Done()
-
-			provider, exists := c.providers[accountID]
-			if !exists {
-				errc <- fmt.Errorf("no matching provider found for account ID '%s'", accountID)
-				return
-			}
-			if err := provider.StreamLogs(subCtx, writerByJobID); err != nil {
-				errc <- err
-				return
-			}
-		}(accountID, writerByJobID)
-	}
-
-	var err error
-	for e := range errc {
-		if err == nil {
-			err = e
-		}
-		cancel()
-	}
-
-	return err
+	return provider.StreamLog(ctx, jobID, writer)
 }

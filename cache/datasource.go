@@ -18,6 +18,6 @@ type HierarchicalTabularDataSource interface {
 	Select(key interface{}, nbrBefore int, nbrAfter int) ([]TabularSourceRow, int, error)
 	SelectFirst(limit int) ([]TabularSourceRow, error)
 	SelectLast(limit int) ([]TabularSourceRow, error)
-	WriteToDirectory(ctx context.Context, key interface{}, tmpDir string) ([]string, Streamer, error)
+	WriteToDirectory(ctx context.Context, key interface{}, tmpDir string) (string, Streamer, error)
 	NextMatch(top, bottom, active interface{}, search string, ascending bool) ([]TabularSourceRow, int, error)
 }

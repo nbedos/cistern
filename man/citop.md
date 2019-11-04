@@ -31,7 +31,7 @@ Open search prompt. The prompt may be closed with Enter or Escape.
 Move to the next (resp. previous) match
 
 ## v
-View logs of the jobs under the cursor in less 
+Open the log of the job at the cursor in less
 
 ## b
 Open selected row in $BROWSER
