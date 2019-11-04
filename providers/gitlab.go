@@ -16,16 +16,20 @@ import (
 )
 
 type GitLabClient struct {
-	accountID   string
-	remote      *gitlab.Client
-	rateLimiter <-chan time.Time
+	accountID            string
+	remote               *gitlab.Client
+	rateLimiter          <-chan time.Time
+	updateTimePerBuildID map[int]time.Time
+	mux                  *sync.Mutex
 }
 
 func NewGitLabClient(accountID string, token string, rateLimit time.Duration) GitLabClient {
 	return GitLabClient{
-		accountID:   accountID,
-		remote:      gitlab.NewClient(nil, token),
-		rateLimiter: time.Tick(rateLimit),
+		accountID:            accountID,
+		remote:               gitlab.NewClient(nil, token),
+		rateLimiter:          time.Tick(rateLimit),
+		updateTimePerBuildID: make(map[int]time.Time),
+		mux:                  &sync.Mutex{},
 	}
 }
 
@@ -33,12 +37,17 @@ func (c GitLabClient) AccountID() string {
 	return c.accountID
 }
 
+// TODO Implement live updates once https://github.com/xanzy/go-gitlab/pull/731 is merged
 func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, maxAge time.Duration, buildc chan<- cache.Build) error {
 	repository, err := c.Repository(ctx, repositoryURL)
 	if err != nil {
 		return err
 	}
-	return c.LastBuilds(ctx, repository, maxAge, buildc)
+	if err := c.LastBuilds(ctx, repository, maxAge, buildc); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c GitLabClient) StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error {
@@ -294,5 +303,8 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 		stage.State = cache.AggregateStatuses(jobs)
 	}
 
+	c.mux.Lock()
+	c.updateTimePerBuildID[build.ID] = build.UpdatedAt
+	c.mux.Unlock()
 	return build, <-errc
 }

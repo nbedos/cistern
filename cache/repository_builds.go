@@ -223,7 +223,7 @@ func buildRowFromJob(j Job) buildRow {
 	}
 }
 
-func commitRowFromCommit(builds []Build) buildRow {
+func commitRowFromBuilds(builds []Build) buildRow {
 	if len(builds) == 0 {
 		return buildRow{}
 	}
@@ -265,6 +265,10 @@ func commitRowFromCommit(builds []Build) buildRow {
 
 	row.state = string(AggregateStatuses(latestBuilds))
 
+	sort.Slice(row.children, func(i, j int) bool {
+		return row.children[i].startedAt.Time.After(row.children[j].startedAt.Time)
+	})
+
 	return row
 }
 
@@ -286,7 +290,7 @@ func (s *RepositoryBuilds) FetchRows() {
 
 	rows := make([]buildRow, 0, len(buildsPerCommit))
 	for _, builds := range buildsPerCommit {
-		rows = append(rows, commitRowFromCommit(builds))
+		rows = append(rows, commitRowFromBuilds(builds))
 	}
 
 	sort.Slice(rows, func(i, j int) bool {
@@ -500,7 +504,7 @@ func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{},
 
 		logPath := path.Join(dir, filepath.Base(file.Name()))
 		paths = append(paths, logPath)
-		if job.State.isActive() {
+		if job.State.IsActive() {
 			activeJobs[job] = file
 		} else {
 			finishedJobs[job] = file

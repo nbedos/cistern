@@ -24,7 +24,7 @@ type Provider interface {
 
 type State string
 
-func (s State) isActive() bool {
+func (s State) IsActive() bool {
 	return s == Pending || s == Running
 }
 

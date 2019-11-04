@@ -16,14 +16,18 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/cenkalti/backoff"
 )
 
 type CircleCIClient struct {
-	baseURL     url.URL
-	httpClient  *http.Client
-	rateLimiter <-chan time.Time
-	token       string
-	accountID   string
+	baseURL                 url.URL
+	httpClient              *http.Client
+	rateLimiter             <-chan time.Time
+	token                   string
+	accountID               string
+	updateTimePerPipelineID map[int]time.Time
+	mux                     *sync.Mutex
 }
 
 var CircleCIURL = url.URL{
@@ -35,11 +39,13 @@ var CircleCIURL = url.URL{
 
 func NewCircleCIClient(URL url.URL, accountID string, token string, rateLimit time.Duration) CircleCIClient {
 	return CircleCIClient{
-		baseURL:     URL,
-		httpClient:  &http.Client{Timeout: 10 * time.Second},
-		rateLimiter: time.Tick(rateLimit),
-		token:       token,
-		accountID:   accountID,
+		baseURL:                 URL,
+		httpClient:              &http.Client{Timeout: 10 * time.Second},
+		rateLimiter:             time.Tick(rateLimit),
+		token:                   token,
+		accountID:               accountID,
+		updateTimePerPipelineID: make(map[int]time.Time),
+		mux:                     &sync.Mutex{},
 	}
 }
 
@@ -164,7 +170,38 @@ func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, maxAge
 		return err
 	}
 
-	return c.fetchRepositoryBuilds(ctx, repository, maxAge, buildc)
+	b := backoff.ExponentialBackOff{
+		InitialInterval:     5 * time.Second,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         time.Minute,
+		MaxElapsedTime:      0,
+		Clock:               backoff.SystemClock,
+	}
+	b.Reset()
+
+	for {
+		waitTime := b.NextBackOff()
+		if waitTime == backoff.Stop {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(waitTime):
+		}
+
+		active, err := c.fetchRepositoryBuilds(ctx, repository, maxAge, buildc)
+		if err != nil {
+			return err
+		}
+		if active {
+			b.Reset()
+		}
+	}
+
+	return nil
 }
 
 func (c CircleCIClient) StreamLogs(ctx context.Context, writerByJobID map[int]io.WriteCloser) error {
@@ -203,7 +240,7 @@ func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (c
 
 	// Validate repository existence on CircleCI
 	endPoint := c.projectEndpoint(owner, name)
-	if _, _, err = c.listRecentBuildIDs(ctx, endPoint, 0, 1, time.Second); err != nil {
+	if _, err = c.listRecentAndOutdatedBuildIDs(ctx, endPoint, 0, 1, time.Second); err != nil {
 		if err, ok := err.(HTTPError); ok && err.Status == 404 {
 			return cache.Repository{}, cache.ErrRepositoryNotFound
 		}
@@ -219,7 +256,7 @@ func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (c
 	}, nil
 }
 
-func (c CircleCIClient) listRecentBuildIDs(ctx context.Context, projectEndpoint url.URL, offset int, limit int, maxAge time.Duration) ([]int, bool, error) {
+func (c CircleCIClient) listRecentAndOutdatedBuildIDs(ctx context.Context, projectEndpoint url.URL, offset int, limit int, maxAge time.Duration) ([]int, error) {
 	parameters := projectEndpoint.Query()
 	parameters.Add("offset", strconv.Itoa(offset))
 	parameters.Add("limit", strconv.Itoa(limit))
@@ -228,85 +265,77 @@ func (c CircleCIClient) listRecentBuildIDs(ctx context.Context, projectEndpoint 
 
 	body, err := c.get(ctx, projectEndpoint)
 	if err != nil {
-		return nil, true, err
+		return nil, err
 	}
 
 	var builds []circleCIBuild
 	if err := json.Unmarshal(body.Bytes(), &builds); err != nil {
-		return nil, true, err
+		return nil, err
 	}
 
-	lastPage := false
 	ids := make([]int, 0, len(builds))
 	for _, build := range builds {
-		date, err := utils.NullTimeFromString(build.CreatedAt)
-		if err == nil && date.Valid && time.Since(date.Time) > maxAge {
-			lastPage = true
+		createdAt, err := utils.NullTimeFromString(build.CreatedAt)
+		if err != nil {
+			return nil, err
 		}
-		ids = append(ids, build.ID)
-	}
-	if len(builds) == 0 {
-		lastPage = true
+		if !createdAt.Valid || time.Since(createdAt.Time) > maxAge {
+			continue
+		}
+		startedAt, err := utils.NullTimeFromString(build.StartedAt)
+		if err != nil {
+			return nil, err
+		}
+		finishedAt, err := utils.NullTimeFromString(build.FinishedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		updatedAt := utils.MaxNullTime(createdAt, startedAt, finishedAt)
+		c.mux.Lock()
+		lastUpdate, exists := c.updateTimePerPipelineID[build.ID]
+		if !exists || (updatedAt.Valid && updatedAt.Time.After(lastUpdate)) {
+			c.updateTimePerPipelineID[build.ID] = updatedAt.Time
+			ids = append(ids, build.ID)
+		}
+		c.mux.Unlock()
 	}
 
-	return ids, lastPage, nil
+	return ids, nil
 }
 
-func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) error {
+func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) (bool, error) {
 	projectEndpoint := c.projectEndpoint(repository.Owner, repository.Name)
 	pageSize := 20
+	active := false
 
-	errc := make(chan error)
-	wg := sync.WaitGroup{}
-	subCtx, cancel := context.WithCancel(ctx)
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		var err error
-		var buildIDs []int
-		lastPage := false
-		for offset := 0; !lastPage; offset += pageSize {
-			buildIDs, lastPage, err = c.listRecentBuildIDs(subCtx, projectEndpoint, offset, pageSize, maxAge)
-			if err != nil {
-				errc <- err
-				return
-			}
-
-			for _, buildID := range buildIDs {
-				build, err := c.fetchBuild(subCtx, projectEndpoint, buildID, &repository, false)
-				if err != nil {
-					errc <- err
-					return
-				}
-				if build.StartedAt.Valid && time.Since(build.StartedAt.Time) <= maxAge {
-					select {
-					case buildc <- build:
-					case <-subCtx.Done():
-						errc <- subCtx.Err()
-					}
-				} else {
-					lastPage = true
-				}
-			}
-		}
-	}()
-
-	go func() {
-		wg.Wait()
-		close(errc)
-	}()
-
-	// FIXME We probably want to report all errors
 	var err error
-	for e := range errc {
-		if e != nil && err == nil {
-			cancel()
-			err = e
+	var buildIDs []int
+	for offset := 0; ; offset += pageSize {
+		buildIDs, err = c.listRecentAndOutdatedBuildIDs(ctx, projectEndpoint, offset, pageSize, maxAge)
+		if err != nil {
+			return active, err
+		}
+		if len(buildIDs) == 0 {
+			break
+		}
+
+		for _, buildID := range buildIDs {
+			build, err := c.fetchBuild(ctx, projectEndpoint, buildID, &repository, false)
+			if err != nil {
+				return active, err
+			}
+			active = active || build.State.IsActive()
+			select {
+			case buildc <- build:
+			case <-ctx.Done():
+				return active, ctx.Err()
+			}
+
 		}
 	}
 
-	return err
+	return active, nil
 }
 
 func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL, buildID int, repository *cache.Repository, log bool) (build cache.Build, err error) {
@@ -369,6 +398,10 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 			Log:        buildLog,
 		},
 	}
+
+	c.mux.Lock()
+	c.updateTimePerPipelineID[build.ID] = build.UpdatedAt
+	c.mux.Unlock()
 
 	return build, nil
 }

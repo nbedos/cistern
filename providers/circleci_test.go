@@ -25,7 +25,7 @@ func TestCircleCIClientFetchRepositoryBuilds(t *testing.T) {
 	}
 
 	go func() {
-		if err := client.fetchRepositoryBuilds(ctx, repository, 20, buildc); err != nil {
+		if _, err := client.fetchRepositoryBuilds(ctx, repository, 7*24*time.Hour, buildc); err != nil {
 			errc <- err
 		}
 		close(buildc)
