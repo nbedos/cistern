@@ -1,0 +1,12 @@
+# appveyor.yml
+image:
+    - Ubuntu
+
+environment:
+  GOPATH: /usr/go/
+
+stack: go 1.13
+
+test_script:
+  - go test ./...
+
