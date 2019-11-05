@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/nbedos/citop/text"
 	"github.com/nbedos/citop/utils"
 	"io/ioutil"
 	"path"
@@ -57,7 +58,7 @@ func (b buildRow) Children() []utils.TreeNode {
 	return children
 }
 
-func (b buildRow) Tabular() map[string]string {
+func (b buildRow) Tabular() map[string]text.StyledString {
 	const nullPlaceholder = "-"
 
 	nullTimeToString := func(t sql.NullTime) string {
@@ -67,15 +68,27 @@ func (b buildRow) Tabular() map[string]string {
 		return nullPlaceholder
 	}
 
-	return map[string]string{
-		"COMMIT":   string([]rune(b.key.sha)[:shaLength]),
-		"TYPE":     b.type_,
-		"STATE":    b.state,
-		"NAME":     fmt.Sprintf("%s%s", b.prefix, b.name),
-		"STARTED":  nullTimeToString(b.startedAt),
-		"FINISHED": nullTimeToString(b.finishedAt),
-		"UPDATED":  nullTimeToString(b.updatedAt),
-		"DURATION": b.duration.String(),
+	var state text.StyledString
+	switch b.state {
+	case "failed", "canceled":
+		state = text.NewStyledString(b.state, text.StatusFailed)
+	case "passed":
+		state = text.NewStyledString(b.state, text.StatusPassed)
+	case "pending", "running":
+		state = text.NewStyledString(b.state, text.StatusRunning)
+	default:
+		state = text.NewStyledString(b.state)
+	}
+
+	return map[string]text.StyledString{
+		"COMMIT":   text.NewStyledString(string([]rune(b.key.sha)[:shaLength]), text.CommitSha),
+		"TYPE":     text.NewStyledString(b.type_),
+		"STATE":    state,
+		"NAME":     text.NewStyledString(fmt.Sprintf("%s%s", b.prefix, b.name)),
+		"STARTED":  text.NewStyledString(nullTimeToString(b.startedAt)),
+		"FINISHED": text.NewStyledString(nullTimeToString(b.finishedAt)),
+		"UPDATED":  text.NewStyledString(nullTimeToString(b.updatedAt)),
+		"DURATION": text.NewStyledString(b.duration.String()),
 	}
 }
 
@@ -170,7 +183,7 @@ func buildRowFromStage(s Stage) buildRow {
 			buildID:   s.Build.ID,
 			stageID:   s.ID,
 		},
-		type_: "S",
+		type_: "Content",
 		state: string(s.State),
 		name:  s.Name,
 		url:   s.Build.WebURL,
@@ -373,8 +386,8 @@ func (s *RepositoryBuilds) NextMatch(top, bottom, active interface{}, search str
 
 	for i := start; i != s.dfsIndex[activeKey]; i = next(i) {
 		row := s.dfsTraversal[i]
-		for _, value := range row.Tabular() {
-			if strings.Contains(value, search) {
+		for _, styledString := range row.Tabular() {
+			if styledString.Contains(search) {
 				nbrRows := s.dfsIndex[bottomKey] - s.dfsIndex[topKey] + 1
 				var maxIndex, minIndex int
 				if i > s.dfsIndex[activeKey] {

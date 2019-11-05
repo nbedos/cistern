@@ -2,12 +2,13 @@ package cache
 
 import (
 	"context"
+	"github.com/nbedos/citop/text"
 )
 
 type Streamer func(context.Context) error
 
 type TabularSourceRow interface {
-	Tabular() map[string]string
+	Tabular() map[string]text.StyledString
 	Key() interface{}
 	URL() string
 }

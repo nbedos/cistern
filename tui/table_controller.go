@@ -7,6 +7,7 @@ import (
 	"github.com/gdamore/tcell"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/man"
+	"github.com/nbedos/citop/text"
 	"github.com/nbedos/citop/utils"
 	"github.com/nbedos/citop/widgets"
 	"io/ioutil"
@@ -27,13 +28,13 @@ type TableController struct {
 func NewTableController(source cache.HierarchicalTabularDataSource, tempDir string, defaultStatus string) (TableController, error) {
 	// TODO Move this out of here
 	headers := []string{"COMMIT", "TYPE", "STATE", "UPDATED", "DURATION", "NAME"}
-	alignment := map[string]widgets.Alignment{
-		"COMMIT":   widgets.Left,
-		"TYPE":     widgets.Left,
-		"STATE":    widgets.Left,
-		"UPDATED":  widgets.Left,
-		"DURATION": widgets.Right,
-		"NAME":     widgets.Left,
+	alignment := map[string]text.Alignment{
+		"COMMIT":   text.Left,
+		"TYPE":     text.Left,
+		"STATE":    text.Left,
+		"UPDATED":  text.Left,
+		"DURATION": text.Right,
+		"NAME":     text.Left,
 	}
 
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
@@ -65,7 +66,7 @@ func (c *TableController) ClearStatus() {
 	c.SetStatus(c.defaultStatus)
 }
 
-func (c *TableController) Refresh() ([]widgets.StyledText, error) {
+func (c *TableController) Refresh() ([]text.LocalizedStyledString, error) {
 	if err := c.table.Refresh(); err != nil {
 		return nil, err
 	}
@@ -73,8 +74,8 @@ func (c *TableController) Refresh() ([]widgets.StyledText, error) {
 	return c.Text()
 }
 
-func (c TableController) Text() ([]widgets.StyledText, error) {
-	texts := make([]widgets.StyledText, 0)
+func (c TableController) Text() ([]text.LocalizedStyledString, error) {
+	texts := make([]text.LocalizedStyledString, 0)
 	yOffset := 0
 
 	for _, child := range []widgets.Widget{c.table, c.status} {

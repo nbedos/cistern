@@ -3,6 +3,7 @@ package widgets
 import (
 	"errors"
 	"fmt"
+	"github.com/nbedos/citop/text"
 	"github.com/nbedos/citop/utils"
 )
 
@@ -49,24 +50,22 @@ func (s *StatusBar) Resize(width int, height int) error {
 	return nil
 }
 
-func (s StatusBar) Text() ([]StyledText, error) {
+func (s StatusBar) Text() ([]text.LocalizedStyledString, error) {
 	if s.ShowInput {
-		return []StyledText{{
-			X:       0,
-			Y:       utils.MaxInt(s.height-1, 0),
-			Content: fmt.Sprintf("%s%s", s.inputPrefix, s.InputBuffer),
-			Class:   DefaultClass,
+		return []text.LocalizedStyledString{{
+			X: 0,
+			Y: utils.MaxInt(s.height-1, 0),
+			S: text.NewStyledString(fmt.Sprintf("%s%s", s.inputPrefix, s.InputBuffer)),
 		}}, nil
 	}
 
-	texts := make([]StyledText, 0)
+	texts := make([]text.LocalizedStyledString, 0)
 	startRow := utils.MaxInt(0, len(s.outputBuffer)-s.height)
 	for i := startRow; i < len(s.outputBuffer); i++ {
-		texts = append(texts, StyledText{
-			X:       0,
-			Y:       i - startRow,
-			Content: s.outputBuffer[i],
-			Class:   DefaultClass,
+		texts = append(texts, text.LocalizedStyledString{
+			X: 0,
+			Y: i - startRow,
+			S: text.NewStyledString(s.outputBuffer[i]),
 		})
 	}
 

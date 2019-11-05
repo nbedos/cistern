@@ -4,15 +4,15 @@ import (
 	"errors"
 	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/cache"
+	"github.com/nbedos/citop/text"
 	"github.com/nbedos/citop/utils"
-	"strings"
 )
 
 type Table struct {
 	Source     cache.HierarchicalTabularDataSource
 	ActiveLine int
 	columns    []string
-	alignment  map[string]Alignment
+	alignment  map[string]text.Alignment
 	Rows       []cache.TabularSourceRow
 	height     int
 	width      int
@@ -20,7 +20,7 @@ type Table struct {
 	maxWidths  map[string]int
 }
 
-func NewTable(source cache.HierarchicalTabularDataSource, columns []string, alignment map[string]Alignment, width int, height int, sep string) (Table, error) {
+func NewTable(source cache.HierarchicalTabularDataSource, columns []string, alignment map[string]text.Alignment, width int, height int, sep string) (Table, error) {
 	if width < 0 || height < 0 {
 		return Table{}, errors.New("table width and height must be >= 0")
 	}
@@ -224,7 +224,7 @@ func (t *Table) computeMaxWidths() {
 	}
 	for _, row := range t.Rows {
 		for header, value := range row.Tabular() {
-			t.maxWidths[header] = utils.MaxInt(t.maxWidths[header], runewidth.StringWidth(value))
+			t.maxWidths[header] = utils.MaxInt(t.maxWidths[header], value.Length())
 		}
 	}
 }
@@ -233,43 +233,51 @@ func (t *Table) setActiveLine(activeLine int) {
 	t.ActiveLine = utils.Bounded(activeLine, 0, len(t.Rows)-1)
 }
 
-func (t Table) stringFromColumns(values map[string]string, header bool) string {
-	paddedColumns := make([]string, len(t.columns))
+func (t Table) stringFromColumns(values map[string]text.StyledString, header bool) text.StyledString {
+	paddedColumns := make([]text.StyledString, len(t.columns))
 	for j, name := range t.columns {
-		alignment := Left
+		alignment := text.Left
 		if !header {
 			alignment = t.alignment[name]
 		}
-		paddedColumns[j] = align(values[name], t.maxWidths[name], alignment)
+		paddedColumns[j] = values[name]
+		paddedColumns[j].Align(alignment, t.maxWidths[name])
 	}
 
-	return align(strings.Join(paddedColumns, t.sep), t.width, Left)
+	line := text.Join(paddedColumns, t.sep)
+	line.Align(text.Left, t.width)
+
+	return line
 }
 
-func (t *Table) Text() ([]StyledText, error) {
-	texts := make([]StyledText, 0, len(t.Rows))
+func (t *Table) Text() ([]text.LocalizedStyledString, error) {
+	texts := make([]text.LocalizedStyledString, 0, len(t.Rows))
 
-	headers := make(map[string]string)
+	headers := make(map[string]text.StyledString)
 	for _, header := range t.columns {
-		headers[header] = header
+		headers[header] = text.NewStyledString(header)
 	}
-	texts = append(texts, StyledText{
-		Content: t.stringFromColumns(headers, true),
-		Class:   TableHeader,
+
+	s := t.stringFromColumns(headers, true)
+	s.Add(text.TableHeader)
+	texts = append(texts, text.LocalizedStyledString{
+		X: 0,
+		Y: 0,
+		S: s,
 	})
 
 	for i, row := range t.Rows {
-		text := StyledText{
-			X:       0,
-			Y:       i + 1,
-			Content: t.stringFromColumns(row.Tabular(), false),
+		tx := text.LocalizedStyledString{
+			X: 0,
+			Y: i + 1,
+			S: t.stringFromColumns(row.Tabular(), false),
 		}
 
-		if text.Y == t.ActiveLine+1 {
-			text.Class = ActiveRow
+		if tx.Y == t.ActiveLine+1 {
+			tx.S.Add(text.ActiveRow)
 		}
 
-		texts = append(texts, text)
+		texts = append(texts, tx)
 	}
 
 	return texts, nil

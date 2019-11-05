@@ -6,8 +6,8 @@ import (
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/encoding"
 	"github.com/nbedos/citop/providers"
+	"github.com/nbedos/citop/text"
 	"github.com/nbedos/citop/utils"
-	"github.com/nbedos/citop/widgets"
 	"io/ioutil"
 	"log"
 	"os"
@@ -22,7 +22,7 @@ type OutputEvent interface {
 }
 
 type ShowText struct {
-	content []widgets.StyledText
+	content []text.LocalizedStyledString
 }
 
 func (e ShowText) isOutputEvent() {}
@@ -69,10 +69,22 @@ func RunWidgetApp() (err error) {
 	defer os.RemoveAll(tmpDir)
 
 	defaultStyle := tcell.StyleDefault
-	styleSheet := map[widgets.Class]tcell.Style{
-		widgets.TableHeader:  defaultStyle.Bold(true).Reverse(true),
-		widgets.ActiveRow:    defaultStyle.Reverse(true),
-		widgets.DefaultClass: defaultStyle,
+	styleSheet := text.StyleSheet{
+		text.TableHeader: func(s tcell.Style) tcell.Style {
+			return s.Bold(true).Reverse(true)
+		},
+		text.ActiveRow: func(s tcell.Style) tcell.Style {
+			return s.Background(tcell.ColorSilver).Foreground(tcell.ColorBlack)
+		},
+		text.StatusRunning: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorYellow)
+		},
+		text.StatusFailed: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorRed)
+		},
+		text.StatusPassed: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorGreen)
+		},
 	}
 
 	CIProviders := []cache.Provider{
@@ -192,7 +204,7 @@ func RunWidgetApp() (err error) {
 
 			case ShowText:
 				screen.Clear()
-				if err = widgets.Draw(e.content, screen, styleSheet); err != nil {
+				if err = text.Draw(e.content, screen, defaultStyle, styleSheet); err != nil {
 					return
 				}
 				screen.Show()
