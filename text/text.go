@@ -17,6 +17,8 @@ const (
 	StatusPassed
 	StatusRunning
 	StatusFailed
+	GitRef
+	Provider
 )
 
 type elementaryString struct {
@@ -34,7 +36,7 @@ func (s *StyledString) Add(c Class) {
 	}
 }
 
-func (s *StyledString) Append(content string, classes []Class) {
+func (s *StyledString) Append(content string, classes ...Class) {
 	s.components = append(s.components, elementaryString{
 		Content: content,
 		Classes: classes,

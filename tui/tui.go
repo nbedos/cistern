@@ -74,7 +74,7 @@ func RunWidgetApp() (err error) {
 			return s.Bold(true).Reverse(true)
 		},
 		text.ActiveRow: func(s tcell.Style) tcell.Style {
-			return s.Background(tcell.ColorSilver).Foreground(tcell.ColorBlack)
+			return s.Background(tcell.ColorSilver).Foreground(tcell.ColorBlack).Bold(false).Underline(false).Blink(false)
 		},
 		text.StatusRunning: func(s tcell.Style) tcell.Style {
 			return s.Foreground(tcell.ColorYellow)
@@ -84,6 +84,12 @@ func RunWidgetApp() (err error) {
 		},
 		text.StatusPassed: func(s tcell.Style) tcell.Style {
 			return s.Foreground(tcell.ColorGreen)
+		},
+		text.GitRef: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorGray)
+		},
+		text.Provider: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorGray)
 		},
 	}
 
@@ -122,12 +128,13 @@ func RunWidgetApp() (err error) {
 	if err != nil {
 		return err
 	}
+	originURL = "https://github.com/circleci/circleci-docs"
 	source := cacheDB.NewRepositoryBuilds(originURL)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
-		if err := cacheDB.UpdateFromProviders(ctx, originURL, 7*24*time.Hour, updates); err != nil {
+		if err := cacheDB.UpdateFromProviders(ctx, originURL, 1*24*time.Hour, updates); err != nil {
 			errc <- err
 		}
 	}()

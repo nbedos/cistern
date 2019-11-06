@@ -97,7 +97,7 @@ type Commit struct {
 
 type Build struct {
 	Repository      *Repository
-	ID              int
+	ID              string
 	Commit          Commit
 	Ref             string
 	IsTag           bool
@@ -149,7 +149,7 @@ type Stage struct {
 
 type JobKey struct {
 	AccountID string
-	BuildID   int
+	BuildID   string
 	StageID   int
 	ID        int
 }
@@ -193,7 +193,7 @@ func (j Job) AllowedFailure() bool { return j.AllowFailure }
 
 type buildKey struct {
 	AccountID string
-	BuildID   int
+	BuildID   string
 }
 
 type Cache struct {

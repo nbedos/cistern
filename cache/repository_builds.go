@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -22,7 +23,7 @@ var ErrNoMatchFound = errors.New("no match found")
 type buildRowKey struct {
 	sha       string
 	accountID string
-	buildID   int
+	buildID   string
 	stageID   int
 	jobID     int
 }
@@ -31,7 +32,9 @@ type buildRow struct {
 	key         buildRowKey
 	type_       string
 	state       string
+	ref         string
 	name        string
+	provider    string
 	prefix      string
 	startedAt   sql.NullTime
 	finishedAt  sql.NullTime
@@ -80,11 +83,25 @@ func (b buildRow) Tabular() map[string]text.StyledString {
 		state = text.NewStyledString(b.state)
 	}
 
+	var name text.StyledString
+	switch b.type_ {
+	case "C":
+		name = text.NewStyledString(fmt.Sprintf("%s[", b.prefix))
+		name.Append(b.ref, text.GitRef)
+		name.Append(fmt.Sprintf("] %s", b.name))
+	case "P":
+		name = text.NewStyledString(b.prefix)
+		name.Append(b.provider, text.Provider)
+		name.Append(fmt.Sprintf(" (%s)", b.name))
+	default:
+		name = text.NewStyledString(fmt.Sprintf("%s%s", b.prefix, b.name))
+	}
+
 	return map[string]text.StyledString{
 		"COMMIT":   text.NewStyledString(string([]rune(b.key.sha)[:shaLength]), text.CommitSha),
 		"TYPE":     text.NewStyledString(b.type_),
 		"STATE":    state,
-		"NAME":     text.NewStyledString(fmt.Sprintf("%s%s", b.prefix, b.name)),
+		"NAME":     name,
 		"STARTED":  text.NewStyledString(nullTimeToString(b.startedAt)),
 		"FINISHED": text.NewStyledString(nullTimeToString(b.finishedAt)),
 		"UPDATED":  text.NewStyledString(nullTimeToString(b.updatedAt)),
@@ -137,6 +154,13 @@ func (s *RepositoryBuilds) SetTraversable(key interface{}, traversable bool, rec
 	return nil
 }
 
+func Ref(ref string, tag bool) string {
+	if tag {
+		return fmt.Sprintf("tag: %s", ref)
+	}
+	return ref
+}
+
 func buildRowFromBuild(b Build) buildRow {
 	row := buildRow{
 		key: buildRowKey{
@@ -146,12 +170,20 @@ func buildRowFromBuild(b Build) buildRow {
 		},
 		type_:      "P",
 		state:      string(b.State),
-		name:       fmt.Sprintf("%s (#%d)", b.Repository.AccountID, b.ID),
+		ref:        Ref(b.Ref, b.IsTag),
 		startedAt:  b.StartedAt,
 		finishedAt: b.FinishedAt,
 		updatedAt:  sql.NullTime{Time: b.UpdatedAt, Valid: true},
 		url:        b.WebURL,
 		duration:   b.Duration,
+		provider:   b.Repository.AccountID,
+	}
+
+	// Prefix only numeric IDs with hash
+	if _, err := strconv.Atoi(b.ID); err == nil {
+		row.name = fmt.Sprintf("#%s", b.ID)
+	} else {
+		row.name = b.ID
 	}
 
 	jobIDs := make([]int, 0, len(b.Jobs))
@@ -183,10 +215,12 @@ func buildRowFromStage(s Stage) buildRow {
 			buildID:   s.Build.ID,
 			stageID:   s.ID,
 		},
-		type_: "Content",
-		state: string(s.State),
-		name:  s.Name,
-		url:   s.Build.WebURL,
+		type_:    "S",
+		state:    string(s.State),
+		ref:      Ref(s.Build.Ref, s.Build.IsTag),
+		name:     s.Name,
+		url:      s.Build.WebURL,
+		provider: s.Build.Repository.AccountID,
 	}
 
 	jobIDs := make([]int, 0, len(s.Jobs))
@@ -227,11 +261,13 @@ func buildRowFromJob(j Job) buildRow {
 		type_:      "J",
 		state:      string(j.State),
 		name:       j.Name,
+		ref:        Ref(j.Build.Ref, j.Build.IsTag),
 		startedAt:  j.StartedAt,
 		finishedAt: j.FinishedAt,
 		updatedAt:  utils.MaxNullTime(j.FinishedAt, j.StartedAt, j.CreatedAt),
 		url:        j.WebURL,
 		duration:   j.Duration,
+		provider:   j.Build.Repository.AccountID,
 	}
 }
 
@@ -246,9 +282,11 @@ func commitRowFromBuilds(builds []Build) buildRow {
 			sha: builds[0].Commit.Sha,
 		},
 		type_:       "C",
-		name:        fmt.Sprintf("[%s] %s", builds[0].Ref, messageLines[0]),
+		ref:         Ref(builds[0].Ref, builds[0].IsTag),
+		name:        messageLines[0],
 		children:    make([]buildRow, 0, len(builds)),
 		traversable: false,
+		provider:    "-",
 	}
 
 	latestBuildByProvider := make(map[string]Build)
@@ -305,13 +343,23 @@ func (s *RepositoryBuilds) FetchRows() {
 			}
 		}
 	}
-	buildsPerCommit := make(map[string][]Build)
+	type Ref struct {
+		sha   string
+		ref   string
+		isTag bool
+	}
+	buildsPerRef := make(map[Ref][]Build)
 	for _, build := range s.cache.Builds() {
-		buildsPerCommit[build.Commit.Sha] = append(buildsPerCommit[build.Commit.Sha], build)
+		ref := Ref{
+			sha:   build.Commit.Sha,
+			ref:   build.Ref,
+			isTag: build.IsTag,
+		}
+		buildsPerRef[ref] = append(buildsPerRef[ref], build)
 	}
 
-	rows := make([]buildRow, 0, len(buildsPerCommit))
-	for _, builds := range buildsPerCommit {
+	rows := make([]buildRow, 0, len(buildsPerRef))
+	for _, builds := range buildsPerRef {
 		rows = append(rows, commitRowFromBuilds(builds))
 	}
 

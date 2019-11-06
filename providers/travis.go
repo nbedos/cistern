@@ -109,7 +109,7 @@ func (b travisBuild) ToInserters(accountID string, repository *cache.Repository,
 
 	build = cache.Build{
 		Repository: repository,
-		ID:         b.ID,
+		ID:         strconv.Itoa(b.ID),
 		Commit:     commit,
 		IsTag:      b.Tag.Name != "",
 		State:      FromTravisState(b.State),
@@ -293,7 +293,7 @@ var TravisPusherHost = "ws.pusherapp.com"
 func NewTravisClient(URL url.URL, pusherHost string, token string, accountID string, rateLimit time.Duration) TravisClient {
 	return TravisClient{
 		baseURL:        URL,
-		httpClient:     &http.Client{Timeout: 10 * time.Second},
+		httpClient:     &http.Client{Timeout: 20 * time.Second},
 		pusherHost:     pusherHost,
 		rateLimiter:    time.Tick(rateLimit),
 		token:          token,
@@ -335,7 +335,7 @@ func (c TravisClient) Builds(ctx context.Context, repositoryURL string, maxAge t
 		errc <- c.events(subCtx, p, eventc)
 	}()
 
-	builds := make(map[int]*cache.Build)
+	builds := make(map[string]*cache.Build)
 
 eventLoop:
 	for {
@@ -489,9 +489,9 @@ func (err HTTPError) Error() string {
 		err.Method, err.URL, err.Status, err.Message)
 }
 
-func (c TravisClient) fetchBuild(ctx context.Context, repository *cache.Repository, buildID int) (cache.Build, error) {
+func (c TravisClient) fetchBuild(ctx context.Context, repository *cache.Repository, buildID string) (cache.Build, error) {
 	buildURL := c.baseURL
-	buildURL.Path += fmt.Sprintf("/build/%d", buildID)
+	buildURL.Path += fmt.Sprintf("/build/%s", buildID)
 	parameters := buildURL.Query()
 	parameters.Add("include", "build.jobs,build.commit,job.config")
 	buildURL.RawQuery = parameters.Encode()
@@ -567,7 +567,7 @@ func (c TravisClient) RepositoryBuilds(ctx context.Context, repository *cache.Re
 				}
 
 				wg.Add(1)
-				go func(buildID int) {
+				go func(buildID string) {
 					defer wg.Done()
 
 					build, err := c.fetchBuild(subCtx, repository, buildID)
@@ -580,7 +580,7 @@ func (c TravisClient) RepositoryBuilds(ctx context.Context, repository *cache.Re
 					case <-subCtx.Done():
 						errc <- subCtx.Err()
 					}
-				}(build.ID)
+				}(strconv.Itoa(build.ID))
 			}
 		}
 	}()
@@ -743,13 +743,13 @@ type travisEvent interface {
 }
 
 type travisBuildUpdate struct {
-	remoteID int
+	remoteID string
 }
 
 func (travisBuildUpdate) isTravisEvent() {}
 
 type travisJobUpdate struct {
-	buildRemoteID int
+	buildRemoteID string
 	jobKey        cache.JobKey
 	state         cache.State
 }
@@ -791,7 +791,7 @@ func (c TravisClient) events(ctx context.Context, p utils.PusherClient, teventc 
 			}
 
 			select {
-			case teventc <- travisBuildUpdate{remoteID: data.Build.ID}:
+			case teventc <- travisBuildUpdate{remoteID: strconv.Itoa(data.Build.ID)}:
 			case <-ctx.Done():
 				return ctx.Err()
 			}
@@ -828,10 +828,10 @@ func (c TravisClient) events(ctx context.Context, p utils.PusherClient, teventc 
 			}
 
 			tevent := travisJobUpdate{
-				buildRemoteID: data.BuildID,
+				buildRemoteID: strconv.Itoa(data.BuildID),
 				jobKey: cache.JobKey{
 					AccountID: c.accountID,
-					BuildID:   data.BuildID,
+					BuildID:   strconv.Itoa(data.BuildID),
 					StageID:   stageID,
 					ID:        data.ID,
 				},

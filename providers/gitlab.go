@@ -19,7 +19,7 @@ type GitLabClient struct {
 	accountID            string
 	remote               *gitlab.Client
 	rateLimiter          <-chan time.Time
-	updateTimePerBuildID map[int]time.Time
+	updateTimePerBuildID map[string]time.Time
 	mux                  *sync.Mutex
 }
 
@@ -28,7 +28,7 @@ func NewGitLabClient(accountID string, token string, rateLimit time.Duration) Gi
 		accountID:            accountID,
 		remote:               gitlab.NewClient(nil, token),
 		rateLimiter:          time.Tick(rateLimit),
-		updateTimePerBuildID: make(map[int]time.Time),
+		updateTimePerBuildID: make(map[string]time.Time),
 		mux:                  &sync.Mutex{},
 	}
 }
@@ -194,7 +194,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 	}
 	build = cache.Build{
 		Repository:      repository,
-		ID:              pipeline.ID,
+		ID:              strconv.Itoa(pipeline.ID),
 		Commit:          cacheCommit,
 		Ref:             pipeline.Ref,
 		IsTag:           pipeline.Tag,
