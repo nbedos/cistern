@@ -85,20 +85,21 @@ func (b buildRow) Tabular() map[string]text.StyledString {
 
 	var name text.StyledString
 	switch b.type_ {
-	case "C":
-		name = text.NewStyledString(fmt.Sprintf("%s[", b.prefix))
-		name.Append(b.ref, text.GitRef)
-		name.Append(fmt.Sprintf("] %s", b.name))
 	case "P":
 		name = text.NewStyledString(b.prefix)
 		name.Append(b.provider, text.Provider)
 		name.Append(fmt.Sprintf(" (%s)", b.name))
 	default:
-		name = text.NewStyledString(fmt.Sprintf("%s%s", b.prefix, b.name))
+		prefix := b.prefix
+		if prefix == "" {
+			prefix = nullPlaceholder
+		}
+		name = text.NewStyledString(fmt.Sprintf("%s%s", prefix, b.name))
 	}
 
 	return map[string]text.StyledString{
 		"COMMIT":   text.NewStyledString(string([]rune(b.key.sha)[:shaLength]), text.CommitSha),
+		"REF":      text.NewStyledString(b.ref, text.GitRef),
 		"TYPE":     text.NewStyledString(b.type_),
 		"STATE":    state,
 		"NAME":     name,
@@ -286,7 +287,7 @@ func commitRowFromBuilds(builds []Build) buildRow {
 		name:        messageLines[0],
 		children:    make([]buildRow, 0, len(builds)),
 		traversable: false,
-		provider:    "-",
+		provider:    "",
 	}
 
 	latestBuildByProvider := make(map[string]Build)

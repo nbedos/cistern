@@ -73,10 +73,15 @@ func (c GitLabClient) Repository(ctx context.Context, repositoryURL string) (cac
 		return cache.Repository{}, err
 	}
 
+	splitPath := strings.SplitN(project.PathWithNamespace, "/", 2)
+	if len(splitPath) != 2 {
+		return cache.Repository{}, fmt.Errorf("invalid repository path: '%s'", project.PathWithNamespace)
+	}
+
 	return cache.Repository{
 		ID:        project.ID,
-		Owner:     project.Owner.Username,
-		Name:      project.Name,
+		Owner:     splitPath[0],
+		Name:      splitPath[1],
 		URL:       project.WebURL,
 		AccountID: c.accountID,
 	}, nil
@@ -96,6 +101,8 @@ func FromGitLabState(s string) cache.State {
 		return cache.Failed
 	case "skipped":
 		return cache.Skipped
+	case "manual":
+		return cache.Manual
 	default:
 		return cache.Unknown
 	}
@@ -213,14 +220,24 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 		Jobs:   make(map[int]*cache.Job),
 	}
 
-	select {
-	case <-c.rateLimiter:
-	case <-ctx.Done():
-		return build, ctx.Err()
-	}
-	jobs, _, err := c.remote.Jobs.ListPipelineJobs(repository.ID, pipeline.ID, nil, gitlab.WithContext(ctx))
-	if err != nil {
-		return build, nil
+	jobs := make([]*gitlab.Job, 0)
+	options := gitlab.ListJobsOptions{}
+	for {
+		select {
+		case <-c.rateLimiter:
+		case <-ctx.Done():
+			return build, ctx.Err()
+		}
+		pageJobs, resp, err := c.remote.Jobs.ListPipelineJobs(repository.ID, pipeline.ID, &options, gitlab.WithContext(ctx))
+		if err != nil {
+			return build, nil
+		}
+		jobs = append(jobs, pageJobs...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		options.Page = resp.NextPage
 	}
 
 	stagesByName := make(map[string]*cache.Stage)
@@ -238,49 +255,24 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 		}
 	}
 
-	jobc := make(chan cache.Job)
-	errc := make(chan error, len(jobs))
-	wg := sync.WaitGroup{}
-
-	for _, job := range jobs {
-		wg.Add(1)
-		go func(job *gitlab.Job) {
-			defer wg.Done()
-			select {
-			case <-c.rateLimiter:
-			case <-ctx.Done():
-				errc <- ctx.Err()
-				return
-			}
-
-			jobc <- cache.Job{
-				Build:      &build,
-				Stage:      stagesByName[job.Stage],
-				ID:         job.ID,
-				State:      FromGitLabState(job.Status),
-				Name:       job.Name,
-				Log:        sql.NullString{},
-				CreatedAt:  utils.NullTimeFromTime(job.CreatedAt),
-				StartedAt:  utils.NullTimeFromTime(job.StartedAt),
-				FinishedAt: utils.NullTimeFromTime(job.FinishedAt),
-				Duration: cache.NullDuration{
-					Duration: time.Duration(job.Duration) * time.Second,
-					Valid:    int64(job.Duration) > 0,
-				},
-				WebURL:       job.WebURL,
-				AllowFailure: job.AllowFailure,
-			}
-		}(job)
-	}
-
-	go func() {
-		wg.Wait()
-		close(jobc)
-		close(errc)
-	}()
-
-	for job := range jobc {
-		job := job
+	for _, gitlabJob := range jobs {
+		job := cache.Job{
+			Build:      &build,
+			Stage:      stagesByName[gitlabJob.Stage],
+			ID:         gitlabJob.ID,
+			State:      FromGitLabState(gitlabJob.Status),
+			Name:       gitlabJob.Name,
+			Log:        sql.NullString{},
+			CreatedAt:  utils.NullTimeFromTime(gitlabJob.CreatedAt),
+			StartedAt:  utils.NullTimeFromTime(gitlabJob.StartedAt),
+			FinishedAt: utils.NullTimeFromTime(gitlabJob.FinishedAt),
+			Duration: cache.NullDuration{
+				Duration: time.Duration(gitlabJob.Duration) * time.Second,
+				Valid:    int64(gitlabJob.Duration) > 0,
+			},
+			WebURL:       gitlabJob.WebURL,
+			AllowFailure: gitlabJob.AllowFailure,
+		}
 		build.Stages[job.Stage.ID].Jobs[job.ID] = &job
 	}
 
@@ -306,5 +298,5 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 	c.mux.Lock()
 	c.updateTimePerBuildID[build.ID] = build.UpdatedAt
 	c.mux.Unlock()
-	return build, <-errc
+	return build, nil
 }

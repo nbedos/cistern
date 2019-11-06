@@ -560,8 +560,12 @@ func (c TravisClient) RepositoryBuilds(ctx context.Context, repository *cache.Re
 			}
 
 			for _, build := range builds {
-				startedAt, err := utils.NullTimeFromString(build.StartedAt)
-				if err == nil && startedAt.Valid && time.Since(startedAt.Time) > maxAge {
+				date := build.StartedAt
+				if date == "" {
+					date = build.UpdatedAt
+				}
+				t, err := utils.NullTimeFromString(date)
+				if err == nil && t.Valid && time.Since(t.Time) > maxAge {
 					lastPage = true
 					continue
 				}

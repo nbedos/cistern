@@ -35,17 +35,19 @@ const (
 	Passed   State = "passed"
 	Failed   State = "failed"
 	Canceled State = "canceled"
+	Manual   State = "manual"
 	Skipped  State = "skipped"
 )
 
 var statePrecedence = map[State]int{
-	Unknown:  7,
-	Running:  6,
-	Pending:  5,
-	Canceled: 4,
-	Failed:   3,
-	Passed:   2,
-	Skipped:  1,
+	Unknown:  80,
+	Running:  70,
+	Pending:  60,
+	Canceled: 50,
+	Failed:   40,
+	Passed:   30,
+	Skipped:  20,
+	Manual:   10,
 }
 
 type Statuser interface {

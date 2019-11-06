@@ -118,9 +118,9 @@ func RepositorySlugFromURL(repositoryURL string) (string, error) {
 	// Turn "git@host:path.git" into "host/path" so that it is compatible with url.Parse()
 	if strings.HasPrefix(repositoryURL, "git@") {
 		repositoryURL = strings.TrimPrefix(repositoryURL, "git@")
-		repositoryURL = strings.TrimSuffix(repositoryURL, ".git")
 		repositoryURL = strings.Replace(repositoryURL, ":", "/", 1)
 	}
+	repositoryURL = strings.TrimSuffix(repositoryURL, ".git")
 
 	u, err := url.Parse(repositoryURL)
 	if err != nil {
