@@ -259,13 +259,17 @@ func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, m
 	errc := make(chan error)
 	buildc := make(chan Build)
 
+	repositoryNotFoundCount := 0
 	for _, provider := range c.providers {
 		wg.Add(1)
 		go func(p Provider) {
 			defer wg.Done()
 			err := p.Builds(subCtx, repositoryURL, maxAge, buildc)
+			if err == ErrRepositoryNotFound {
+				repositoryNotFoundCount++
+			}
 			// FIXME We probably want to log this
-			if err != nil && err != ErrRepositoryNotFound {
+			if err != nil && (err != ErrRepositoryNotFound || repositoryNotFoundCount == len(c.providers)) {
 				errc <- err
 			}
 		}(provider)

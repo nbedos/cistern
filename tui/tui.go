@@ -2,12 +2,10 @@ package tui
 
 import (
 	"context"
-	"errors"
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/encoding"
 	"github.com/nbedos/citop/providers"
 	"github.com/nbedos/citop/text"
-	"github.com/nbedos/citop/utils"
 	"io/ioutil"
 	"log"
 	"os"
@@ -38,34 +36,15 @@ type ExitEvent struct{}
 
 func (e ExitEvent) isOutputEvent() {}
 
-func RunWidgetApp() (err error) {
+func RunWidgetApp(repositoryURL string, travisToken string, gitlabToken string, circleciToken string) (err error) {
 	// FIXME Discard log until the status bar is implemented in order to hide the "Unsolicited response received on
 	//  idle HTTP channel" from GitLab's HTTP client
 	log.SetOutput(ioutil.Discard)
-
-	travisToken := os.Getenv("TRAVIS_API_TOKEN")
-	if travisToken == "" {
-		err = errors.New("environment variable TRAVIS_API_TOKEN is not set")
-		return
-	}
-
-	gitlabToken := os.Getenv("GITLAB_API_TOKEN")
-	if gitlabToken == "" {
-		err = errors.New("environment variable GITLAB_API_TOKEN is not set")
-		return
-	}
-
-	circleciToken := os.Getenv("CIRCLECI_API_TOKEN")
-	if circleciToken == "" {
-		err = errors.New("environment variable CIRCLECI_API_TOKEN is not set")
-		return
-	}
 
 	tmpDir, err := ioutil.TempDir("", "citop")
 	if err != nil {
 		return err
 	}
-
 	defer os.RemoveAll(tmpDir)
 
 	defaultStyle := tcell.StyleDefault
@@ -106,22 +85,14 @@ func RunWidgetApp() (err error) {
 	eventc := make(chan tcell.Event)
 	outc := make(chan OutputEvent)
 	errc := make(chan error)
-
 	updates := make(chan time.Time)
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	originURL, err := utils.GitOriginURL(cwd)
-	if err != nil {
-		return err
-	}
-	source := cacheDB.NewRepositoryBuilds(originURL)
+
+	source := cacheDB.NewRepositoryBuilds(repositoryURL)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
-		if err := cacheDB.UpdateFromProviders(ctx, originURL, 24*time.Hour, updates); err != nil {
+		if err := cacheDB.UpdateFromProviders(ctx, repositoryURL, 7*24*time.Hour, updates); err != nil {
 			errc <- err
 		}
 	}()
