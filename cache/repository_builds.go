@@ -66,7 +66,8 @@ func (b buildRow) Tabular() map[string]text.StyledString {
 
 	nullTimeToString := func(t sql.NullTime) string {
 		if t.Valid {
-			return t.Time.Local().Truncate(time.Second).String()
+			t := t.Time.Local().Truncate(time.Second)
+			return t.Format("Jan _2 15:04")
 		}
 		return nullPlaceholder
 	}
@@ -225,12 +226,24 @@ func buildRowFromStage(s Stage) buildRow {
 	}
 
 	jobIDs := make([]int, 0, len(s.Jobs))
+	// We agreggate jobs by name and only keep the most recent to weed out previous runs of the job.
+	// This is mainly for GitLab which keeps jobs after they are restarted. Maybe we should add
+	// date fields to Stage and have providers fill them instead of computing them here.
+	jobByName := make(map[string]*Job, len(s.Jobs))
 	for ID, job := range s.Jobs {
 		jobIDs = append(jobIDs, ID)
+		namedJob, exists := jobByName[job.Name]
+		if !exists || job.CreatedAt.Valid && job.CreatedAt.Time.After(namedJob.CreatedAt.Time) {
+			jobByName[job.Name] = job
+		}
+	}
+
+	for _, job := range jobByName {
 		row.startedAt = utils.MinNullTime(row.startedAt, job.StartedAt)
 		row.finishedAt = utils.MaxNullTime(row.finishedAt, job.FinishedAt)
-		row.updatedAt = utils.MinNullTime(row.updatedAt, job.FinishedAt, job.StartedAt, job.CreatedAt)
+		row.updatedAt = utils.MaxNullTime(row.updatedAt, job.FinishedAt, job.StartedAt, job.CreatedAt)
 	}
+
 	if row.startedAt.Valid && row.finishedAt.Valid {
 		row.duration = NullDuration{
 			Valid:    true,
@@ -239,8 +252,8 @@ func buildRowFromStage(s Stage) buildRow {
 	}
 
 	sort.Ints(jobIDs)
-	for _, jobID := range jobIDs {
-		row.children = append(row.children, buildRowFromJob(*s.Jobs[jobID]))
+	for i := len(jobIDs) - 1; i >= 0; i-- {
+		row.children = append(row.children, buildRowFromJob(*s.Jobs[jobIDs[i]]))
 	}
 
 	return row
@@ -261,7 +274,7 @@ func buildRowFromJob(j Job) buildRow {
 		},
 		type_:      "J",
 		state:      string(j.State),
-		name:       j.Name,
+		name:       fmt.Sprintf("%s (#%d)", j.Name, j.ID),
 		ref:        Ref(j.Build.Ref, j.Build.IsTag),
 		startedAt:  j.StartedAt,
 		finishedAt: j.FinishedAt,

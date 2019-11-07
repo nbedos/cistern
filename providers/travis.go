@@ -293,12 +293,12 @@ var TravisPusherHost = "ws.pusherapp.com"
 func NewTravisClient(URL url.URL, pusherHost string, token string, accountID string, rateLimit time.Duration) TravisClient {
 	return TravisClient{
 		baseURL:        URL,
-		httpClient:     &http.Client{Timeout: 20 * time.Second},
+		httpClient:     &http.Client{Timeout: 10 * time.Second},
 		pusherHost:     pusherHost,
 		rateLimiter:    time.Tick(rateLimit),
 		token:          token,
 		accountID:      accountID,
-		buildsPageSize: 20,
+		buildsPageSize: 10,
 	}
 }
 

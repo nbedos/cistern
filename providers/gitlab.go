@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/cenkalti/backoff"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
 	"github.com/xanzy/go-gitlab"
@@ -43,14 +44,51 @@ func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, maxAge t
 	if err != nil {
 		return err
 	}
-	if err := c.LastBuilds(ctx, repository, maxAge, buildc); err != nil {
-		return err
+
+	b := backoff.ExponentialBackOff{
+		InitialInterval:     5 * time.Second,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         time.Minute,
+		MaxElapsedTime:      0,
+		Clock:               backoff.SystemClock,
+	}
+	b.Reset()
+
+	var active bool
+	for {
+		waitTime := b.NextBackOff()
+		if waitTime == backoff.Stop {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(waitTime):
+		}
+
+		if active, err = c.LastBuilds(ctx, repository, maxAge, buildc); err != nil {
+			return err
+		}
+		if active {
+			b.Reset()
+		}
 	}
 
 	return nil
 }
 
 func (c GitLabClient) StreamLog(ctx context.Context, jobID int, writer io.Writer) error {
+	trace, _, err := c.remote.Jobs.GetTraceFile(repository.ID, jobID, nil, gitlab.WithContext(ctx))
+	if err != nil {
+		return "", err
+	}
+	buf := new(bytes.Buffer)
+	if _, err := buf.ReadFrom(trace); err != nil {
+		return "", err
+	}
+
 	return nil
 }
 
@@ -108,53 +146,57 @@ func FromGitLabState(s string) cache.State {
 	}
 }
 
-func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) error {
+func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) (bool, error) {
 	opt := gitlab.ListProjectPipelinesOptions{
 		ListOptions: gitlab.ListOptions{
 			Page:    0,
 			PerPage: 20,
 		},
 	}
+	active := false
 	lastPage := false
 
 	for opt.ListOptions.Page = 0; !lastPage; opt.ListOptions.Page++ {
 		select {
 		case <-c.rateLimiter:
 		case <-ctx.Done():
-			return ctx.Err()
+			return active, ctx.Err()
 		}
-
 		pipelines, _, err := c.remote.Pipelines.ListProjectPipelines(repository.ID, &opt,
 			gitlab.WithContext(ctx))
 		if err != nil {
-			return err
+			return active, err
 		}
 		if len(pipelines) == 0 {
 			lastPage = true
 			continue
 		}
 
+	pipelines:
 		for _, minimalPipeline := range pipelines {
-			build, err := c.fetchBuild(ctx, &repository, minimalPipeline.ID)
-			if err != nil {
-				return err
+			active = active || FromGitLabState(minimalPipeline.Status).IsActive()
+
+			if minimalPipeline.CreatedAt != nil && time.Since(*minimalPipeline.CreatedAt) > maxAge {
+				lastPage = true
+				continue pipelines
 			}
 
-			// minimalPipeline is so minimal that it has no date attribute so we have to test
-			// the date of the full build.
-			if build.CreatedAt.Valid && time.Since(build.CreatedAt.Time) > maxAge {
-				lastPage = true
-			} else {
+			lastUpdate := c.updateTimePerBuildID[strconv.Itoa(minimalPipeline.ID)]
+			if minimalPipeline.UpdatedAt != nil && minimalPipeline.UpdatedAt.After(lastUpdate) {
+				build, err := c.fetchBuild(ctx, &repository, minimalPipeline.ID)
+				if err != nil {
+					return active, err
+				}
 				select {
 				case buildc <- build:
 				case <-ctx.Done():
-					return ctx.Err()
+					return active, ctx.Err()
 				}
 			}
 		}
 	}
 
-	return nil
+	return active, nil
 }
 
 func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, error) {

@@ -7,7 +7,7 @@ require (
 	github.com/gdamore/tcell v1.3.0
 	github.com/google/go-cmp v0.3.1
 	github.com/mattn/go-runewidth v0.0.6
-	github.com/xanzy/go-gitlab v0.21.0
+	github.com/xanzy/go-gitlab v0.22.0
 	go.uber.org/multierr v1.3.0 // indirect
 	golang.org/x/crypto v0.0.0-20191029031824-8986dd9e96cf // indirect
 	golang.org/x/net v0.0.0-20191101175033-0deb6923b6d9 // indirect
