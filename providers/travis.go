@@ -627,7 +627,7 @@ func (c TravisClient) fetchJobLog(ctx context.Context, jobID int) (int, string, 
 	return len(log.Parts), log.Content, nil
 }
 
-func (c TravisClient) StreamLog(ctx context.Context, jobID int, writer io.Writer) error {
+func (c TravisClient) StreamLog(ctx context.Context, repositoryID int, jobID int, writer io.Writer) error {
 	var err error
 
 	p, err := c.pusherClient(ctx, []string{fmt.Sprintf("job-%d", jobID)})

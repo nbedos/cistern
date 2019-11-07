@@ -53,43 +53,143 @@ func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, maxAge t
 		MaxElapsedTime:      0,
 		Clock:               backoff.SystemClock,
 	}
-	b.Reset()
 
 	var active bool
 	for {
-		waitTime := b.NextBackOff()
-		if waitTime == backoff.Stop {
-			break
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(waitTime):
-		}
-
 		if active, err = c.LastBuilds(ctx, repository, maxAge, buildc); err != nil {
 			return err
 		}
 		if active {
 			b.Reset()
 		}
+
+		waitTime := b.NextBackOff()
+		if waitTime == backoff.Stop {
+			break
+		}
+
+		select {
+		case <-time.After(waitTime):
+			// Do nothing
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
 	return nil
 }
 
-func (c GitLabClient) StreamLog(ctx context.Context, jobID int, writer io.Writer) error {
-	trace, _, err := c.remote.Jobs.GetTraceFile(repository.ID, jobID, nil, gitlab.WithContext(ctx))
-	if err != nil {
-		return "", err
+func (c GitLabClient) StreamLog(ctx context.Context, repositoryID int, jobID int, writer io.Writer) error {
+	b := backoff.ExponentialBackOff{
+		InitialInterval:     10 * time.Second,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         time.Hour,
+		MaxElapsedTime:      0,
+		Clock:               backoff.SystemClock,
 	}
-	buf := new(bytes.Buffer)
-	if _, err := buf.ReadFrom(trace); err != nil {
-		return "", err
+	b.Reset()
+
+	contentLength := 0
+	traceLength := 0
+	jobIsRunning := true
+	for jobIsRunning {
+		job, _, err := c.GetJob(ctx, repositoryID, jobID)
+		if err != nil {
+			return err
+		}
+		jobIsRunning = FromGitLabState(job.Status).IsActive()
+
+		// Ideally we would use the Range HTTP request header to get the next part of the log
+		// but that is not supported by GitLab. So we rely on Content-Length to monitor log
+		// changes.
+		nextContentLength, _, err := c.GetTraceFileSize(ctx, repositoryID, jobID)
+		if err != nil {
+			return err
+		}
+		if nextContentLength > contentLength {
+			buf, n, _, err := c.GetTraceFile(ctx, repositoryID, jobID)
+			if err != nil {
+				return err
+			}
+			contentLength = n
+
+			if buf.Len() > traceLength {
+				b.Reset()
+				_ = buf.Next(traceLength)
+				written, err := buf.WriteTo(writer)
+				if err != nil {
+					return err
+				}
+				traceLength += int(written)
+			}
+		}
+
+		waitTime := b.NextBackOff()
+		if waitTime == backoff.Stop {
+			break
+		}
+
+		select {
+		case <-time.After(waitTime):
+			// Do nothing
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
 	return nil
+}
+
+func (c *GitLabClient) GetJob(ctx context.Context, repositoryID int, jobID int) (*gitlab.Job, *gitlab.Response, error) {
+	select {
+	case <-c.rateLimiter:
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	}
+	return c.remote.Jobs.GetJob(repositoryID, jobID, gitlab.WithContext(ctx))
+}
+
+func (c *GitLabClient) GetTraceFileSize(ctx context.Context, projectID int, jobID int) (int, *gitlab.Response, error) {
+	u := fmt.Sprintf("projects/%d/jobs/%d/trace", projectID, jobID)
+
+	req, err := c.remote.NewRequest("HEAD", u, nil, []gitlab.OptionFunc{gitlab.WithContext(ctx)})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	traceBuf := new(bytes.Buffer)
+	resp, err := c.remote.Do(req, traceBuf)
+	if err != nil {
+		return 0, resp, err
+	}
+
+	contentLength, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+	if err != nil {
+		return 0, resp, err
+	}
+
+	return contentLength, resp, err
+}
+
+func (c *GitLabClient) GetTraceFile(ctx context.Context, repositoryID int, jobID int) (bytes.Buffer, int, *gitlab.Response, error) {
+	buf := bytes.Buffer{}
+	select {
+	case <-c.rateLimiter:
+	case <-ctx.Done():
+		return buf, 0, nil, ctx.Err()
+	}
+	trace, resp, err := c.remote.Jobs.GetTraceFile(repositoryID, jobID, nil, gitlab.WithContext(ctx))
+	if err != nil {
+		return buf, 0, nil, err
+	}
+	n, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+	if err != nil {
+		return buf, 0, nil, err
+	}
+
+	_, err = buf.ReadFrom(trace)
+	return buf, n, resp, err
 }
 
 func (c GitLabClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
@@ -200,14 +300,11 @@ func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repositor
 }
 
 func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, error) {
-	trace, _, err := c.remote.Jobs.GetTraceFile(repository.ID, jobID, nil, gitlab.WithContext(ctx))
+	buf, _, _, err := c.GetTraceFile(ctx, repository.ID, jobID)
 	if err != nil {
 		return "", err
 	}
-	buf := new(bytes.Buffer)
-	if _, err := buf.ReadFrom(trace); err != nil {
-		return "", err
-	}
+
 	return buf.String(), nil
 }
 

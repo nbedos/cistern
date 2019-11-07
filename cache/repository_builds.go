@@ -586,7 +586,8 @@ func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{},
 	case ErrIncompleteLog:
 		stream := func(ctx context.Context) error {
 			defer file.Close()
-			return s.cache.StreamLog(ctx, jobKey.AccountID, jobKey.ID, file)
+			w := utils.NewANSIStripper(file)
+			return s.cache.StreamLog(ctx, jobKey, w)
 		}
 		return logPath, stream, nil
 	case nil:

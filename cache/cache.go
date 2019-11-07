@@ -19,7 +19,7 @@ type Provider interface {
 	// Builds should return err == ErrRepositoryNotFound when appropriate
 	Builds(ctx context.Context, repositoryURL string, duration time.Duration, buildc chan<- Build) error
 	Log(ctx context.Context, repository Repository, jobID int) (string, error)
-	StreamLog(ctx context.Context, jobID int, writer io.Writer) error
+	StreamLog(ctx context.Context, repositoryID int, jobID int, writer io.Writer) error
 }
 
 type State string
@@ -226,7 +226,7 @@ func (c *Cache) Save(build *Build) {
 	}] = build
 }
 
-func (c *Cache) SaveJob(job *Job) error {
+func (c *Cache) SaveJob(job Job) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	key := buildKey{
@@ -237,7 +237,15 @@ func (c *Cache) SaveJob(job *Job) error {
 	if !exists {
 		return fmt.Errorf("no matching build found in cache for key %v", key)
 	}
-	build.Jobs[job.ID] = job
+	if job.Stage == nil {
+		build.Jobs[job.ID] = &job
+	} else {
+		stage, exists := build.Stages[job.Stage.ID]
+		if !exists {
+			return fmt.Errorf("build has no stage %d", job.Stage.ID)
+		}
+		stage.Jobs[job.ID] = &job
+	}
 	return nil
 }
 
@@ -368,7 +376,7 @@ func (c *Cache) WriteLog(ctx context.Context, key JobKey, writer io.Writer) erro
 		}
 
 		job.Log = sql.NullString{String: log, Valid: true}
-		if err = c.SaveJob(&job); err != nil {
+		if err = c.SaveJob(job); err != nil {
 			return err
 		}
 	}
@@ -382,11 +390,16 @@ func (c *Cache) WriteLog(ctx context.Context, key JobKey, writer io.Writer) erro
 	return err
 }
 
-func (c Cache) StreamLog(ctx context.Context, accountID string, jobID int, writer io.WriteCloser) error {
-	provider, exists := c.providers[accountID]
-	if !exists {
-		return fmt.Errorf("no matching provider found for account ID '%s'", accountID)
+func (c Cache) StreamLog(ctx context.Context, key JobKey, writer io.WriteCloser) error {
+	job, err := c.fetchJob(key)
+	if err != nil {
+		return err
 	}
 
-	return provider.StreamLog(ctx, jobID, writer)
+	provider, exists := c.providers[key.AccountID]
+	if !exists {
+		return fmt.Errorf("no matching provider found for account ID '%s'", key.AccountID)
+	}
+
+	return provider.StreamLog(ctx, job.Build.Repository.ID, job.ID, writer)
 }

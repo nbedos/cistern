@@ -177,20 +177,8 @@ func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, maxAge
 		MaxElapsedTime:      0,
 		Clock:               backoff.SystemClock,
 	}
-	b.Reset()
 
 	for {
-		waitTime := b.NextBackOff()
-		if waitTime == backoff.Stop {
-			break
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(waitTime):
-		}
-
 		active, err := c.fetchRepositoryBuilds(ctx, repository, maxAge, buildc)
 		if err != nil {
 			return err
@@ -198,12 +186,24 @@ func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, maxAge
 		if active {
 			b.Reset()
 		}
+
+		waitTime := b.NextBackOff()
+		if waitTime == backoff.Stop {
+			break
+		}
+
+		select {
+		case <-time.After(waitTime):
+			// Do nothing
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
 	return nil
 }
 
-func (c CircleCIClient) StreamLog(ctx context.Context, jobID int, writer io.Writer) error {
+func (c CircleCIClient) StreamLog(ctx context.Context, repositoryID int, jobID int, writer io.Writer) error {
 	return nil
 }
 

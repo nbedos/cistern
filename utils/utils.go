@@ -1,10 +1,12 @@
 package utils
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"github.com/mattn/go-runewidth"
 	"gopkg.in/src-d/go-git.v4"
+	"io"
 	"net/url"
 	"regexp"
 	"strings"
@@ -197,9 +199,55 @@ var deleteUntilCarriageReturn = regexp.MustCompile(`.*\r([^\r\n])`)
 
 // Is this specific to Travis?
 // FIXME Does not work for streaming
-func PostProcess(log string) string {
-	tmp := deleteEraseInLine.ReplaceAllString(log, "")
+func PostProcess(line string) string {
+	tmp := deleteEraseInLine.ReplaceAllString(line, "")
 	return deleteUntilCarriageReturn.ReplaceAllString(tmp, "$1")
+}
+
+type ANSIStripper struct {
+	writer io.WriteCloser
+	buffer bytes.Buffer
+}
+
+func NewANSIStripper(w io.WriteCloser) ANSIStripper {
+	return ANSIStripper{writer: w}
+}
+
+func (a ANSIStripper) Write(p []byte) (int, error) {
+	var (
+		line []byte
+		err  error
+	)
+	a.buffer.Write(p)
+	for {
+		line, err = a.buffer.ReadBytes('\n')
+		if err != nil {
+			break
+		}
+
+		s := PostProcess(string(line))
+		if _, err := a.writer.Write([]byte(s)); err != nil {
+			return 0, err
+		}
+	}
+	a.buffer.Write(line)
+
+	return len(p), nil
+}
+
+func (a ANSIStripper) Close() error {
+	s := a.buffer.String()
+	if len(s) > 0 {
+		if !strings.HasSuffix(s, "\n") {
+			s = s + "\n"
+		}
+		processed := PostProcess(s)
+		if _, err := a.writer.Write([]byte(processed)); err != nil {
+			return err
+		}
+	}
+
+	return a.writer.Close()
 }
 
 func GitOriginURL(path string) (string, error) {
