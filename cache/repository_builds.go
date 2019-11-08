@@ -35,10 +35,11 @@ type buildRow struct {
 	name        string
 	provider    string
 	prefix      string
+	createdAt   utils.NullTime
 	startedAt   utils.NullTime
 	finishedAt  utils.NullTime
 	updatedAt   utils.NullTime
-	duration    NullDuration
+	duration    utils.NullDuration
 	children    []buildRow
 	traversable bool
 	url         string
@@ -103,6 +104,7 @@ func (b buildRow) Tabular() map[string]text.StyledString {
 		"TYPE":     text.NewStyledString(b.type_),
 		"STATE":    state,
 		"NAME":     name,
+		"CREATED":  text.NewStyledString(nullTimeToString(b.createdAt)),
 		"STARTED":  text.NewStyledString(nullTimeToString(b.startedAt)),
 		"FINISHED": text.NewStyledString(nullTimeToString(b.finishedAt)),
 		"UPDATED":  text.NewStyledString(nullTimeToString(b.updatedAt)),
@@ -172,6 +174,7 @@ func buildRowFromBuild(b Build) buildRow {
 		type_:      "P",
 		state:      string(b.State),
 		ref:        Ref(b.Ref, b.IsTag),
+		createdAt:  b.CreatedAt,
 		startedAt:  b.StartedAt,
 		finishedAt: b.FinishedAt,
 		updatedAt:  utils.NullTime{Time: b.UpdatedAt, Valid: true},
@@ -238,13 +241,14 @@ func buildRowFromStage(s Stage) buildRow {
 	}
 
 	for _, job := range jobByName {
+		row.createdAt = utils.MinNullTime(row.createdAt, job.CreatedAt)
 		row.startedAt = utils.MinNullTime(row.startedAt, job.StartedAt)
 		row.finishedAt = utils.MaxNullTime(row.finishedAt, job.FinishedAt)
 		row.updatedAt = utils.MaxNullTime(row.updatedAt, job.FinishedAt, job.StartedAt, job.CreatedAt)
 	}
 
 	if row.startedAt.Valid && row.finishedAt.Valid {
-		row.duration = NullDuration{
+		row.duration = utils.NullDuration{
 			Valid:    true,
 			Duration: row.finishedAt.Time.Sub(row.startedAt.Time),
 		}
@@ -275,6 +279,7 @@ func buildRowFromJob(j Job) buildRow {
 		state:      string(j.State),
 		name:       fmt.Sprintf("%s (#%d)", j.Name, j.ID),
 		ref:        Ref(j.Build.Ref, j.Build.IsTag),
+		createdAt:  j.CreatedAt,
 		startedAt:  j.StartedAt,
 		finishedAt: j.FinishedAt,
 		updatedAt:  utils.MaxNullTime(j.FinishedAt, j.StartedAt, j.CreatedAt),
@@ -315,6 +320,7 @@ func commitRowFromBuilds(builds []Build) buildRow {
 	latestBuilds := make([]Statuser, 0, len(latestBuildByProvider))
 	for _, build := range latestBuildByProvider {
 		latestBuilds = append(latestBuilds, build)
+		row.createdAt = utils.MinNullTime(row.createdAt, build.CreatedAt)
 		row.startedAt = utils.MinNullTime(row.startedAt, build.StartedAt)
 		row.finishedAt = utils.MaxNullTime(row.finishedAt, build.FinishedAt)
 		if !row.updatedAt.Valid || row.updatedAt.Time.Before(build.UpdatedAt) {
@@ -330,16 +336,18 @@ func commitRowFromBuilds(builds []Build) buildRow {
 
 	sort.Slice(row.children, func(i, j int) bool {
 		ti := utils.MinNullTime(
+			row.children[i].createdAt,
 			row.children[i].startedAt,
 			row.children[i].updatedAt,
 			row.children[i].finishedAt)
 
 		tj := utils.MinNullTime(
+			row.children[i].createdAt,
 			row.children[j].startedAt,
 			row.children[j].updatedAt,
 			row.children[j].finishedAt)
 
-		return ti.Time.After(tj.Time)
+		return ti.Time.After(tj.Time) || (ti == tj && row.children[i].name > row.children[j].name)
 	})
 
 	return row
@@ -377,7 +385,19 @@ func (s *RepositoryBuilds) FetchRows() {
 	}
 
 	sort.Slice(rows, func(i, j int) bool {
-		return rows[i].updatedAt.Valid && rows[j].updatedAt.Valid && rows[i].updatedAt.Time.After(rows[j].updatedAt.Time)
+		ti := utils.MinNullTime(
+			rows[i].createdAt,
+			rows[i].startedAt,
+			rows[i].updatedAt,
+			rows[i].finishedAt)
+
+		tj := utils.MinNullTime(
+			rows[i].createdAt,
+			rows[j].startedAt,
+			rows[j].updatedAt,
+			rows[j].finishedAt)
+
+		return ti.Time.After(tj.Time)
 	})
 
 	treeIndex := make(map[buildRowKey]*buildRow)

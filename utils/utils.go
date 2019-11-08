@@ -146,6 +146,11 @@ func Prefix(s string, prefix string) string {
 	return builder.String()
 }
 
+type NullString struct {
+	Valid  bool
+	String string
+}
+
 type NullTime struct {
 	Valid bool
 	Time  time.Time
@@ -270,4 +275,23 @@ func GitOriginURL(path string) (string, error) {
 	}
 
 	return remote.Config().URLs[0], nil
+}
+
+type NullDuration struct {
+	Valid    bool
+	Duration time.Duration
+}
+
+func (d NullDuration) String() string {
+	if !d.Valid {
+		return "-"
+	}
+
+	minutes := d.Duration / time.Minute
+	seconds := (d.Duration - minutes*time.Minute) / time.Second
+
+	if minutes == 0 {
+		return fmt.Sprintf("%ds", seconds)
+	}
+	return fmt.Sprintf("%dm%02ds", minutes, seconds)
 }

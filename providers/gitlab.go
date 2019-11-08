@@ -3,7 +3,6 @@ package providers
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"fmt"
 	"github.com/cenkalti/backoff/v3"
 	"github.com/nbedos/citop/cache"
@@ -350,7 +349,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 		StartedAt:       utils.NullTimeFromTime(pipeline.StartedAt),
 		FinishedAt:      utils.NullTimeFromTime(pipeline.FinishedAt),
 		UpdatedAt:       *pipeline.UpdatedAt,
-		Duration: cache.NullDuration{
+		Duration: utils.NullDuration{
 			Duration: time.Duration(pipeline.Duration) * time.Second,
 			Valid:    pipeline.Duration > 0,
 		},
@@ -401,11 +400,11 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 			ID:         gitlabJob.ID,
 			State:      FromGitLabState(gitlabJob.Status),
 			Name:       gitlabJob.Name,
-			Log:        sql.NullString{},
+			Log:        utils.NullString{},
 			CreatedAt:  utils.NullTimeFromTime(gitlabJob.CreatedAt),
 			StartedAt:  utils.NullTimeFromTime(gitlabJob.StartedAt),
 			FinishedAt: utils.NullTimeFromTime(gitlabJob.FinishedAt),
-			Duration: cache.NullDuration{
+			Duration: utils.NullDuration{
 				Duration: time.Duration(gitlabJob.Duration) * time.Second,
 				Valid:    int64(gitlabJob.Duration) > 0,
 			},

@@ -27,13 +27,14 @@ type TableController struct {
 
 func NewTableController(source cache.HierarchicalTabularDataSource, tempDir string, defaultStatus string) (TableController, error) {
 	// TODO Move this out of here
-	headers := []string{"COMMIT", "REF", "TYPE", "STATE", "STARTED", "UPDATED", "DURATION", "NAME"}
+	headers := []string{"REF", "COMMIT", "TYPE", "STATE", "CREATED", "DURATION", "NAME"}
 	// FIXME This should be included in classes
 	alignment := map[string]text.Alignment{
-		"COMMIT":   text.Left,
 		"REF":      text.Left,
+		"COMMIT":   text.Left,
 		"TYPE":     text.Right,
 		"STATE":    text.Left,
+		"CREATED":  text.Left,
 		"STARTED":  text.Left,
 		"UPDATED":  text.Left,
 		"DURATION": text.Right,
@@ -42,7 +43,7 @@ func NewTableController(source cache.HierarchicalTabularDataSource, tempDir stri
 
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := 10, 10
-	table, err := widgets.NewTable(source, headers, alignment, width, height, "   ")
+	table, err := widgets.NewTable(source, headers, alignment, width, height, "  ")
 	if err != nil {
 		return TableController{}, err
 	}

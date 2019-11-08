@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/nbedos/citop/utils"
@@ -109,7 +108,7 @@ type Build struct {
 	StartedAt       utils.NullTime
 	FinishedAt      utils.NullTime
 	UpdatedAt       time.Time
-	Duration        NullDuration
+	Duration        utils.NullDuration
 	WebURL          string
 	Stages          map[int]*Stage
 	Jobs            map[int]*Job
@@ -156,25 +155,6 @@ type JobKey struct {
 	ID        int
 }
 
-type NullDuration struct {
-	Valid    bool
-	Duration time.Duration
-}
-
-func (d NullDuration) String() string {
-	if !d.Valid {
-		return "-"
-	}
-
-	minutes := d.Duration / time.Minute
-	seconds := (d.Duration - minutes*time.Minute) / time.Second
-
-	if minutes == 0 {
-		return fmt.Sprintf("%ds", seconds)
-	}
-	return fmt.Sprintf("%dm%02ds", minutes, seconds)
-}
-
 type Job struct {
 	Build        *Build
 	Stage        *Stage // nil if the Job is only linked to a Build
@@ -184,8 +164,8 @@ type Job struct {
 	CreatedAt    utils.NullTime
 	StartedAt    utils.NullTime
 	FinishedAt   utils.NullTime
-	Duration     NullDuration
-	Log          sql.NullString
+	Duration     utils.NullDuration
+	Log          utils.NullString
 	WebURL       string
 	AllowFailure bool
 }
@@ -375,7 +355,7 @@ func (c *Cache) WriteLog(ctx context.Context, key JobKey, writer io.Writer) erro
 			return err
 		}
 
-		job.Log = sql.NullString{String: log, Valid: true}
+		job.Log = utils.NullString{String: log, Valid: true}
 		if err = c.SaveJob(job); err != nil {
 			return err
 		}

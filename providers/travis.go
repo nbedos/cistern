@@ -3,7 +3,6 @@ package providers
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/nbedos/citop/cache"
@@ -26,7 +25,7 @@ type travisRepository struct {
 	Name string
 }
 
-func FromTravisState(s string) cache.State {
+func fromTravisState(s string) cache.State {
 	switch strings.ToLower(s) {
 	case "created", "queued", "received":
 		return cache.Pending
@@ -45,7 +44,7 @@ func FromTravisState(s string) cache.State {
 	}
 }
 
-func (r travisRepository) ToInserter(accountID string) cache.Repository {
+func (r travisRepository) toCacheRepository(accountID string) cache.Repository {
 	return cache.Repository{
 		ID:        r.ID,
 		AccountID: accountID,
@@ -64,7 +63,7 @@ type travisCommit struct {
 	Date string `json:"committed_at"`
 }
 
-func (c travisCommit) ToInserter(accountID string, repository *cache.Repository) (cache.Commit, error) {
+func (c travisCommit) toCacheCommit(accountID string, repository *cache.Repository) (cache.Commit, error) {
 	committedAt, err := utils.NullTimeFromString(c.Date)
 	if err != nil {
 		return cache.Commit{}, err
@@ -101,8 +100,8 @@ type travisBuild struct {
 	Jobs []travisJob
 }
 
-func (b travisBuild) ToInserters(accountID string, repository *cache.Repository, webURL string) (build cache.Build, err error) {
-	commit, err := b.Commit.ToInserter(accountID, repository)
+func (b travisBuild) toCacheBuild(accountID string, repository *cache.Repository, webURL string) (build cache.Build, err error) {
+	commit, err := b.Commit.toCacheCommit(accountID, repository)
 	if err != nil {
 		return build, err
 	}
@@ -112,9 +111,9 @@ func (b travisBuild) ToInserters(accountID string, repository *cache.Repository,
 		ID:         strconv.Itoa(b.ID),
 		Commit:     commit,
 		IsTag:      b.Tag.Name != "",
-		State:      FromTravisState(b.State),
+		State:      fromTravisState(b.State),
 		CreatedAt:  utils.NullTime{}, // FIXME We need this
-		Duration: cache.NullDuration{
+		Duration: utils.NullDuration{
 			Duration: time.Duration(b.Duration) * time.Second,
 			Valid:    b.Duration > 0,
 		},
@@ -147,16 +146,19 @@ func (b travisBuild) ToInserters(accountID string, repository *cache.Repository,
 			var exists bool
 			stage, exists = build.Stages[travisJob.Stage.ID]
 			if !exists {
-				s := travisJob.Stage.ToInserter(&build)
+				s := travisJob.Stage.toCacheStage(&build)
 				stage = &s
 				build.Stages[stage.ID] = stage
 			}
 		}
-		job, err := travisJob.ToInserter(&build, stage, webURL)
+		job, err := travisJob.toCacheJob(&build, stage, webURL)
 		if err != nil {
 			return build, err
 		}
 
+		if job.CreatedAt.Valid {
+			build.CreatedAt = utils.MinNullTime(build.CreatedAt, job.CreatedAt)
+		}
 		if stage != nil {
 			stage.Jobs[job.ID] = &job
 		} else {
@@ -216,45 +218,43 @@ func (c travisJobConfig) String() string {
 	return strings.Join(nonEmptyValues, ", ")
 }
 
-func (j travisJob) ToInserter(build *cache.Build, stage *cache.Stage, webURL string) (cache.Job, error) {
+func (j travisJob) toCacheJob(build *cache.Build, stage *cache.Stage, webURL string) (cache.Job, error) {
 	var err error
-
-	jobStartedAt, err := utils.NullTimeFromString(j.StartedAt)
-	if err != nil {
-		return cache.Job{}, err
-	}
-
-	jobFinishedAt, err := utils.NullTimeFromString(j.FinishedAt)
-	if err != nil {
-		return cache.Job{}, err
-	}
 
 	name, _ := j.Config["name"].(string)
 	if name == "" {
 		name = j.Config.String()
 	}
 
-	var duration int64
-	if jobStartedAt.Valid && jobFinishedAt.Valid {
-		duration = int64(jobFinishedAt.Time.Sub(jobStartedAt.Time).Seconds())
-	}
-
 	job := cache.Job{
-		Build:      build,
-		Stage:      stage,
-		ID:         j.ID,
-		State:      FromTravisState(j.State),
-		Name:       name,
-		CreatedAt:  utils.NullTime{},
-		StartedAt:  jobStartedAt,
-		FinishedAt: jobFinishedAt,
-		Log:        sql.NullString{String: j.Log, Valid: j.Log != ""},
-		Duration: cache.NullDuration{
-			Duration: time.Duration(duration) * time.Second,
-			Valid:    duration > 0,
-		},
+		Build:        build,
+		Stage:        stage,
+		ID:           j.ID,
+		State:        fromTravisState(j.State),
+		Name:         name,
+		Log:          utils.NullString{String: j.Log, Valid: j.Log != ""},
 		WebURL:       fmt.Sprintf("%s/jobs/%d", webURL, j.ID),
 		AllowFailure: j.AllowFailure,
+	}
+
+	ats := map[string]*utils.NullTime{
+		j.CreatedAt:  &job.CreatedAt,
+		j.StartedAt:  &job.StartedAt,
+		j.FinishedAt: &job.FinishedAt,
+	}
+	for s, t := range ats {
+		*t, err = utils.NullTimeFromString(s)
+		if err != nil {
+			return cache.Job{}, err
+		}
+	}
+
+	if job.StartedAt.Valid && job.FinishedAt.Valid {
+		d := int64(job.FinishedAt.Time.Sub(job.StartedAt.Time).Seconds())
+		job.Duration = utils.NullDuration{
+			Valid:    true,
+			Duration: time.Duration(d) * time.Second,
+		}
 	}
 
 	return job, nil
@@ -266,12 +266,12 @@ type travisStage struct {
 	State string
 }
 
-func (s travisStage) ToInserter(build *cache.Build) cache.Stage {
+func (s travisStage) toCacheStage(build *cache.Build) cache.Stage {
 	return cache.Stage{
 		Build: build,
 		ID:    s.ID,
 		Name:  s.Name,
-		State: FromTravisState(s.State),
+		State: fromTravisState(s.State),
 		Jobs:  make(map[int]*cache.Job),
 	}
 }
@@ -322,7 +322,7 @@ func (c TravisClient) Builds(ctx context.Context, repositoryURL string, maxAge t
 
 	// Fetch build history and active builds list
 	// FIXME Remove hardcoded values
-	if err := c.RepositoryBuilds(ctx, &repository, maxAge, buildc); err != nil {
+	if err := c.repositoryBuilds(ctx, &repository, maxAge, buildc); err != nil {
 		return err
 	}
 
@@ -420,10 +420,10 @@ func (c TravisClient) Repository(ctx context.Context, repositoryURL string) (cac
 		return cache.Repository{}, err
 	}
 
-	return travisRepo.ToInserter(c.accountID), nil
+	return travisRepo.toCacheRepository(c.accountID), nil
 }
 
-func (c TravisClient) WebURL(repository cache.Repository) (url.URL, error) {
+func (c TravisClient) webURL(repository cache.Repository) (url.URL, error) {
 	var err error
 	webURL := c.baseURL
 	webURL.Host = strings.TrimPrefix(webURL.Host, "api.")
@@ -505,11 +505,11 @@ func (c TravisClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 	var build travisBuild
 	err = json.Unmarshal(body.Bytes(), &build)
 
-	webURL, err := c.WebURL(*repository)
+	webURL, err := c.webURL(*repository)
 	if err != nil {
 		return cache.Build{}, err
 	}
-	return build.ToInserters(c.accountID, repository, webURL.String())
+	return build.toCacheBuild(c.accountID, repository, webURL.String())
 }
 
 func (c TravisClient) fetchBuilds(ctx context.Context, repository *cache.Repository, offset int, limit int) ([]travisBuild, error) {
@@ -539,7 +539,7 @@ func (c TravisClient) fetchBuilds(ctx context.Context, repository *cache.Reposit
 	return response.Builds, err
 }
 
-func (c TravisClient) RepositoryBuilds(ctx context.Context, repository *cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) error {
+func (c TravisClient) repositoryBuilds(ctx context.Context, repository *cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) error {
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
 	subCtx, cancel := context.WithCancel(ctx)
@@ -840,7 +840,7 @@ func (c TravisClient) events(ctx context.Context, p utils.PusherClient, teventc 
 					StageID:   stageID,
 					ID:        data.ID,
 				},
-				state: FromTravisState(data.State),
+				state: fromTravisState(data.State),
 			}
 
 			select {

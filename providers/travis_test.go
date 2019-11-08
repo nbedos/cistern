@@ -25,7 +25,7 @@ func Test_RecentRepoBuilds(t *testing.T) {
 	errc := make(chan error)
 	buildc := make(chan cache.Build)
 	go func() {
-		err := client.RepositoryBuilds(context.Background(), &repository, time.Hour*24*14, buildc)
+		err := client.repositoryBuilds(context.Background(), &repository, time.Hour*24*14, buildc)
 		close(buildc)
 		errc <- err
 	}()

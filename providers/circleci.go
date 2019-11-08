@@ -3,7 +3,6 @@ package providers
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -366,7 +365,7 @@ func (c CircleCIClient) fetchWorkflow(ctx context.Context, projectEndpoint url.U
 		StartedAt:       utils.NullTime{},
 		FinishedAt:      utils.NullTime{},
 		UpdatedAt:       time.Time{},
-		Duration:        cache.NullDuration{},
+		Duration:        utils.NullDuration{},
 		WebURL:          webURL.String(),
 		Stages:          nil,
 		Jobs:            nil,
@@ -457,7 +456,7 @@ func (c CircleCIClient) fetchJob(ctx context.Context, projectEndpoint url.URL, j
 				}
 			}
 		}
-		job.Log = sql.NullString{String: fullLog.String(), Valid: true}
+		job.Log = utils.NullString{String: fullLog.String(), Valid: true}
 	}
 
 	return job, nil
@@ -504,7 +503,7 @@ func (b circleCIBuild) ToCacheBuild(accountID string, repository *cache.Reposito
 	}
 
 	if b.DurationMilliseconds > 0 {
-		build.Duration = cache.NullDuration{
+		build.Duration = utils.NullDuration{
 			Duration: time.Duration(b.DurationMilliseconds) * time.Millisecond,
 			Valid:    true,
 		}
@@ -546,13 +545,13 @@ func (b circleCIBuild) ToCacheJob() (cache.Job, error) {
 		ID:           b.ID,
 		State:        fromCircleCIStatus(b.Lifecycle, b.Outcome),
 		Name:         b.Workflows.JobName,
-		Log:          sql.NullString{},
+		Log:          utils.NullString{},
 		WebURL:       b.WebURL,
 		AllowFailure: false,
 	}
 
 	if b.DurationMilliseconds > 0 {
-		job.Duration = cache.NullDuration{
+		job.Duration = utils.NullDuration{
 			Duration: time.Duration(b.DurationMilliseconds) * time.Millisecond,
 			Valid:    true,
 		}
