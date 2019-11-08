@@ -113,7 +113,7 @@ func (b travisBuild) ToInserters(accountID string, repository *cache.Repository,
 		Commit:     commit,
 		IsTag:      b.Tag.Name != "",
 		State:      FromTravisState(b.State),
-		CreatedAt:  sql.NullTime{}, // FIXME We need this
+		CreatedAt:  utils.NullTime{}, // FIXME We need this
 		Duration: cache.NullDuration{
 			Duration: time.Duration(b.Duration) * time.Second,
 			Valid:    b.Duration > 0,
@@ -245,7 +245,7 @@ func (j travisJob) ToInserter(build *cache.Build, stage *cache.Stage, webURL str
 		ID:         j.ID,
 		State:      FromTravisState(j.State),
 		Name:       name,
-		CreatedAt:  sql.NullTime{},
+		CreatedAt:  utils.NullTime{},
 		StartedAt:  jobStartedAt,
 		FinishedAt: jobFinishedAt,
 		Log:        sql.NullString{String: j.Log, Valid: j.Log != ""},
@@ -434,12 +434,13 @@ func (c TravisClient) WebURL(repository cache.Repository) (url.URL, error) {
 
 // Rate-limited HTTP GET request with custom headers
 func (c TravisClient) get(ctx context.Context, resourceURL url.URL) (*bytes.Buffer, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", resourceURL.String(), nil)
+	req, err := http.NewRequest("GET", resourceURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Add("Travis-API-Version", "3")
 	req.Header.Add("Authorization", fmt.Sprintf("token %s", c.token))
+	req = req.WithContext(ctx)
 
 	select {
 	case <-c.rateLimiter:

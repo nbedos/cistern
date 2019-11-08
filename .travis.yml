@@ -2,16 +2,29 @@ language: go
 
 jobs:
     include:
-        - os: linux
+        - stage: "tests"
+          name: "GoLang 1.13 on Ubuntu Bionic"
+          os: linux
           dist: bionic
           go: 1.13.x
 
-        - os: linux
+        - stage: "tests"
+          name: "GoLang 1.12 on Ubuntu Trusty"
+          os: linux
           dist: trusty
-          go: 1.13.x
+          go: 1.12.x
 
-        - os: osx
-          go: 1.13.x
+        - stage: "tests"
+          name: "GoLang 1.13 on macOS 10.14"
+          os: osx
+          osx_image: xcode11.2
+          go: 1.12.x
+
+        - stage: "tests"
+          name: "GoLang 1.12 on macOS 10.13"
+          os: osx
+          osx_image: xcode9.4
+          go: 1.12.x
 
 install: true
 

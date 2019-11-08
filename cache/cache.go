@@ -94,7 +94,7 @@ func (r Repository) Slug() string {
 type Commit struct {
 	Sha     string
 	Message string
-	Date    sql.NullTime
+	Date    utils.NullTime
 }
 
 type Build struct {
@@ -105,9 +105,9 @@ type Build struct {
 	IsTag           bool
 	RepoBuildNumber string
 	State           State
-	CreatedAt       sql.NullTime
-	StartedAt       sql.NullTime
-	FinishedAt      sql.NullTime
+	CreatedAt       utils.NullTime
+	StartedAt       utils.NullTime
+	FinishedAt      utils.NullTime
 	UpdatedAt       time.Time
 	Duration        NullDuration
 	WebURL          string
@@ -181,9 +181,9 @@ type Job struct {
 	ID           int
 	State        State
 	Name         string
-	CreatedAt    sql.NullTime
-	StartedAt    sql.NullTime
-	FinishedAt   sql.NullTime
+	CreatedAt    utils.NullTime
+	StartedAt    utils.NullTime
+	FinishedAt   utils.NullTime
 	Duration     NullDuration
 	Log          sql.NullString
 	WebURL       string

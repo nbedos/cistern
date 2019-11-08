@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"database/sql"
 	"fmt"
 	"github.com/mattn/go-runewidth"
 	"gopkg.in/src-d/go-git.v4"
@@ -147,17 +146,22 @@ func Prefix(s string, prefix string) string {
 	return builder.String()
 }
 
-func NullTimeFromTime(t *time.Time) sql.NullTime {
+type NullTime struct {
+	Valid bool
+	Time  time.Time
+}
+
+func NullTimeFromTime(t *time.Time) NullTime {
 	if t == nil {
-		return sql.NullTime{}
+		return NullTime{}
 	}
-	return sql.NullTime{
+	return NullTime{
 		Time:  *t,
 		Valid: true,
 	}
 }
 
-func NullTimeFromString(s string) (t sql.NullTime, err error) {
+func NullTimeFromString(s string) (t NullTime, err error) {
 	if s != "" {
 		t.Time, err = time.Parse(time.RFC3339, s)
 		t.Valid = err == nil
@@ -166,8 +170,8 @@ func NullTimeFromString(s string) (t sql.NullTime, err error) {
 	return
 }
 
-func MinNullTime(times ...sql.NullTime) sql.NullTime {
-	result := sql.NullTime{}
+func MinNullTime(times ...NullTime) NullTime {
+	result := NullTime{}
 	for _, t := range times {
 		if result.Valid {
 			if t.Valid && t.Time.Before(result.Time) {
@@ -180,8 +184,8 @@ func MinNullTime(times ...sql.NullTime) sql.NullTime {
 	return result
 }
 
-func MaxNullTime(times ...sql.NullTime) sql.NullTime {
-	result := sql.NullTime{}
+func MaxNullTime(times ...NullTime) NullTime {
+	result := NullTime{}
 	for _, t := range times {
 		if result.Valid {
 			if t.Valid && t.Time.After(result.Time) {

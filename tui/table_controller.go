@@ -27,13 +27,14 @@ type TableController struct {
 
 func NewTableController(source cache.HierarchicalTabularDataSource, tempDir string, defaultStatus string) (TableController, error) {
 	// TODO Move this out of here
-	headers := []string{"COMMIT", "REF", "TYPE", "STATE", "UPDATED", "DURATION", "NAME"}
+	headers := []string{"COMMIT", "REF", "TYPE", "STATE", "STARTED", "UPDATED", "DURATION", "NAME"}
 	// FIXME This should be included in classes
 	alignment := map[string]text.Alignment{
 		"COMMIT":   text.Left,
 		"REF":      text.Left,
 		"TYPE":     text.Right,
 		"STATE":    text.Left,
+		"STARTED":  text.Left,
 		"UPDATED":  text.Left,
 		"DURATION": text.Right,
 		"NAME":     text.Left,

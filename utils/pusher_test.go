@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -35,19 +34,23 @@ func Test_RecentRepoBuilds(t *testing.T) {
 forever:
 	for {
 		event, err := p.NextEvent(ctx)
-		switch {
-		case errors.Is(err, context.DeadlineExceeded):
+		switch err {
+		case nil:
+			// Do nothing
+		case context.DeadlineExceeded:
 			break forever
-		case err != nil:
+		default:
 			t.Fatal(err)
 		}
 		switch event.Event {
 		case ConnectionEstablished:
 			err := p.Subscribe(ctx, channel)
-			switch {
-			case errors.Is(err, context.DeadlineExceeded):
+			switch err {
+			case nil:
+				// Do nothing
+			case context.DeadlineExceeded:
 				break forever
-			case err != nil:
+			default:
 				t.Fatal(err)
 			}
 		}

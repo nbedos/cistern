@@ -5,9 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/websocket"
 	"net/http"
 	"net/url"
-	"nhooyr.io/websocket"
 	"strings"
 	"time"
 )
@@ -80,7 +80,7 @@ type PusherClient struct {
 }
 
 func NewPusherClient(ctx context.Context, wsURL string, authURL string, authHeader map[string]string, authLimiter <-chan time.Time) (PusherClient, error) {
-	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, nil)
 	if err != nil {
 		return PusherClient{}, err
 	}
@@ -97,12 +97,52 @@ func NewPusherClient(ctx context.Context, wsURL string, authURL string, authHead
 }
 
 func (p *PusherClient) readJSON(ctx context.Context, e *PusherEvent) error {
-	_, bs, err := p.conn.Read(ctx)
+	errc := make(chan error)
+	go func() {
+		// Will return once a message is received or the connection is closed
+		errc <- p.conn.ReadJSON(&e)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-errc:
+		return err
+	}
+}
+
+func (p *PusherClient) send(ctx context.Context, eventType string, channel string, payload interface{}) error {
+	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
 
-	return json.Unmarshal(bs, &e)
+	event := PusherEvent{
+		Event:   eventType,
+		Channel: channel,
+		Data:    jsonPayload,
+	}
+
+	errc := make(chan error)
+	go func() {
+		// Will return once a message is received or the connection is closed
+		errc <- p.conn.WriteJSON(event)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-errc:
+		return err
+	}
+}
+
+func (p *PusherClient) Close() error {
+	if p.connected {
+		return p.conn.Close()
+	}
+
+	return nil
 }
 
 func (p *PusherClient) NextEvent(ctx context.Context) (event PusherEvent, err error) {
@@ -167,33 +207,6 @@ func (p *PusherClient) Unsubscribe(ctx context.Context, channel string) error {
 	return nil
 }
 
-func (p *PusherClient) send(ctx context.Context, eventType string, channel string, payload interface{}) error {
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-
-	event := PusherEvent{
-		Event:   eventType,
-		Channel: channel,
-		Data:    jsonPayload,
-	}
-	bs, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-
-	return p.conn.Write(ctx, websocket.MessageText, bs)
-}
-
-func (p *PusherClient) Close() error {
-	if p.connected {
-		return p.conn.Close(websocket.StatusNormalClosure, "")
-	}
-
-	return nil
-}
-
 func (p *PusherClient) Expect(ctx context.Context, eventType string) (event PusherEvent, err error) {
 	event, err = p.NextEvent(ctx)
 	if err != nil {
@@ -219,10 +232,11 @@ func (p *PusherClient) Authenticate(ctx context.Context, channel string) (string
 		return "", err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", p.authURL, bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequest("POST", p.authURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return "", err
 	}
+	req.WithContext(ctx)
 
 	req.Header.Add("Content-type_", "application/json; charset=utf-8")
 	for k, v := range p.authHeader {

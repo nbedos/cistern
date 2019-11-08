@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/nbedos/citop/text"
@@ -36,9 +35,9 @@ type buildRow struct {
 	name        string
 	provider    string
 	prefix      string
-	startedAt   sql.NullTime
-	finishedAt  sql.NullTime
-	updatedAt   sql.NullTime
+	startedAt   utils.NullTime
+	finishedAt  utils.NullTime
+	updatedAt   utils.NullTime
 	duration    NullDuration
 	children    []buildRow
 	traversable bool
@@ -64,7 +63,7 @@ func (b buildRow) Children() []utils.TreeNode {
 func (b buildRow) Tabular() map[string]text.StyledString {
 	const nullPlaceholder = "-"
 
-	nullTimeToString := func(t sql.NullTime) string {
+	nullTimeToString := func(t utils.NullTime) string {
 		if t.Valid {
 			t := t.Time.Local().Truncate(time.Second)
 			return t.Format("Jan _2 15:04")
@@ -175,7 +174,7 @@ func buildRowFromBuild(b Build) buildRow {
 		ref:        Ref(b.Ref, b.IsTag),
 		startedAt:  b.StartedAt,
 		finishedAt: b.FinishedAt,
-		updatedAt:  sql.NullTime{Time: b.UpdatedAt, Valid: true},
+		updatedAt:  utils.NullTime{Time: b.UpdatedAt, Valid: true},
 		url:        b.WebURL,
 		duration:   b.Duration,
 		provider:   b.Repository.AccountID,

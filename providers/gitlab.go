@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v3"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
 	"github.com/xanzy/go-gitlab"

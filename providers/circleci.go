@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v3"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
 	"io"
@@ -53,11 +53,12 @@ func (c CircleCIClient) get(ctx context.Context, resourceURL url.URL) (*bytes.Bu
 	parameters.Add("circle-token", c.token)
 	resourceURL.RawQuery = parameters.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", resourceURL.String(), nil)
+	req, err := http.NewRequest("GET", resourceURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Add("Accept", "application/json")
+	req.WithContext(ctx)
 
 	select {
 	case <-c.rateLimiter:
@@ -104,10 +105,11 @@ func (c CircleCIClient) get(ctx context.Context, resourceURL url.URL) (*bytes.Bu
 
 func (c CircleCIClient) fetchLog(ctx context.Context, url string) (string, error) {
 	// FIXME Deduplicate code below
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", err
 	}
+	req = req.WithContext(ctx)
 
 	select {
 	case <-c.rateLimiter:
@@ -360,9 +362,9 @@ func (c CircleCIClient) fetchWorkflow(ctx context.Context, projectEndpoint url.U
 		IsTag:           false,
 		RepoBuildNumber: "",
 		State:           "",
-		CreatedAt:       sql.NullTime{},
-		StartedAt:       sql.NullTime{},
-		FinishedAt:      sql.NullTime{},
+		CreatedAt:       utils.NullTime{},
+		StartedAt:       utils.NullTime{},
+		FinishedAt:      utils.NullTime{},
 		UpdatedAt:       time.Time{},
 		Duration:        cache.NullDuration{},
 		WebURL:          webURL.String(),
