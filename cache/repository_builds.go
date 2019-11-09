@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/nbedos/citop/text"
-	"github.com/nbedos/citop/utils"
 	"io/ioutil"
 	"path"
 	"path/filepath"
@@ -13,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/nbedos/citop/text"
+	"github.com/nbedos/citop/utils"
 )
 
 var shaLength = 7
@@ -228,7 +229,7 @@ func buildRowFromStage(s Stage) buildRow {
 	}
 
 	jobIDs := make([]int, 0, len(s.Jobs))
-	// We agreggate jobs by name and only keep the most recent to weed out previous runs of the job.
+	// We aggregate jobs by name and only keep the most recent to weed out previous runs of the job.
 	// This is mainly for GitLab which keeps jobs after they are restarted. Maybe we should add
 	// date fields to Stage and have providers fill them instead of computing them here.
 	jobByName := make(map[string]*Job, len(s.Jobs))
@@ -255,8 +256,8 @@ func buildRowFromStage(s Stage) buildRow {
 	}
 
 	sort.Ints(jobIDs)
-	for i := len(jobIDs) - 1; i >= 0; i-- {
-		row.children = append(row.children, buildRowFromJob(*s.Jobs[jobIDs[i]]))
+	for _, id := range jobIDs {
+		row.children = append(row.children, buildRowFromJob(*s.Jobs[id]))
 	}
 
 	return row

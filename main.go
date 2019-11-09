@@ -3,11 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/nbedos/citop/tui"
-	"github.com/nbedos/citop/utils"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/nbedos/citop/tui"
+	"github.com/nbedos/citop/utils"
 )
 
 const usage = "Usage: citop [repository_URL]"

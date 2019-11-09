@@ -2,44 +2,32 @@ package tui
 
 import (
 	"context"
-	"github.com/gdamore/tcell"
-	"github.com/gdamore/tcell/encoding"
-	"github.com/nbedos/citop/providers"
-	"github.com/nbedos/citop/text"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 
+	"github.com/gdamore/tcell"
+	"github.com/gdamore/tcell/encoding"
 	"github.com/nbedos/citop/cache"
+	"github.com/nbedos/citop/providers"
+	"github.com/nbedos/citop/text"
 )
 
-type OutputEvent interface {
-	isOutputEvent()
-}
-
-type ShowText struct {
-	content []text.LocalizedStyledString
-}
-
-func (e ShowText) isOutputEvent() {}
-
 type ExecCmd struct {
-	cmd    exec.Cmd
+	name   string
+	args   []string
+	dir    string
 	stream cache.Streamer
 }
-
-func (e ExecCmd) isOutputEvent() {}
-
-type ExitEvent struct{}
-
-func (e ExitEvent) isOutputEvent() {}
 
 func RunWidgetApp(repositoryURL string, travisToken string, gitlabToken string, circleciToken string) (err error) {
 	// FIXME Discard log until the status bar is implemented in order to hide the "Unsolicited response received on
 	//  idle HTTP channel" from GitLab's HTTP client
 	log.SetOutput(ioutil.Discard)
+	encoding.Register()
 
 	tmpDir, err := ioutil.TempDir("", "citop")
 	if err != nil {
@@ -59,6 +47,7 @@ func RunWidgetApp(repositoryURL string, travisToken string, gitlabToken string, 
 			return s.Bold(true)
 		},
 	}
+	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  b:Browser  ?:Help  q:Quit"
 
 	CIProviders := []cache.Provider{
 		providers.NewTravisClient(
@@ -80,132 +69,172 @@ func RunWidgetApp(repositoryURL string, travisToken string, gitlabToken string, 
 			100*time.Millisecond),
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	cacheDB := cache.NewCache(CIProviders)
-
-	eventc := make(chan tcell.Event)
-	outc := make(chan OutputEvent)
-	errc := make(chan error)
-	updates := make(chan time.Time)
-
 	source := cacheDB.NewRepositoryBuilds(repositoryURL)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		if err := cacheDB.UpdateFromProviders(ctx, repositoryURL, 7*24*time.Hour, updates); err != nil {
-			errc <- err
-		}
-	}()
-
-	go func() {
-		defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  b:Browser  ?:Help  q:Quit"
-		controller, err := NewTableController(&source, tmpDir, defaultStatus)
-		if err != nil {
-			errc <- err
-			return
-		}
-
-		for {
-			select {
-			case <-updates:
-				content, err := controller.Refresh()
-				if err != nil {
-					errc <- err
-				}
-				outc <- ShowText{content}
-
-			case event := <-eventc:
-				if event == nil {
-					return
-				}
-				if err = controller.Process(ctx, event, outc); err != nil {
-					errc <- err
-				}
-			}
-		}
-	}()
-
-	encoding.Register()
-	screen, err := tcell.NewScreen()
+	ui, err := NewTUI(defaultStyle, styleSheet)
 	if err != nil {
-		return
+		return err
 	}
 	defer func() {
-		screen.Fini()
+		ui.Finish()
 	}()
 
-	if err = screen.Init(); err != nil {
-		return
+	controller, err := NewTableController(&ui, &source, tmpDir, defaultStatus)
+	if err != nil {
+		return err
 	}
 
-	screen.SetStyle(defaultStyle)
+	errc := make(chan error)
+	updates := make(chan time.Time)
+	go func() {
+		errc <- cacheDB.UpdateFromProviders(ctx, repositoryURL, 7*24*time.Hour, updates)
+	}()
+
+	go func() {
+		errc <- controller.Run(ctx, updates)
+	}()
+
+	for i := 0; i < 2; i++ {
+		e := <-errc
+		if i == 0 {
+			cancel()
+			err = e
+		}
+	}
+
+	return err
+}
+
+type TUI struct {
+	screen       tcell.Screen
+	defaultStyle tcell.Style
+	styleSheet   text.StyleSheet
+	eventc       chan tcell.Event
+}
+
+func NewTUI(defaultStyle tcell.Style, styleSheet text.StyleSheet) (TUI, error) {
+	ui := TUI{
+		defaultStyle: defaultStyle,
+		styleSheet:   styleSheet,
+		eventc:       make(chan tcell.Event),
+	}
+	err := ui.init()
+
+	return ui, err
+}
+
+func (t *TUI) init() error {
+	var err error
+	t.screen, err = tcell.NewScreen()
+	if err != nil {
+		return err
+	}
+
+	if err = t.screen.Init(); err != nil {
+		return err
+	}
+	t.screen.SetStyle(t.defaultStyle)
 	//screen.EnableMouse()
-	screen.Clear()
+	t.screen.Clear()
 
-	poll := func() {
-		for {
-			event := screen.PollEvent()
-			if event == nil {
-				break
-			}
-			eventc <- event
-		}
-	}
+	go t.poll()
 
-	go poll()
+	return nil
+}
 
+func (t TUI) Finish() {
+	t.screen.Fini()
+}
+
+func (t TUI) Events() <-chan tcell.Event {
+	return t.eventc
+}
+
+func (t TUI) poll() {
+	// Exits when t.Finish() is called
 	for {
-		select {
-		case err := <-errc:
-			return err
-		case outEvent := <-outc:
-			if outEvent == nil {
-				return nil
+		event := t.screen.PollEvent()
+		if event == nil {
+			break
+		}
+		t.eventc <- event
+	}
+}
+
+func (t TUI) Draw(texts ...text.LocalizedStyledString) error {
+	t.screen.Clear()
+	if err := text.Draw(texts, t.screen, t.defaultStyle, t.styleSheet); err != nil {
+		return err
+	}
+	t.screen.Show()
+
+	return nil
+}
+
+type errStream struct{ error }
+
+func (e errStream) Error() string { return e.error.Error() }
+
+type errCmd struct{ error }
+
+func (e errCmd) Error() string { return e.error.Error() }
+
+func (t *TUI) Exec(ctx context.Context, e ExecCmd) error {
+	t.Finish()
+
+	cmdCtx, cancel := context.WithCancel(ctx)
+	cmd := exec.CommandContext(cmdCtx, e.name, e.args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+
+	errc := make(chan error)
+	wg := sync.WaitGroup{}
+
+	if e.stream != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errc <- errStream{error: e.stream(cmdCtx)}
+		}()
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		errc <- errCmd{error: cmd.Run()}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(errc)
+	}()
+
+	var err error
+	errSet := false
+	for e := range errc {
+		switch e := e.(type) {
+		case errStream:
+			if e.error != nil {
+				cancel()
+				if !errSet {
+					errSet = true
+					err = e.error
+				}
 			}
-			switch e := outEvent.(type) {
-			case ExitEvent:
-				cancel()
-				return
-
-			case ShowText:
-				screen.Clear()
-				if err = text.Draw(e.content, screen, defaultStyle, styleSheet); err != nil {
-					return
-				}
-				screen.Show()
-
-			case ExecCmd:
-				screen.Fini()
-
-				e.cmd.Stdin = os.Stdin
-				// e.cmd.Stderr = os.Stderr FIXME?
-				e.cmd.Stdout = os.Stdout
-				// FIXME Show return value in status bar
-
-				subCtx, cancel := context.WithCancel(ctx)
-				if e.stream != nil {
-					go func() {
-						e.stream(subCtx)
-					}()
-				}
-				e.cmd.Run()
-				cancel()
-
-				screen, err = tcell.NewScreen()
-				if err != nil {
-					return
-				}
-
-				if err = screen.Init(); err != nil {
-					return
-				}
-
-				screen.SetStyle(defaultStyle)
-				//screen.EnableMouse()
-				screen.Clear()
-
-				go poll()
+		case errCmd:
+			cancel()
+			if !errSet {
+				errSet = true
+				err = e.error
 			}
 		}
 	}
+	if err != nil {
+		return err
+	}
+
+	return t.init()
 }

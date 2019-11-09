@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/nbedos/citop/utils"
 	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nbedos/citop/utils"
 )
 
 var ErrRepositoryNotFound = errors.New("repository not found")

@@ -2,9 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"github.com/google/go-cmp/cmp"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 type TestNode struct {

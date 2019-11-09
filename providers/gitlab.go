@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/cenkalti/backoff/v3"
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/utils"
-	"github.com/xanzy/go-gitlab"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/cenkalti/backoff/v3"
+	"github.com/nbedos/citop/cache"
+	"github.com/nbedos/citop/utils"
+	"github.com/xanzy/go-gitlab"
 )
 
 type GitLabClient struct {

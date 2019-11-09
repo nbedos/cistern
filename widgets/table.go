@@ -2,6 +2,7 @@ package widgets
 
 import (
 	"errors"
+
 	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/text"

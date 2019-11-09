@@ -4,20 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"path"
+	"time"
+
 	"github.com/gdamore/tcell"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/man"
 	"github.com/nbedos/citop/text"
 	"github.com/nbedos/citop/utils"
 	"github.com/nbedos/citop/widgets"
-	"io/ioutil"
-	"log"
-	"os"
-	"os/exec"
-	"path"
 )
 
 type TableController struct {
+	tui           *TUI
 	table         *widgets.Table
 	status        *widgets.StatusBar
 	tempDir       string
@@ -25,7 +27,7 @@ type TableController struct {
 	defaultStatus string
 }
 
-func NewTableController(source cache.HierarchicalTabularDataSource, tempDir string, defaultStatus string) (TableController, error) {
+func NewTableController(tui *TUI, source cache.HierarchicalTabularDataSource, tempDir string, defaultStatus string) (TableController, error) {
 	// TODO Move this out of here
 	headers := []string{"REF", "COMMIT", "TYPE", "STATE", "CREATED", "DURATION", "NAME"}
 	// FIXME This should be included in classes
@@ -55,6 +57,7 @@ func NewTableController(source cache.HierarchicalTabularDataSource, tempDir stri
 	status.Write(defaultStatus)
 
 	return TableController{
+		tui:           tui,
 		table:         &table,
 		status:        &status,
 		tempDir:       tempDir,
@@ -62,12 +65,38 @@ func NewTableController(source cache.HierarchicalTabularDataSource, tempDir stri
 	}, nil
 }
 
-func (c *TableController) SetStatus(s string) {
+func (c *TableController) Run(ctx context.Context, updates <-chan time.Time) error {
+	exit := false
+	for !exit {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-updates:
+			texts, err := c.Refresh()
+			if err != nil {
+				return err
+			}
+			if err := c.tui.Draw(texts...); err != nil {
+				return err
+			}
+		case event := <-c.tui.eventc:
+			var err error
+			exit, err = c.Process(ctx, event)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *TableController) setStatus(s string) {
 	c.status.Write(s)
 }
 
-func (c *TableController) ClearStatus() {
-	c.SetStatus(c.defaultStatus)
+func (c *TableController) clearStatus() {
+	c.setStatus(c.defaultStatus)
 }
 
 func (c *TableController) Refresh() ([]text.LocalizedStyledString, error) {
@@ -116,29 +145,23 @@ func (c *TableController) Resize(width int, height int) error {
 	return nil
 }
 
-func (c *TableController) SendShowText(ctx context.Context, outc chan OutputEvent) error {
+func (c *TableController) Draw() error {
 	texts, err := c.Text()
 	if err != nil {
 		return err
 	}
-	select {
-	case outc <- ShowText{content: texts}:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	return nil
+	return c.tui.Draw(texts...)
 }
 
-func (c *TableController) Process(ctx context.Context, event tcell.Event, outc chan OutputEvent) error {
-	c.ClearStatus()
+func (c *TableController) Process(ctx context.Context, event tcell.Event) (bool, error) {
+	c.clearStatus()
 	switch ev := event.(type) {
 	case *tcell.EventResize:
 		sx, sy := ev.Size()
 		if err := c.Resize(sx, sy); err != nil {
 			log.Fatal(err)
 		}
-
-		return c.SendShowText(ctx, outc)
+		return false, c.Draw()
 
 	case *tcell.EventKey:
 		switch ev.Key() {
@@ -147,6 +170,7 @@ func (c *TableController) Process(ctx context.Context, event tcell.Event, outc c
 				c.inputMode = false
 				c.status.ShowInput = false
 			}
+			return false, c.Draw()
 		case tcell.KeyEnter:
 			if c.inputMode {
 				c.inputMode = false
@@ -155,13 +179,15 @@ func (c *TableController) Process(ctx context.Context, event tcell.Event, outc c
 			if c.status.InputBuffer != "" {
 				found := c.table.NextMatch(c.status.InputBuffer, true)
 				if !found {
-					c.SetStatus(fmt.Sprintf("No match found for %#v", c.status.InputBuffer))
+					c.setStatus(fmt.Sprintf("No match found for %#v", c.status.InputBuffer))
 				}
 			}
+			return false, c.Draw()
 		case tcell.KeyCtrlU:
 			if c.inputMode {
 				c.status.InputBuffer = ""
 			}
+			return false, c.Draw()
 
 		case tcell.KeyBackspace, tcell.KeyBackspace2:
 			if c.inputMode {
@@ -170,19 +196,16 @@ func (c *TableController) Process(ctx context.Context, event tcell.Event, outc c
 					c.status.InputBuffer = string(runes[:len(runes)-1])
 				}
 			}
+			return false, c.Draw()
+
 		case tcell.KeyRune:
 			if c.inputMode {
 				c.status.InputBuffer += string(ev.Rune())
-				return c.SendShowText(ctx, outc)
+				return false, c.Draw()
 			}
 			switch keyRune := ev.Rune(); keyRune {
 			case 'q':
-				select {
-				case outc <- ExitEvent{}:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-				return nil
+				return true, nil
 			case '/':
 				c.inputMode = true
 				c.status.ShowInput = true
@@ -191,75 +214,75 @@ func (c *TableController) Process(ctx context.Context, event tcell.Event, outc c
 				// FIXME Just write on stdin instead of using a temporary file
 				file, err := ioutil.TempFile(c.tempDir, "citop_")
 				if err != nil {
-					return err
+					return false, err
 				}
 				_, err = file.Write([]byte(man.Section1))
 				if err != nil {
-					return err
+					return false, err
 				}
 
-				var cmd *exec.Cmd
-				cmd = exec.Command("less", path.Join(c.tempDir, path.Base(file.Name())))
-				cmd.Dir = c.tempDir
-
-				select {
-				case outc <- ExecCmd{cmd: *cmd, stream: nil}:
-				case <-ctx.Done():
-					return ctx.Err()
+				cmd := ExecCmd{
+					name:   "less",
+					args:   []string{path.Join(c.tempDir, path.Base(file.Name()))},
+					dir:    c.tempDir,
+					stream: nil,
 				}
-				return nil
+				if err := c.tui.Exec(ctx, cmd); err != nil {
+					return false, err
+				}
+				return false, c.Draw()
 
 			case 'e', 'v':
-				c.SetStatus("Fetching logs...")
-				if err := c.SendShowText(ctx, outc); err != nil {
-					return err
+				c.setStatus("Fetching logs...")
+
+				if err := c.Draw(); err != nil {
+					return false, err
 				}
 				defer func() {
-					c.ClearStatus()
-					c.SendShowText(ctx, outc)
+					c.clearStatus()
+					c.Draw()
 				}()
 
 				if c.table.ActiveLine < 0 || c.table.ActiveLine >= len(c.table.Rows) {
-					return nil
+					return false, nil
 				}
 
 				key := c.table.Rows[c.table.ActiveLine].Key()
 				logPath, stream, err := c.table.Source.WriteToDirectory(ctx, key, c.tempDir)
 				if err != nil {
 					if err == cache.ErrNoLogHere {
-						return nil
+						return false, nil
 					}
-					return err
+					return false, err
 				}
 
-				var cmd *exec.Cmd
 				var args []string
 				if stream == nil {
 					args = []string{"-R"}
 				} else {
 					args = []string{"+F", "-R"}
 				}
-				cmd = exec.Command("less", append(args, logPath)...)
-				cmd.Dir = c.tempDir
 
-				select {
-				case outc <- ExecCmd{cmd: *cmd, stream: stream}:
-				case <-ctx.Done():
-					return ctx.Err()
+				cmd := ExecCmd{
+					name:   "less",
+					args:   append(args, logPath),
+					dir:    c.tempDir,
+					stream: stream,
 				}
-				return nil
+
+				return false, c.tui.Exec(ctx, cmd)
 			}
 		}
 	}
 
-	if err := ProcessDefaultTableEvents(c.table, event, c.status.InputBuffer); err != nil {
-		return err
+	if err := processDefaultTableEvents(c.table, event, c.status.InputBuffer); err != nil {
+		return false, err
 	}
 
-	return c.SendShowText(ctx, outc)
+	return false, c.Draw()
 }
 
-func ProcessDefaultTableEvents(table *widgets.Table, event tcell.Event, search string) error {
+func processDefaultTableEvents(table *widgets.Table, event tcell.Event, search string) error {
 	switch ev := event.(type) {
 	case *tcell.EventKey:
 		switch ev.Key() {

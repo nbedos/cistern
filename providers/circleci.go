@@ -6,9 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cenkalti/backoff/v3"
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/utils"
 	"io"
 	"net/http"
 	"net/url"
@@ -16,6 +13,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/cenkalti/backoff/v3"
+	"github.com/nbedos/citop/cache"
+	"github.com/nbedos/citop/utils"
 )
 
 type CircleCIClient struct {

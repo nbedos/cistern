@@ -2,9 +2,10 @@ package text
 
 import (
 	"bytes"
+	"strings"
+
 	"github.com/gdamore/tcell"
 	"github.com/mattn/go-runewidth"
-	"strings"
 )
 
 type Class int

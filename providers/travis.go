@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/utils"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,6 +12,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nbedos/citop/cache"
+	"github.com/nbedos/citop/utils"
 )
 
 type travisRepository struct {
@@ -635,11 +636,7 @@ func (c TravisClient) StreamLog(ctx context.Context, repositoryID int, jobID int
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if errClose := p.Close(); errClose != nil && err == nil {
-			err = errClose
-		}
-	}()
+	defer p.Close()
 
 	nbrParts, content, err := c.fetchJobLog(ctx, jobID)
 	log := utils.PostProcess(content)
@@ -647,36 +644,33 @@ func (c TravisClient) StreamLog(ctx context.Context, repositoryID int, jobID int
 		return err
 	}
 
+	errEvent := make(chan error)
 	eventc := make(chan travisEvent)
-	errc := make(chan error)
 	subCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+
 	go func() {
-		errc <- c.events(subCtx, p, eventc)
+		errEvent <- c.events(subCtx, p, eventc)
 	}()
 
-eventLoop:
-	for {
-		select {
-		case <-ctx.Done():
-			if err == nil {
-				err = ctx.Err()
-			}
-		case e := <-errc:
-			if err == nil {
-				err = e
-			}
-			break eventLoop
-		case event := <-eventc:
-			if event, ok := event.(travisPusherJobLog); ok && event.Number >= nbrParts {
+	errSet := false
+	for event := range eventc {
+		switch event := event.(type) {
+		case travisPusherJobLog:
+			// FIXME Check that log parts are received in the right order.
+			if event.Number >= nbrParts {
+				// FIXME Use utils.ANSIStripper
 				log := utils.PostProcess(event.Log)
 				if _, err = writer.Write([]byte(log)); err != nil || event.Final {
+					errSet = true
 					cancel()
 					break
 				}
 				nbrParts++
 			}
 		}
+	}
+	if e := <-errEvent; !errSet {
+		err = e
 	}
 
 	return err
@@ -772,6 +766,8 @@ func (travisPusherJobLog) isTravisEvent() {}
 
 // FIXME Isolate transformation from pusher event to travis event for easier testing
 func (c TravisClient) events(ctx context.Context, p utils.PusherClient, teventc chan<- travisEvent) error {
+	defer close(teventc)
+
 	for {
 		event, err := p.NextEvent(ctx)
 		if err != nil {

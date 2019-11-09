@@ -3,6 +3,7 @@ package widgets
 import (
 	"errors"
 	"fmt"
+
 	"github.com/nbedos/citop/text"
 	"github.com/nbedos/citop/utils"
 )

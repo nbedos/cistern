@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+
 	"github.com/nbedos/citop/text"
 )
 

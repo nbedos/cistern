@@ -2,10 +2,11 @@ package providers
 
 import (
 	"context"
-	"github.com/nbedos/citop/cache"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/nbedos/citop/cache"
 )
 
 func Test_RecentRepoBuilds(t *testing.T) {

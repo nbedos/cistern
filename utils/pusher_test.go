@@ -14,7 +14,7 @@ func Test_RecentRepoBuilds(t *testing.T) {
 		t.Fatal("Environment variable TRAVIS_API_TOKEN is not set")
 	}
 
-	authUrl := "https://api.travis-ci.org/pusher/auth"
+	authURL := "https://api.travis-ci.org/pusher/auth"
 	wsURL := PusherURL("ws.pusherapp.com", "5df8ac576dcccf4fd076")
 	//channel := "private-user-1842548"
 	channel := "repo-25564643"
@@ -25,7 +25,7 @@ func Test_RecentRepoBuilds(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer cancel()
-	p, err := NewPusherClient(ctx, wsURL, authUrl, authHeader, ticker.C)
+	p, err := NewPusherClient(ctx, wsURL, authURL, authHeader, ticker.C)
 	if err != nil {
 		t.Fatal(err)
 	}

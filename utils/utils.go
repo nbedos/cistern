@@ -3,13 +3,14 @@ package utils
 import (
 	"bytes"
 	"fmt"
-	"github.com/mattn/go-runewidth"
-	"gopkg.in/src-d/go-git.v4"
 	"io"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/mattn/go-runewidth"
+	"gopkg.in/src-d/go-git.v4"
 )
 
 func Modulo(a, b int) int {

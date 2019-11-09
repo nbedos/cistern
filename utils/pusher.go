@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -137,6 +138,7 @@ func (p *PusherClient) send(ctx context.Context, eventType string, channel strin
 	}
 }
 
+// FIXME No need to implement this interface. Replace by 'Finish' or something...
 func (p *PusherClient) Close() error {
 	if p.connected {
 		return p.conn.Close()
