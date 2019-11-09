@@ -1,0 +1,768 @@
+{
+  "@type": "builds",
+  "@href": "/repo/25564643/builds?offset=10&limit=10",
+  "@representation": "standard",
+  "@pagination": {
+    "limit": 10,
+    "offset": 10,
+    "count": 72,
+    "is_first": false,
+    "is_last": false,
+    "next": {
+      "@href": "/repo/25564643/builds?limit=10&offset=20",
+      "offset": 20,
+      "limit": 10
+    },
+    "prev": {
+      "@href": "/repo/25564643/builds?limit=10&offset=0",
+      "offset": 0,
+      "limit": 10
+    },
+    "first": {
+      "@href": "/repo/25564643/builds?limit=10&offset=0",
+      "offset": 0,
+      "limit": 10
+    },
+    "last": {
+      "@href": "/repo/25564643/builds?limit=10&offset=70",
+      "offset": 70,
+      "limit": 10
+    }
+  },
+  "builds": [
+    {
+      "@type": "build",
+      "@href": "/build/607359944",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 607359944,
+      "number": "62",
+      "state": "errored",
+      "duration": 112,
+      "event_type": "push",
+      "previous_state": "failed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-11-04T21:50:05Z",
+      "finished_at": "2019-11-04T21:52:45Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Fappveyor",
+        "@representation": "minimal",
+        "name": "feature/appveyor"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184369771,
+        "sha": "5faa1b78414d4cd1af35990b5ac5726cfc3101c4",
+        "ref": "refs/heads/feature/appveyor",
+        "message": "Add configuration",
+        "compare_url": "https://github.com/nbedos/citop/compare/9b8941eeb38b...5faa1b78414d",
+        "committed_at": "2019-11-04T21:49:30Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/607359945",
+          "@representation": "minimal",
+          "id": 607359945
+        },
+        {
+          "@type": "job",
+          "@href": "/job/607359946",
+          "@representation": "minimal",
+          "id": 607359946
+        },
+        {
+          "@type": "job",
+          "@href": "/job/607359947",
+          "@representation": "minimal",
+          "id": 607359947
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-11-04T21:52:45.766Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/607356631",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 607356631,
+      "number": "61",
+      "state": "failed",
+      "duration": 216,
+      "event_type": "push",
+      "previous_state": null,
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-11-04T21:42:45Z",
+      "finished_at": "2019-11-04T21:45:54Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Fappveyor",
+        "@representation": "minimal",
+        "name": "feature/appveyor"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184368654,
+        "sha": "9b8941eeb38b7967f2853ebd62448dba613224dd",
+        "ref": "refs/heads/feature/appveyor",
+        "message": "Add configuration",
+        "compare_url": "https://github.com/nbedos/citop/compare/35b56dcb98f9^...9b8941eeb38b",
+        "committed_at": "2019-11-04T21:40:23Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/607356632",
+          "@representation": "minimal",
+          "id": 607356632
+        },
+        {
+          "@type": "job",
+          "@href": "/job/607356633",
+          "@representation": "minimal",
+          "id": 607356633
+        },
+        {
+          "@type": "job",
+          "@href": "/job/607356634",
+          "@representation": "minimal",
+          "id": 607356634
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-11-04T21:45:54.908Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/607060646",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 607060646,
+      "number": "60",
+      "state": "passed",
+      "duration": 225,
+      "event_type": "push",
+      "previous_state": "passed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-11-08T11:15:51Z",
+      "finished_at": "2019-11-08T11:18:05Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/master",
+        "@representation": "minimal",
+        "name": "master"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184270876,
+        "sha": "d1a1ed004f0a400b9be8506e37669bf112a11a94",
+        "ref": "refs/heads/master",
+        "message": "Add manual page",
+        "compare_url": "https://github.com/nbedos/citop/compare/327dc870192d...d1a1ed004f0a",
+        "committed_at": "2019-11-04T10:20:56Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/607060647",
+          "@representation": "minimal",
+          "id": 607060647
+        },
+        {
+          "@type": "job",
+          "@href": "/job/607060648",
+          "@representation": "minimal",
+          "id": 607060648
+        },
+        {
+          "@type": "job",
+          "@href": "/job/607060649",
+          "@representation": "minimal",
+          "id": 607060649
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-11-08T11:18:05.774Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/607059776",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 607059776,
+      "number": "59",
+      "state": "passed",
+      "duration": 241,
+      "event_type": "push",
+      "previous_state": "passed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-11-04T10:20:56Z",
+      "finished_at": "2019-11-04T10:22:58Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/master",
+        "@representation": "minimal",
+        "name": "master"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184270609,
+        "sha": "327dc870192de836e040bd164833ff9ef194d47c",
+        "ref": "refs/heads/master",
+        "message": "Add manual page",
+        "compare_url": "https://github.com/nbedos/citop/compare/541548103b4b...327dc870192d",
+        "committed_at": "2019-11-04T10:19:55Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/607059777",
+          "@representation": "minimal",
+          "id": 607059777
+        },
+        {
+          "@type": "job",
+          "@href": "/job/607059778",
+          "@representation": "minimal",
+          "id": 607059778
+        },
+        {
+          "@type": "job",
+          "@href": "/job/607059779",
+          "@representation": "minimal",
+          "id": 607059779
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-11-04T10:22:58.326Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/606103420",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 606103420,
+      "number": "58",
+      "state": "errored",
+      "duration": 80,
+      "event_type": "push",
+      "previous_state": "canceled",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-11-03T14:40:35Z",
+      "finished_at": "2019-11-03T14:41:35Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Ftravis_ci",
+        "@representation": "minimal",
+        "name": "feature/travis_ci"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 183956430,
+        "sha": "eb22cef9a95cec2d929d2190fae8b08f7faa8ff9",
+        "ref": "refs/heads/feature/travis_ci",
+        "message": "Fix unit tests",
+        "compare_url": "https://github.com/nbedos/citop/compare/63b2102bd998...eb22cef9a95c",
+        "committed_at": "2019-11-01T17:07:22Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/606103422",
+          "@representation": "minimal",
+          "id": 606103422
+        },
+        {
+          "@type": "job",
+          "@href": "/job/606103424",
+          "@representation": "minimal",
+          "id": 606103424
+        },
+        {
+          "@type": "job",
+          "@href": "/job/606103426",
+          "@representation": "minimal",
+          "id": 606103426
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-11-03T14:41:35.547Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/605628645",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 605628645,
+      "number": "57",
+      "state": "canceled",
+      "duration": 129,
+      "event_type": "push",
+      "previous_state": null,
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-31T17:26:15Z",
+      "finished_at": "2019-10-31T17:39:43Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Ftravis_ci",
+        "@representation": "minimal",
+        "name": "feature/travis_ci"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 183796868,
+        "sha": "63b2102bd998602ec1417e5e9defe353589a525b",
+        "ref": "refs/heads/feature/travis_ci",
+        "message": "Add OS X to build matrix",
+        "compare_url": "https://github.com/nbedos/citop/compare/227b80c37a8e...63b2102bd998",
+        "committed_at": "2019-10-31T17:25:26Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/605628646",
+          "@representation": "minimal",
+          "id": 605628646
+        },
+        {
+          "@type": "job",
+          "@href": "/job/605628647",
+          "@representation": "minimal",
+          "id": 605628647
+        },
+        {
+          "@type": "job",
+          "@href": "/job/605628648",
+          "@representation": "minimal",
+          "id": 605628648
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-31T17:39:43.791Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/599340942",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 599340942,
+      "number": "56",
+      "state": "failed",
+      "duration": 198,
+      "event_type": "push",
+      "previous_state": "failed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-17T20:34:28Z",
+      "finished_at": "2019-10-17T20:36:13Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/ci%2Fgolang_1_12",
+        "@representation": "minimal",
+        "name": "ci/golang_1_12"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181754905,
+        "sha": "e3bff6f542449b33844b984a79a5262a7eddc794",
+        "ref": "refs/heads/ci/golang_1_12",
+        "message": "Test with golang 1.12",
+        "compare_url": "https://github.com/nbedos/citop/compare/4daf20c5f977...e3bff6f54244",
+        "committed_at": "2019-10-17T20:33:46Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/599340943",
+          "@representation": "minimal",
+          "id": 599340943
+        },
+        {
+          "@type": "job",
+          "@href": "/job/599340944",
+          "@representation": "minimal",
+          "id": 599340944
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-17T20:36:14.071Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/599339545",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 599339545,
+      "number": "55",
+      "state": "failed",
+      "duration": 176,
+      "event_type": "push",
+      "previous_state": null,
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-17T20:30:23Z",
+      "finished_at": "2019-10-17T20:31:53Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/ci%2Fgolang_1_12",
+        "@representation": "minimal",
+        "name": "ci/golang_1_12"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181754417,
+        "sha": "4daf20c5f97754f4a98bda2f70f353e6d8e04418",
+        "ref": "refs/heads/ci/golang_1_12",
+        "message": "Test with golang 1.12",
+        "compare_url": "https://github.com/nbedos/citop/compare/9facf071e1e1^...4daf20c5f977",
+        "committed_at": "2019-10-17T20:29:33Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/599339546",
+          "@representation": "minimal",
+          "id": 599339546
+        },
+        {
+          "@type": "job",
+          "@href": "/job/599339547",
+          "@representation": "minimal",
+          "id": 599339547
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-17T20:31:53.503Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/598815592",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 598815592,
+      "number": "54",
+      "state": "passed",
+      "duration": 86,
+      "event_type": "push",
+      "previous_state": "passed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-23T09:56:42Z",
+      "finished_at": "2019-10-23T09:58:08Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/master",
+        "@representation": "minimal",
+        "name": "master"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181585472,
+        "sha": "541548103b4b19802fa26adb841fe4a50e159878",
+        "ref": "refs/heads/master",
+        "message": "Add CircleCI provider\n\ncommit a0934dacd7efcd98f2c769a13168b4666e114ce0\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Wed Oct 16 16:27:27 2019 +0200\n\n    Integration with existing UI\n\ncommit 439f4c73789647ecca8de6fc5add90dc3e825cce\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Tue Oct 15 22:46:06 2019 +0200\n\n    Add fetchBuild()\n\ncommit ceb2b34cf4b30864056b930ca071454958bce991\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Tue Oct 15 14:45:13 2019 +0200\n\n    Setup CI configuration\n\ncommit 72b93af2a63c29fa33130ffaa4d91c34956c61f1\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Tue Oct 15 14:38:16 2019 +0200\n\n    Disable azure pipelines",
+        "compare_url": "https://github.com/nbedos/citop/compare/8ff2b5235cd0...541548103b4b",
+        "committed_at": "2019-10-16T19:11:22Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/598815593",
+          "@representation": "minimal",
+          "id": 598815593
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-23T09:58:08.212Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/598749982",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 598749982,
+      "number": "53",
+      "state": "errored",
+      "duration": 31,
+      "event_type": "push",
+      "previous_state": "failed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-21T12:46:10Z",
+      "finished_at": "2019-10-21T12:46:41Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Fcircle_ci",
+        "@representation": "minimal",
+        "name": "feature/circle_ci"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181564371,
+        "sha": "a0934dacd7efcd98f2c769a13168b4666e114ce0",
+        "ref": "refs/heads/feature/circle_ci",
+        "message": "Integration with existing UI",
+        "compare_url": "https://github.com/nbedos/citop/compare/1d24041038ed...a0934dacd7ef",
+        "committed_at": "2019-10-16T16:36:38Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/598749983",
+          "@representation": "minimal",
+          "id": 598749983
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-21T12:46:41.294Z"
+    }
+  ]
+}

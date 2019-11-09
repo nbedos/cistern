@@ -1,0 +1,254 @@
+{
+  "@type": "build",
+  "@href": "/build/606103420",
+  "@representation": "standard",
+  "@permissions": {
+    "read": true,
+    "cancel": false,
+    "restart": false
+  },
+  "id": 606103420,
+  "number": "58",
+  "state": "errored",
+  "duration": 80,
+  "event_type": "push",
+  "previous_state": "canceled",
+  "pull_request_title": null,
+  "pull_request_number": null,
+  "started_at": "2019-11-03T14:40:35Z",
+  "finished_at": "2019-11-03T14:41:35Z",
+  "private": false,
+  "repository": {
+    "@type": "repository",
+    "@href": "/repo/25564643",
+    "@representation": "minimal",
+    "id": 25564643,
+    "name": "citop",
+    "slug": "nbedos/citop"
+  },
+  "branch": {
+    "@type": "branch",
+    "@href": "/repo/25564643/branch/feature%2Ftravis_ci",
+    "@representation": "minimal",
+    "name": "feature/travis_ci"
+  },
+  "tag": null,
+  "commit": {
+    "@type": "commit",
+    "@representation": "standard",
+    "id": 183956430,
+    "sha": "eb22cef9a95cec2d929d2190fae8b08f7faa8ff9",
+    "ref": "refs/heads/feature/travis_ci",
+    "message": "Fix unit tests",
+    "compare_url": "https://github.com/nbedos/citop/compare/63b2102bd998...eb22cef9a95c",
+    "committed_at": "2019-11-01T17:07:22Z",
+    "committer": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    },
+    "author": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    }
+  },
+  "jobs": [
+    {
+      "@type": "job",
+      "@href": "/job/606103422",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 606103422,
+      "allow_failure": false,
+      "number": "58.1",
+      "state": "errored",
+      "started_at": "2019-11-03T14:41:09Z",
+      "finished_at": "2019-11-03T14:41:35Z",
+      "build": {
+        "@href": "/build/606103420"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 183956430,
+        "sha": "eb22cef9a95cec2d929d2190fae8b08f7faa8ff9",
+        "ref": "refs/heads/feature/travis_ci",
+        "message": "Fix unit tests",
+        "compare_url": "https://github.com/nbedos/citop/compare/63b2102bd998...eb22cef9a95c",
+        "committed_at": "2019-11-01T17:07:22Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": null,
+      "created_at": "2019-11-01T17:07:28.473Z",
+      "updated_at": "2019-11-03T14:41:35.528Z",
+      "private": false,
+      "config": {
+        "go": "1.13.x",
+        "os": "linux",
+        "dist": "bionic",
+        "group": "stable",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/606103424",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 606103424,
+      "allow_failure": false,
+      "number": "58.2",
+      "state": "errored",
+      "started_at": "2019-11-03T14:40:35Z",
+      "finished_at": "2019-11-03T14:41:04Z",
+      "build": {
+        "@href": "/build/606103420"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 183956430,
+        "sha": "eb22cef9a95cec2d929d2190fae8b08f7faa8ff9",
+        "ref": "refs/heads/feature/travis_ci",
+        "message": "Fix unit tests",
+        "compare_url": "https://github.com/nbedos/citop/compare/63b2102bd998...eb22cef9a95c",
+        "committed_at": "2019-11-01T17:07:22Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": null,
+      "created_at": "2019-11-01T17:07:28.482Z",
+      "updated_at": "2019-11-03T14:41:04.907Z",
+      "private": false,
+      "config": {
+        "go": "1.13.x",
+        "os": "linux",
+        "dist": "trusty",
+        "group": "stable",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/606103426",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 606103426,
+      "allow_failure": false,
+      "number": "58.3",
+      "state": "errored",
+      "started_at": "2019-11-03T14:41:09Z",
+      "finished_at": "2019-11-03T14:41:34Z",
+      "build": {
+        "@href": "/build/606103420"
+      },
+      "queue": "builds.macstadium6",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 183956430,
+        "sha": "eb22cef9a95cec2d929d2190fae8b08f7faa8ff9",
+        "ref": "refs/heads/feature/travis_ci",
+        "message": "Fix unit tests",
+        "compare_url": "https://github.com/nbedos/citop/compare/63b2102bd998...eb22cef9a95c",
+        "committed_at": "2019-11-01T17:07:22Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": null,
+      "created_at": "2019-11-01T17:07:28.487Z",
+      "updated_at": "2019-11-03T14:41:34.977Z",
+      "private": false,
+      "config": {
+        "go": "1.13.x",
+        "os": "osx",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    }
+  ],
+  "stages": [
+
+  ],
+  "created_by": {
+    "@type": "user",
+    "@href": "/user/1072861",
+    "@representation": "minimal",
+    "id": 1072861,
+    "login": "nbedos"
+  },
+  "updated_at": "2019-11-03T14:41:35.547Z"
+}

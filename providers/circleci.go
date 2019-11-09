@@ -243,7 +243,7 @@ func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (c
 		return cache.Repository{}, err
 	}
 
-	// FIXME What about Repository.ID?
+	// FIXME What about repository.ID?
 	return cache.Repository{
 		AccountID: c.accountID,
 		URL:       repositoryURL,

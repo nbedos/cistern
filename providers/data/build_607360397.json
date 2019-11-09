@@ -1,0 +1,254 @@
+{
+  "@type": "build",
+  "@href": "/build/607360397",
+  "@representation": "standard",
+  "@permissions": {
+    "read": true,
+    "cancel": false,
+    "restart": false
+  },
+  "id": 607360397,
+  "number": "63",
+  "state": "canceled",
+  "duration": 0,
+  "event_type": "push",
+  "previous_state": "failed",
+  "pull_request_title": null,
+  "pull_request_number": null,
+  "started_at": null,
+  "finished_at": "2019-11-04T21:51:36Z",
+  "private": false,
+  "repository": {
+    "@type": "repository",
+    "@href": "/repo/25564643",
+    "@representation": "minimal",
+    "id": 25564643,
+    "name": "citop",
+    "slug": "nbedos/citop"
+  },
+  "branch": {
+    "@type": "branch",
+    "@href": "/repo/25564643/branch/feature%2Fappveyor",
+    "@representation": "minimal",
+    "name": "feature/appveyor"
+  },
+  "tag": null,
+  "commit": {
+    "@type": "commit",
+    "@representation": "standard",
+    "id": 184369917,
+    "sha": "af0fc8202772f537f0f3617a9771e87c04ac5e81",
+    "ref": "refs/heads/feature/appveyor",
+    "message": "Add configuration",
+    "compare_url": "https://github.com/nbedos/citop/compare/5faa1b78414d...af0fc8202772",
+    "committed_at": "2019-11-04T21:50:38Z",
+    "committer": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    },
+    "author": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    }
+  },
+  "jobs": [
+    {
+      "@type": "job",
+      "@href": "/job/607360398",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 607360398,
+      "allow_failure": false,
+      "number": "63.1",
+      "state": "canceled",
+      "started_at": null,
+      "finished_at": "2019-11-04T21:51:35Z",
+      "build": {
+        "@href": "/build/607360397"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184369917,
+        "sha": "af0fc8202772f537f0f3617a9771e87c04ac5e81",
+        "ref": "refs/heads/feature/appveyor",
+        "message": "Add configuration",
+        "compare_url": "https://github.com/nbedos/citop/compare/5faa1b78414d...af0fc8202772",
+        "committed_at": "2019-11-04T21:50:38Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": null,
+      "created_at": "2019-11-04T21:50:43.031Z",
+      "updated_at": "2019-11-04T21:51:35.874Z",
+      "private": false,
+      "config": {
+        "go": "1.13.x",
+        "os": "linux",
+        "dist": "bionic",
+        "group": "stable",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/607360399",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 607360399,
+      "allow_failure": false,
+      "number": "63.2",
+      "state": "canceled",
+      "started_at": null,
+      "finished_at": "2019-11-04T21:51:36Z",
+      "build": {
+        "@href": "/build/607360397"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184369917,
+        "sha": "af0fc8202772f537f0f3617a9771e87c04ac5e81",
+        "ref": "refs/heads/feature/appveyor",
+        "message": "Add configuration",
+        "compare_url": "https://github.com/nbedos/citop/compare/5faa1b78414d...af0fc8202772",
+        "committed_at": "2019-11-04T21:50:38Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": null,
+      "created_at": "2019-11-04T21:50:43.039Z",
+      "updated_at": "2019-11-04T21:51:36.041Z",
+      "private": false,
+      "config": {
+        "go": "1.13.x",
+        "os": "linux",
+        "dist": "trusty",
+        "group": "stable",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/607360400",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 607360400,
+      "allow_failure": false,
+      "number": "63.3",
+      "state": "canceled",
+      "started_at": null,
+      "finished_at": "2019-11-04T21:51:36Z",
+      "build": {
+        "@href": "/build/607360397"
+      },
+      "queue": "builds.macstadium6",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184369917,
+        "sha": "af0fc8202772f537f0f3617a9771e87c04ac5e81",
+        "ref": "refs/heads/feature/appveyor",
+        "message": "Add configuration",
+        "compare_url": "https://github.com/nbedos/citop/compare/5faa1b78414d...af0fc8202772",
+        "committed_at": "2019-11-04T21:50:38Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": null,
+      "created_at": "2019-11-04T21:50:43.043Z",
+      "updated_at": "2019-11-04T21:51:36.142Z",
+      "private": false,
+      "config": {
+        "go": "1.13.x",
+        "os": "osx",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    }
+  ],
+  "stages": [
+
+  ],
+  "created_by": {
+    "@type": "user",
+    "@href": "/user/1072861",
+    "@representation": "minimal",
+    "id": 1072861,
+    "login": "nbedos"
+  },
+  "updated_at": "2019-11-04T21:51:36.190Z"
+}

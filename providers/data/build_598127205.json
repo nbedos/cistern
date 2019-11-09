@@ -1,0 +1,130 @@
+{
+  "@type": "build",
+  "@href": "/build/598127205",
+  "@representation": "standard",
+  "@permissions": {
+    "read": true,
+    "cancel": false,
+    "restart": false
+  },
+  "id": 598127205,
+  "number": "49",
+  "state": "passed",
+  "duration": 87,
+  "event_type": "push",
+  "previous_state": null,
+  "pull_request_title": null,
+  "pull_request_number": null,
+  "started_at": "2019-10-15T12:39:40Z",
+  "finished_at": "2019-10-15T12:41:07Z",
+  "private": false,
+  "repository": {
+    "@type": "repository",
+    "@href": "/repo/25564643",
+    "@representation": "minimal",
+    "id": 25564643,
+    "name": "citop",
+    "slug": "nbedos/citop"
+  },
+  "branch": {
+    "@type": "branch",
+    "@href": "/repo/25564643/branch/feature%2Fcircle_ci",
+    "@representation": "minimal",
+    "name": "feature/circle_ci"
+  },
+  "tag": null,
+  "commit": {
+    "@type": "commit",
+    "@representation": "standard",
+    "id": 181364997,
+    "sha": "72b93af2a63c29fa33130ffaa4d91c34956c61f1",
+    "ref": "refs/heads/feature/circle_ci",
+    "message": "Disable azure pipelines",
+    "compare_url": "https://github.com/nbedos/citop/commit/72b93af2a63c",
+    "committed_at": "2019-10-15T12:38:16Z",
+    "committer": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    },
+    "author": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    }
+  },
+  "jobs": [
+    {
+      "@type": "job",
+      "@href": "/job/598127206",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 598127206,
+      "allow_failure": false,
+      "number": "49.1",
+      "state": "passed",
+      "started_at": "2019-10-15T12:39:40Z",
+      "finished_at": "2019-10-15T12:41:07Z",
+      "build": {
+        "@href": "/build/598127205"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181364997,
+        "sha": "72b93af2a63c29fa33130ffaa4d91c34956c61f1",
+        "ref": "refs/heads/feature/circle_ci",
+        "message": "Disable azure pipelines",
+        "compare_url": "https://github.com/nbedos/citop/commit/72b93af2a63c",
+        "committed_at": "2019-10-15T12:38:16Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": null,
+      "created_at": "2019-10-15T12:39:12.696Z",
+      "updated_at": "2019-10-15T12:41:07.693Z",
+      "private": false,
+      "config": {
+        "go": "1.13.x",
+        "os": "linux",
+        "dist": "trusty",
+        "group": "stable",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    }
+  ],
+  "stages": [
+
+  ],
+  "created_by": {
+    "@type": "user",
+    "@href": "/user/1072861",
+    "@representation": "minimal",
+    "id": 1072861,
+    "login": "nbedos"
+  },
+  "updated_at": "2019-10-15T12:41:07.712Z"
+}

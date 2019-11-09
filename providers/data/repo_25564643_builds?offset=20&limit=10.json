@@ -1,0 +1,696 @@
+{
+  "@type": "builds",
+  "@href": "/repo/25564643/builds?offset=20&limit=10",
+  "@representation": "standard",
+  "@pagination": {
+    "limit": 10,
+    "offset": 20,
+    "count": 72,
+    "is_first": false,
+    "is_last": false,
+    "next": {
+      "@href": "/repo/25564643/builds?limit=10&offset=30",
+      "offset": 30,
+      "limit": 10
+    },
+    "prev": {
+      "@href": "/repo/25564643/builds?limit=10&offset=10",
+      "offset": 10,
+      "limit": 10
+    },
+    "first": {
+      "@href": "/repo/25564643/builds?limit=10&offset=0",
+      "offset": 0,
+      "limit": 10
+    },
+    "last": {
+      "@href": "/repo/25564643/builds?limit=10&offset=70",
+      "offset": 70,
+      "limit": 10
+    }
+  },
+  "builds": [
+    {
+      "@type": "build",
+      "@href": "/build/598748169",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 598748169,
+      "number": "52",
+      "state": "failed",
+      "duration": 84,
+      "event_type": "push",
+      "previous_state": "failed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-16T16:32:55Z",
+      "finished_at": "2019-10-16T16:34:19Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Fcircle_ci",
+        "@representation": "minimal",
+        "name": "feature/circle_ci"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181563815,
+        "sha": "1d24041038ed98daf0bf27dc2941cf793de40c7c",
+        "ref": "refs/heads/feature/circle_ci",
+        "message": "Integration with existing UI",
+        "compare_url": "https://github.com/nbedos/citop/compare/3c53d889f74d...1d24041038ed",
+        "committed_at": "2019-10-16T16:32:16Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/598748170",
+          "@representation": "minimal",
+          "id": 598748170
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-16T16:34:19.800Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/598744105",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 598744105,
+      "number": "51",
+      "state": "failed",
+      "duration": 81,
+      "event_type": "push",
+      "previous_state": "passed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-16T16:23:20Z",
+      "finished_at": "2019-10-16T16:24:41Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Fcircle_ci",
+        "@representation": "minimal",
+        "name": "feature/circle_ci"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181562561,
+        "sha": "3c53d889f74de71422d1e38018b37a02f3de0163",
+        "ref": "refs/heads/feature/circle_ci",
+        "message": "Integration with existing UI",
+        "compare_url": "https://github.com/nbedos/citop/compare/ceb2b34cf4b3...3c53d889f74d",
+        "committed_at": "2019-10-16T16:22:37Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/598744106",
+          "@representation": "minimal",
+          "id": 598744106
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-16T16:24:42.500Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/598129980",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 598129980,
+      "number": "50",
+      "state": "passed",
+      "duration": 93,
+      "event_type": "push",
+      "previous_state": "passed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-15T12:45:51Z",
+      "finished_at": "2019-10-15T12:47:24Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Fcircle_ci",
+        "@representation": "minimal",
+        "name": "feature/circle_ci"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181365838,
+        "sha": "ceb2b34cf4b30864056b930ca071454958bce991",
+        "ref": "refs/heads/feature/circle_ci",
+        "message": "Setup CI configuration",
+        "compare_url": "https://github.com/nbedos/citop/compare/72b93af2a63c...ceb2b34cf4b3",
+        "committed_at": "2019-10-15T12:45:13Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/598129981",
+          "@representation": "minimal",
+          "id": 598129981
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-15T12:47:24.616Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/598127205",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 598127205,
+      "number": "49",
+      "state": "passed",
+      "duration": 87,
+      "event_type": "push",
+      "previous_state": null,
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-15T12:39:40Z",
+      "finished_at": "2019-10-15T12:41:07Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Fcircle_ci",
+        "@representation": "minimal",
+        "name": "feature/circle_ci"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181364997,
+        "sha": "72b93af2a63c29fa33130ffaa4d91c34956c61f1",
+        "ref": "refs/heads/feature/circle_ci",
+        "message": "Disable azure pipelines",
+        "compare_url": "https://github.com/nbedos/citop/commit/72b93af2a63c",
+        "committed_at": "2019-10-15T12:38:16Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/598127206",
+          "@representation": "minimal",
+          "id": 598127206
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-15T12:41:07.712Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/597720236",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 597720236,
+      "number": "48",
+      "state": "passed",
+      "duration": 92,
+      "event_type": "push",
+      "previous_state": "passed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-14T16:20:35Z",
+      "finished_at": "2019-10-14T16:22:07Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/master",
+        "@representation": "minimal",
+        "name": "master"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181233185,
+        "sha": "8ff2b5235cd0841a9ae1f161f2b8e6ee090b6e2f",
+        "ref": "refs/heads/master",
+        "message": "Merge branch 'master' into azure-pipelines",
+        "compare_url": "https://github.com/nbedos/citop/compare/179395b0bcfd...8ff2b5235cd0",
+        "committed_at": "2019-10-14T16:12:14Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/597720237",
+          "@representation": "minimal",
+          "id": 597720237
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-14T16:22:07.702Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/597718188",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 597718188,
+      "number": "47",
+      "state": "passed",
+      "duration": 82,
+      "event_type": "pull_request",
+      "previous_state": "passed",
+      "pull_request_title": "Set up CI with Azure Pipelines",
+      "pull_request_number": 1,
+      "started_at": "2019-10-14T16:16:58Z",
+      "finished_at": "2019-10-14T16:18:20Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/master",
+        "@representation": "minimal",
+        "name": "master"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181232475,
+        "sha": "c50fd126ee82d674036398c80c248e6a244d8c3c",
+        "ref": "refs/pull/1/merge",
+        "message": "Merge branch 'master' into azure-pipelines",
+        "compare_url": "https://github.com/nbedos/citop/pull/1",
+        "committed_at": "2019-10-14T16:12:14Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/597718189",
+          "@representation": "minimal",
+          "id": 597718189
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-14T16:18:21.161Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/597718178",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 597718178,
+      "number": "46",
+      "state": "passed",
+      "duration": 91,
+      "event_type": "push",
+      "previous_state": "failed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-14T16:16:58Z",
+      "finished_at": "2019-10-14T16:18:29Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/azure-pipelines",
+        "@representation": "minimal",
+        "name": "azure-pipelines"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181232470,
+        "sha": "8ff2b5235cd0841a9ae1f161f2b8e6ee090b6e2f",
+        "ref": "refs/heads/azure-pipelines",
+        "message": "Merge branch 'master' into azure-pipelines",
+        "compare_url": "https://github.com/nbedos/citop/compare/e4f7b185158f...8ff2b5235cd0",
+        "committed_at": "2019-10-14T16:12:14Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/597718179",
+          "@representation": "minimal",
+          "id": 597718179
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-14T16:18:29.082Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/597716450",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 597716450,
+      "number": "45",
+      "state": "passed",
+      "duration": 81,
+      "event_type": "push",
+      "previous_state": "failed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-14T16:13:32Z",
+      "finished_at": "2019-10-14T16:14:53Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/master",
+        "@representation": "minimal",
+        "name": "master"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181231902,
+        "sha": "179395b0bcfd98f27f02e308b0e3bbd7d862fdf2",
+        "ref": "refs/heads/master",
+        "message": "Squashed commit of the following:\n\ncommit 604114f2a51aab5ce32be823d1382cbb2cdc1452\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Oct 14 17:45:53 2019 +0200\n\n    Use anonymous structs where possible\n\ncommit 29c2b78e16c5488b626dff1c8b9bf2ef8cdf3cd1\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sun Oct 13 14:06:18 2019 +0200\n\n    Use default terminal colors\n\ncommit 0117492f5c5fa8ae54627993f1ff127a702c75b7\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Oct 12 23:50:33 2019 +0200\n\n    Open table row URL in $BROWSER\n\ncommit 3c27ca13f4bfaf7ff964b1ef8bfebe916ff9a006\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Oct 12 22:49:53 2019 +0200\n\n    Add build duration and web url\n\ncommit 101fb0021db3dbbb285889790f41e5616af5e26a\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Oct 12 18:37:12 2019 +0200\n\n    Improve repository parametrization of providers\n\ncommit 72f9533e38b8508f0e6a42291a52eee1f94f7b31\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Oct 11 23:07:50 2019 +0200\n\n    Stream GitLab builds\n\ncommit 6497edda580458c0c9bec0cab71173664812ba0b\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Oct 11 21:08:38 2019 +0200\n\n    Fetch Travis repos one by one\n\ncommit ab6da2ae35b628f83d73156657adc5de7e57a763\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Oct 11 15:22:53 2019 +0200\n\n    Standardize build, stage and job state\n\ncommit 16a318a588a1293a00ceebe647f970847eeb0ff3\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Thu Oct 10 22:39:46 2019 +0200\n\n    Remove header customization\n\ncommit cc17ff69c5cb47bdc67d9abb2dda2fd2dbccda59\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Thu Oct 10 21:58:52 2019 +0200\n\n    All queries now go through Cache\n\ncommit 54c86ac9387d78ffd3ee3846345ba8326e627dc1\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Wed Oct 9 18:09:03 2019 +0200\n\n    Add last update date to Build\n\ncommit a7c72fe1a445f2e8683d7923ef1ded26709ea268\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Oct 7 23:25:01 2019 +0200\n\n    Unify Table.Open/Close methods\n\ncommit 4e4cb3fb59e05583c3ab8040daec23e7207a7107\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Oct 7 23:12:33 2019 +0200\n\n    Simplify Text() method of Table widget\n\ncommit 451a206abff46c5be456b6fdc71c8310de2d47cc\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Oct 7 18:27:43 2019 +0200\n\n    Simplify Show/Hide interface\n\ncommit 1d4b3ff4c1bbf3f30d0a3de86bfd7214f48e49bc\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Oct 7 16:49:13 2019 +0200\n\n    Refactor DumpToDir\n\ncommit 5fe130adf197a7872730e456f3755f2d9578b58c\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sun Oct 6 17:51:46 2019 +0200\n\n    WIP\n\ncommit 1e0e21745d979a848977c5ace85fe5e33fce5f9a\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sun Oct 6 11:55:44 2019 +0200\n\n    tree representation\n\ncommit f5140d15f73a4ec464a6d7ca872fbf4bbe897f93\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Oct 5 22:18:12 2019 +0200\n\n    Refactor build view\n\ncommit 3d2bd5c836288326a0b0aac47717b57519ca3a75\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Thu Oct 3 18:56:53 2019 +0200\n\n    Live monitoring (WIP)\n\ncommit 24ceeebd579cec651f01565c58f4f016cd6d2253\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Sep 28 17:25:23 2019 +0200\n\n    Pusher Channels protocol implementation\n\ncommit 40fddf3e6f79d2cf9abf10930a38f0505c642d12\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Sep 27 21:02:49 2019 +0200\n\n    ...\n\ncommit 2678c071a5b8551d1aa91f6c3644b5b4265fcb53\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Thu Sep 26 22:52:10 2019 +0200\n\n    Parallelize log file write operation\n\ncommit 7fdc4ad4ee8a457644726b1d3f305464a77981af\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Thu Sep 26 21:45:04 2019 +0200\n\n    Refactor build_tree SQL queries\n\ncommit 861b387dc2e40fa5b46727c85ba666c599de98bf\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Sep 23 14:03:53 2019 +0200\n\n    WIP\n\ncommit 07da54a273b25d9c1b3e99eea67ea3116cb2658f\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Sep 21 16:51:21 2019 +0200\n\n    Use cmp.Equal for result comparison\n\ncommit 1179f6dab87b5330fed2662f7f817482a68e35dd\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Sep 21 15:57:37 2019 +0200\n\n    Upgrade to golang 1.13\n\ncommit e746ccb168776356db1ab8e977cd85132bfab511\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Sep 21 15:50:00 2019 +0200\n\n    Allow missing commit date\n\ncommit 58e49aba590362f9b78c0acdaafc28746519ccb1\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Sep 21 13:08:54 2019 +0200\n\n    Update project status\n\ncommit 773020ff6f81c6849ed9731df5aaa17e72997c23\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Sep 20 21:55:26 2019 +0200\n\n    Keep same build active during folding operations\n\ncommit 298bde2faec28734d96211ac72578b3d87665556\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Sep 20 18:54:02 2019 +0200\n\n    Improve GitLab support\n\ncommit 8cb98ec66be9fe1f2289e178e5e728c3979bc601\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Thu Sep 19 18:11:03 2019 +0200\n\n    Dump logs in directory for external viewers\n\ncommit ef2c9bd0bf2af5890349a81913f9755e91e5342f\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Thu Sep 19 10:32:34 2019 +0200\n\n    Fix job numbering\n\ncommit 92d543311f8e3db61f0ec43b6b27387a0d9fc8b9\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Wed Sep 18 17:49:01 2019 +0200\n\n    Open log in pager\n\ncommit 9fdba23b8e44f8678360678f281536ea5f536580\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Wed Sep 18 16:42:11 2019 +0200\n\n    Trigger external program from widget controller\n\ncommit 017a4e87e407bd9996f98c3706d2ef0d50e87542\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Tue Sep 17 22:08:26 2019 +0200\n\n    External command test\n\ncommit cfad1024ad8464734fd122b5dbc335d0913f5372\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Tue Sep 17 19:11:55 2019 +0200\n\n    Use first line of commit summary as build name\n\ncommit f1e5ab82d6caf76e730f749bbaf0a529cda9e22b\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Tue Sep 17 16:05:22 2019 +0200\n\n    ...\n\ncommit 4a260d313c0529576a83a9943bf978a0ad1b1071\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Sep 16 21:36:54 2019 +0200\n\n    Allow stage less jobs\n\ncommit 2b902f8f5c27560296640fb011ce0ffd7a2d847a\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Sep 16 17:18:30 2019 +0200\n\n    Travis: Fetch repository build history\n\ncommit cd48789d4879fa306557a13d424bb3a246d23b6e\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Sep 16 10:58:28 2019 +0200\n\n    Column width is now non-decreasing\n\ncommit 6f52bea2e6ceb5c3823b15be6e1825adec5d1898\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Sep 16 10:31:44 2019 +0200\n\n    Revert to per account repositories\n\ncommit 28cd4b57337bf193b255863706a5d7875a6614b1\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sun Sep 15 14:41:53 2019 +0200\n\n    Setup concurrency in main thread\n\ncommit 3af642c5f1241519df14a1897592dea7cd55a3c8\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Sep 13 15:35:26 2019 +0200\n\n    Reorganize UI code\n\ncommit 1465de9791344129e6a03b43ce1630474ed15df1\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Thu Sep 12 20:57:40 2019 +0200\n\n    Connect provider to TUI\n\ncommit 495d886cc3ff5b92a3627fb8d1b18570bdf7c7dd\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Thu Sep 12 17:27:02 2019 +0200\n\n    Fetch logs of Travis jobs concurrently\n\ncommit 14adbdff053bb17f420c24abea2e426cb77a9982\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Wed Sep 11 20:01:19 2019 +0200\n\n    ...\n\ncommit 132162a49cd649389e982c52f11fe1b2e2d8391c\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Tue Sep 10 17:26:52 2019 +0200\n\n    Define widget interface\n\ncommit d4d7d73627f9b72a21fe4f928b94cf91f71e7182\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Sep 9 18:08:26 2019 +0200\n\n    Open/close all builds\n\ncommit b711f4d0e2eeb306fafb664025944b2320b5a3bd\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Sep 9 16:02:50 2019 +0200\n\n    Use DB to store folded build and stages\n\ncommit 1f51b23a3f2a1119b253670c5cff386711a3c5d0\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Sep 9 14:24:14 2019 +0200\n\n    Add folding indicator in name prefix\n\ncommit 46d53709effe8b123b31b4b8f9a184e44e5c3a07\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sun Sep 8 23:08:51 2019 +0200\n\n    Implement build and stage folding (WIP)\n\ncommit 3bcfd90694ad3b32c4c2d8073c5b9a1dd75ae0a2\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sun Sep 8 14:45:03 2019 +0200\n\n    Use temporary table for pagination\n\ncommit 9a072c75bba0742fe1b161ffc863a72f2382fbf9\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Sep 7 22:19:41 2019 +0200\n\n    Add creation, start and finish times to builds and jobs\n\ncommit 96aa4209cf0e0a7bcdd4d1b3ce64521305fda65e\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Sep 7 19:16:05 2019 +0200\n\n    Define TableDataSource abstraction\n\ncommit 42250f5a7a04568d20d59027cfc0b751c180241d\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Sep 7 15:15:41 2019 +0200\n\n    Add commit ref to build\n\ncommit 20fbef582e86466a6c10d4c15c76d3d193164557\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Sep 7 12:22:21 2019 +0200\n\n    Add support for Home and End key\n\ncommit 12c7c6ad72691a8bd276ac565a731a88718e274e\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Sep 7 11:47:00 2019 +0200\n\n    Revert to full SQL pagination\n\ncommit 0575cc34a60ad1bad69974da6b7713ff361bb7b1\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Sep 6 19:46:32 2019 +0200\n\n    Add unit tests to build_tree\n\ncommit 02405242ce02f93c51d19af86947130b56ba8bca\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Sep 6 13:42:08 2019 +0200\n\n    Build hierarchical build/stage/job relations outside SQL\n\ncommit c3453819adde48ad17531c04bce45bba87fc7bd0\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Sep 6 10:51:33 2019 +0200\n\n    Revert \"Stageless builds\"\n\n    This reverts commit 9085ddd3cc3f35c28f7b86dff258ea5ec4083c91.\n\ncommit 9085ddd3cc3f35c28f7b86dff258ea5ec4083c91\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Thu Sep 5 19:23:06 2019 +0200\n\n    Stageless builds\n\ncommit a957facd38afa06763831b71c3b40e5f9524e056\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Wed Sep 4 18:20:02 2019 +0200\n\n    Improve UI components modularity\n\ncommit 62f83dbc52058afb80481b9e56cf36337ffcdb3b\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Mon Sep 2 15:07:29 2019 +0200\n\n    Key based pagination\n\ncommit 96d335ebcf8ccfe74d39286a9abc0f15594ce522\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sun Sep 1 23:00:45 2019 +0200\n\n    Reimplement scrolling\n\ncommit 619cecaffa5dc111ece4d5faac7d69560910c78d\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sun Sep 1 19:01:59 2019 +0200\n\n    Use local ids for stages and jobs to simplify pagination of build_tree view\n\ncommit 7f75ecd69269f2caed1f639a71dda39351c4fdfe\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sun Sep 1 17:51:09 2019 +0200\n\n    Improve Table\n\ncommit 2f5f8073aa2bde39502853c76412f771b7469ef1\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Aug 31 23:32:43 2019 +0200\n\n    Table folding (WIP)\n\ncommit eccbdf368639c32880296c9a7b13d759a338637c\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Aug 31 23:32:19 2019 +0200\n\n    Implement left padding of column content\n\ncommit e8c2e02beda24bd5b29222671cdd892fc315540c\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Aug 31 22:15:07 2019 +0200\n\n    Improve DB schema\n\ncommit de446551e1ea41caba906487aa1279b0d5249339\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Sat Aug 31 19:22:10 2019 +0200\n\n    Tree view\n\ncommit c14dafc0d4396b4905a894c1293934b0e68e8a2a\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Aug 30 23:03:39 2019 +0200\n\n    Scrolling\n\ncommit a7095edb841313996a59d179805ae9d3b8e8c3f9\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Fri Aug 30 19:28:26 2019 +0200\n\n    Use cache as data source for table\n\ncommit 94ca3d6e146b83aedf7975ebeb207ce6d815071c\nAuthor: nbedos <nicolas.bedos@gmail.com>\nDate:   Thu Aug 29 22:58:02 2019 +0200\n\n    Minimalist table",
+        "compare_url": "https://github.com/nbedos/citop/compare/c104a8448e0f...179395b0bcfd",
+        "committed_at": "2019-10-14T16:10:19Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/597716451",
+          "@representation": "minimal",
+          "id": 597716451
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-14T16:14:53.618Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/597713108",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 597713108,
+      "number": "44",
+      "state": "failed",
+      "duration": 185,
+      "event_type": "pull_request",
+      "previous_state": "failed",
+      "pull_request_title": "Set up CI with Azure Pipelines",
+      "pull_request_number": 1,
+      "started_at": "2019-10-14T16:06:56Z",
+      "finished_at": "2019-10-14T16:08:34Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/master",
+        "@representation": "minimal",
+        "name": "master"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181230873,
+        "sha": "df7af048e32e0ae79bb0f5c12d012c7fdd94883c",
+        "ref": "refs/pull/1/merge",
+        "message": "Update azure-pipelines.yml",
+        "compare_url": "https://github.com/nbedos/citop/pull/1",
+        "committed_at": "2019-10-14T16:06:23Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/597713109",
+          "@representation": "minimal",
+          "id": 597713109
+        },
+        {
+          "@type": "job",
+          "@href": "/job/597713110",
+          "@representation": "minimal",
+          "id": 597713110
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-14T16:08:34.531Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/597713086",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 597713086,
+      "number": "43",
+      "state": "failed",
+      "duration": 185,
+      "event_type": "push",
+      "previous_state": "failed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-14T16:06:58Z",
+      "finished_at": "2019-10-14T16:08:39Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/azure-pipelines",
+        "@representation": "minimal",
+        "name": "azure-pipelines"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181230864,
+        "sha": "e4f7b185158f9b7d92630b6e8e2cfe646b15b89b",
+        "ref": "refs/heads/azure-pipelines",
+        "message": "Update azure-pipelines.yml",
+        "compare_url": "https://github.com/nbedos/citop/compare/c3fbcfa320b7...e4f7b185158f",
+        "committed_at": "2019-10-14T16:06:23Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/597713087",
+          "@representation": "minimal",
+          "id": 597713087
+        },
+        {
+          "@type": "job",
+          "@href": "/job/597713088",
+          "@representation": "minimal",
+          "id": 597713088
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-14T16:08:39.794Z"
+    }
+  ]
+}

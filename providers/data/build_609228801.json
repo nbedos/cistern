@@ -1,0 +1,370 @@
+{
+  "@type": "build",
+  "@href": "/build/609228801",
+  "@representation": "standard",
+  "@permissions": {
+    "read": true,
+    "cancel": false,
+    "restart": false
+  },
+  "id": 609228801,
+  "number": "69",
+  "state": "errored",
+  "duration": 162,
+  "event_type": "push",
+  "previous_state": "failed",
+  "pull_request_title": null,
+  "pull_request_number": null,
+  "started_at": "2019-11-08T13:25:44Z",
+  "finished_at": "2019-11-08T13:26:14Z",
+  "private": false,
+  "repository": {
+    "@type": "repository",
+    "@href": "/repo/25564643",
+    "@representation": "minimal",
+    "id": 25564643,
+    "name": "citop",
+    "slug": "nbedos/citop"
+  },
+  "branch": {
+    "@type": "branch",
+    "@href": "/repo/25564643/branch/feature%2Fcompat_golang_1_12",
+    "@representation": "minimal",
+    "name": "feature/compat_golang_1_12"
+  },
+  "tag": null,
+  "commit": {
+    "@type": "commit",
+    "@representation": "standard",
+    "id": 184977125,
+    "sha": "de974f2580ec42d90d4c6093bd0eb5b01a75aa79",
+    "ref": "refs/heads/feature/compat_golang_1_12",
+    "message": "Add GO111MODULE environment variable",
+    "compare_url": "https://github.com/nbedos/citop/compare/6f4c158406c4...de974f2580ec",
+    "committed_at": "2019-11-08T13:16:07Z",
+    "committer": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    },
+    "author": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    }
+  },
+  "jobs": [
+    {
+      "@type": "job",
+      "@href": "/job/609228802",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 609228802,
+      "allow_failure": false,
+      "number": "69.1",
+      "state": "passed",
+      "started_at": "2019-11-08T13:17:23Z",
+      "finished_at": "2019-11-08T13:18:27Z",
+      "build": {
+        "@href": "/build/609228801"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184977125,
+        "sha": "de974f2580ec42d90d4c6093bd0eb5b01a75aa79",
+        "ref": "refs/heads/feature/compat_golang_1_12",
+        "message": "Add GO111MODULE environment variable",
+        "compare_url": "https://github.com/nbedos/citop/compare/6f4c158406c4...de974f2580ec",
+        "committed_at": "2019-11-08T13:16:07Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": {
+        "@type": "stage",
+        "@representation": "minimal",
+        "id": 11288684,
+        "number": 1,
+        "name": "Tests",
+        "state": "errored",
+        "started_at": "2019-11-08T13:25:44Z",
+        "finished_at": "2019-11-08T13:26:14Z"
+      },
+      "created_at": "2019-11-08T13:16:10.797Z",
+      "updated_at": "2019-11-08T13:18:27.461Z",
+      "private": false,
+      "config": {
+        "go": "1.13.x",
+        "os": "linux",
+        "dist": "bionic",
+        "name": "GoLang 1.13 on Ubuntu Bionic",
+        "group": "stable",
+        "stage": "tests",
+        "script": [
+          "go build . && make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/609228803",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 609228803,
+      "allow_failure": false,
+      "number": "69.2",
+      "state": "failed",
+      "started_at": "2019-11-08T13:16:38Z",
+      "finished_at": "2019-11-08T13:17:09Z",
+      "build": {
+        "@href": "/build/609228801"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184977125,
+        "sha": "de974f2580ec42d90d4c6093bd0eb5b01a75aa79",
+        "ref": "refs/heads/feature/compat_golang_1_12",
+        "message": "Add GO111MODULE environment variable",
+        "compare_url": "https://github.com/nbedos/citop/compare/6f4c158406c4...de974f2580ec",
+        "committed_at": "2019-11-08T13:16:07Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": {
+        "@type": "stage",
+        "@representation": "minimal",
+        "id": 11288684,
+        "number": 1,
+        "name": "Tests",
+        "state": "errored",
+        "started_at": "2019-11-08T13:25:44Z",
+        "finished_at": "2019-11-08T13:26:14Z"
+      },
+      "created_at": "2019-11-08T13:16:10.813Z",
+      "updated_at": "2019-11-08T13:17:09.282Z",
+      "private": false,
+      "config": {
+        "go": "1.12.x",
+        "os": "linux",
+        "dist": "trusty",
+        "name": "GoLang 1.12 on Ubuntu Trusty",
+        "group": "stable",
+        "stage": "tests",
+        "script": [
+          "go build . && make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/609228804",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 609228804,
+      "allow_failure": false,
+      "number": "69.3",
+      "state": "errored",
+      "started_at": "2019-11-08T13:25:44Z",
+      "finished_at": "2019-11-08T13:26:14Z",
+      "build": {
+        "@href": "/build/609228801"
+      },
+      "queue": "builds.macstadium6",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184977125,
+        "sha": "de974f2580ec42d90d4c6093bd0eb5b01a75aa79",
+        "ref": "refs/heads/feature/compat_golang_1_12",
+        "message": "Add GO111MODULE environment variable",
+        "compare_url": "https://github.com/nbedos/citop/compare/6f4c158406c4...de974f2580ec",
+        "committed_at": "2019-11-08T13:16:07Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": {
+        "@type": "stage",
+        "@representation": "minimal",
+        "id": 11288684,
+        "number": 1,
+        "name": "Tests",
+        "state": "errored",
+        "started_at": "2019-11-08T13:25:44Z",
+        "finished_at": "2019-11-08T13:26:14Z"
+      },
+      "created_at": "2019-11-08T13:16:10.822Z",
+      "updated_at": "2019-11-08T13:26:14.546Z",
+      "private": false,
+      "config": {
+        "go": "1.12.x",
+        "os": "osx",
+        "name": "GoLang 1.13 on macOS 10.14",
+        "stage": "tests",
+        "script": [
+          "go build . && make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go",
+        "osx_image": "xcode11.2"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/609228805",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 609228805,
+      "allow_failure": false,
+      "number": "69.4",
+      "state": "failed",
+      "started_at": "2019-11-08T13:17:22Z",
+      "finished_at": "2019-11-08T13:17:59Z",
+      "build": {
+        "@href": "/build/609228801"
+      },
+      "queue": "builds.macstadium6",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184977125,
+        "sha": "de974f2580ec42d90d4c6093bd0eb5b01a75aa79",
+        "ref": "refs/heads/feature/compat_golang_1_12",
+        "message": "Add GO111MODULE environment variable",
+        "compare_url": "https://github.com/nbedos/citop/compare/6f4c158406c4...de974f2580ec",
+        "committed_at": "2019-11-08T13:16:07Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": {
+        "@type": "stage",
+        "@representation": "minimal",
+        "id": 11288684,
+        "number": 1,
+        "name": "Tests",
+        "state": "errored",
+        "started_at": "2019-11-08T13:25:44Z",
+        "finished_at": "2019-11-08T13:26:14Z"
+      },
+      "created_at": "2019-11-08T13:16:10.832Z",
+      "updated_at": "2019-11-08T13:17:59.106Z",
+      "private": false,
+      "config": {
+        "go": "1.12.x",
+        "os": "osx",
+        "name": "GoLang 1.12 on macOS 10.13",
+        "stage": "tests",
+        "script": [
+          "go build . && make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go",
+        "osx_image": "xcode9.4"
+      }
+    }
+  ],
+  "stages": [
+    {
+      "@type": "stage",
+      "@representation": "minimal",
+      "id": 11288684,
+      "number": 1,
+      "name": "Tests",
+      "state": "errored",
+      "started_at": "2019-11-08T13:25:44Z",
+      "finished_at": "2019-11-08T13:26:14Z"
+    }
+  ],
+  "created_by": {
+    "@type": "user",
+    "@href": "/user/1072861",
+    "@representation": "minimal",
+    "id": 1072861,
+    "login": "nbedos"
+  },
+  "updated_at": "2019-11-08T13:26:14.580Z"
+}

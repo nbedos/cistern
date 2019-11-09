@@ -1,0 +1,193 @@
+{
+  "@type": "build",
+  "@href": "/build/597707379",
+  "@representation": "standard",
+  "@permissions": {
+    "read": true,
+    "cancel": false,
+    "restart": false
+  },
+  "id": 597707379,
+  "number": "42",
+  "state": "failed",
+  "duration": 192,
+  "event_type": "push",
+  "previous_state": null,
+  "pull_request_title": null,
+  "pull_request_number": null,
+  "started_at": "2019-10-14T15:55:43Z",
+  "finished_at": "2019-10-14T15:57:22Z",
+  "private": false,
+  "repository": {
+    "@type": "repository",
+    "@href": "/repo/25564643",
+    "@representation": "minimal",
+    "id": 25564643,
+    "name": "citop",
+    "slug": "nbedos/citop"
+  },
+  "branch": {
+    "@type": "branch",
+    "@href": "/repo/25564643/branch/azure-pipelines",
+    "@representation": "minimal",
+    "name": "azure-pipelines"
+  },
+  "tag": null,
+  "commit": {
+    "@type": "commit",
+    "@representation": "standard",
+    "id": 181229129,
+    "sha": "c104a8448e0f88ebb9586a450fc2309353cf116f",
+    "ref": "refs/heads/azure-pipelines",
+    "message": "Add basic Travis support",
+    "compare_url": "https://github.com/nbedos/citop/compare/azure-pipelines",
+    "committed_at": null,
+    "committer": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    },
+    "author": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    }
+  },
+  "jobs": [
+    {
+      "@type": "job",
+      "@href": "/job/597707380",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 597707380,
+      "allow_failure": false,
+      "number": "42.1",
+      "state": "failed",
+      "started_at": "2019-10-14T15:55:47Z",
+      "finished_at": "2019-10-14T15:57:20Z",
+      "build": {
+        "@href": "/build/597707379"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181229129,
+        "sha": "c104a8448e0f88ebb9586a450fc2309353cf116f",
+        "ref": "refs/heads/azure-pipelines",
+        "message": "Add basic Travis support",
+        "compare_url": "https://github.com/nbedos/citop/compare/azure-pipelines",
+        "committed_at": null
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": null,
+      "created_at": "2019-10-14T15:55:16.677Z",
+      "updated_at": "2019-10-14T15:57:20.682Z",
+      "private": false,
+      "config": {
+        "go": "1.11.x",
+        "os": "linux",
+        "dist": "trusty",
+        "group": "stable",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/597707381",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 597707381,
+      "allow_failure": false,
+      "number": "42.2",
+      "state": "failed",
+      "started_at": "2019-10-14T15:55:43Z",
+      "finished_at": "2019-10-14T15:57:22Z",
+      "build": {
+        "@href": "/build/597707379"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181229129,
+        "sha": "c104a8448e0f88ebb9586a450fc2309353cf116f",
+        "ref": "refs/heads/azure-pipelines",
+        "message": "Add basic Travis support",
+        "compare_url": "https://github.com/nbedos/citop/compare/azure-pipelines",
+        "committed_at": null
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": null,
+      "created_at": "2019-10-14T15:55:16.685Z",
+      "updated_at": "2019-10-14T15:57:22.661Z",
+      "private": false,
+      "config": {
+        "go": "1.12.x",
+        "os": "linux",
+        "dist": "trusty",
+        "group": "stable",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    }
+  ],
+  "stages": [
+
+  ],
+  "created_by": {
+    "@type": "user",
+    "@href": "/user/1072861",
+    "@representation": "minimal",
+    "id": 1072861,
+    "login": "nbedos"
+  },
+  "updated_at": "2019-10-14T15:57:22.686Z"
+}

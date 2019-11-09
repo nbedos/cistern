@@ -308,7 +308,7 @@ func (c TravisClient) AccountID() string {
 }
 
 func (c TravisClient) Builds(ctx context.Context, repositoryURL string, maxAge time.Duration, buildc chan<- cache.Build) error {
-	repository, err := c.Repository(ctx, repositoryURL)
+	repository, err := c.repository(ctx, repositoryURL)
 	if err != nil {
 		return err
 	}
@@ -397,7 +397,7 @@ func (c TravisClient) Log(ctx context.Context, repository cache.Repository, jobI
 	return log, err
 }
 
-func (c TravisClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
+func (c TravisClient) repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
 	slug, err := utils.RepositorySlugFromURL(repositoryURL)
 	if err != nil {
 		return cache.Repository{}, err

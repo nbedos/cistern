@@ -5,6 +5,7 @@ go 1.12
 require (
 	github.com/cenkalti/backoff/v3 v3.0.0
 	github.com/gdamore/tcell v1.3.0
+	github.com/go-test/deep v1.0.4
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.3.1
 	github.com/gorilla/websocket v1.4.1

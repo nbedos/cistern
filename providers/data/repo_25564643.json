@@ -1,0 +1,25 @@
+{
+  "@type": "repository",
+  "@href": "/repo/25564643",
+  "@representation": "standard",
+  "id": 25564643,
+  "name": "citop",
+  "slug": "nbedos/citop",
+  "description": null,
+  "github_id": 200203900,
+  "github_language": null,
+  "active": true,
+  "private": false,
+  "owner": {
+    "@type": "user",
+    "id": 1072861,
+    "login": "nbedos",
+    "@href": "/user/1072861"
+  },
+  "default_branch": {
+    "@type": "branch",
+    "@href": "/repo/25564643/branch/master",
+    "@representation": "minimal",
+    "name": "master"
+  }
+}

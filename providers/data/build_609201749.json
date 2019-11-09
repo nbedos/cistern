@@ -1,0 +1,380 @@
+{
+  "@type": "build",
+  "@href": "/build/609201749",
+  "@representation": "standard",
+  "@permissions": {
+    "read": true,
+    "cancel": false,
+    "restart": false
+  },
+  "id": 609201749,
+  "number": "66",
+  "state": "passed",
+  "duration": 323,
+  "event_type": "push",
+  "previous_state": null,
+  "pull_request_title": null,
+  "pull_request_number": null,
+  "started_at": "2019-11-08T12:01:33Z",
+  "finished_at": "2019-11-08T12:05:28Z",
+  "private": false,
+  "repository": {
+    "@type": "repository",
+    "@href": "/repo/25564643",
+    "@representation": "minimal",
+    "id": 25564643,
+    "name": "citop",
+    "slug": "nbedos/citop"
+  },
+  "branch": {
+    "@type": "branch",
+    "@href": "/repo/25564643/branch/feature%2Fcompat_golang_1_12",
+    "@representation": "minimal",
+    "name": "feature/compat_golang_1_12"
+  },
+  "tag": null,
+  "commit": {
+    "@type": "commit",
+    "@representation": "standard",
+    "id": 184968501,
+    "sha": "018f0683db97ce45458bdb653a81ae79483bd020",
+    "ref": "refs/heads/feature/compat_golang_1_12",
+    "message": "Add support for GoLang 1.12",
+    "compare_url": "https://github.com/nbedos/citop/compare/a3dcd8977c39^...018f0683db97",
+    "committed_at": "2019-11-08T11:59:57Z",
+    "committer": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    },
+    "author": {
+      "name": "nbedos",
+      "avatar_url": "https://0.gravatar.com/avatar/19b8bf8f77709ac9b8212cbe81dc1878"
+    }
+  },
+  "jobs": [
+    {
+      "@type": "job",
+      "@href": "/job/609201750",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 609201750,
+      "allow_failure": false,
+      "number": "66.1",
+      "state": "passed",
+      "started_at": "2019-11-08T12:01:33Z",
+      "finished_at": "2019-11-08T12:02:34Z",
+      "build": {
+        "@href": "/build/609201749"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184968501,
+        "sha": "018f0683db97ce45458bdb653a81ae79483bd020",
+        "ref": "refs/heads/feature/compat_golang_1_12",
+        "message": "Add support for GoLang 1.12",
+        "compare_url": "https://github.com/nbedos/citop/compare/a3dcd8977c39^...018f0683db97",
+        "committed_at": "2019-11-08T11:59:57Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": {
+        "@type": "stage",
+        "@representation": "minimal",
+        "id": 11287339,
+        "number": 1,
+        "name": "Test",
+        "state": "passed",
+        "started_at": "2019-11-08T12:01:33Z",
+        "finished_at": "2019-11-08T12:02:34Z"
+      },
+      "created_at": "2019-11-08T12:00:25.990Z",
+      "updated_at": "2019-11-08T12:02:34.611Z",
+      "private": false,
+      "config": {
+        "go": "1.13.x",
+        "os": "linux",
+        "dist": "bionic",
+        "name": "GoLang 1.13 on Ubuntu Bionic",
+        "group": "stable",
+        "state": "tests",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/609201751",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 609201751,
+      "allow_failure": false,
+      "number": "66.2",
+      "state": "passed",
+      "started_at": "2019-11-08T12:03:03Z",
+      "finished_at": "2019-11-08T12:04:28Z",
+      "build": {
+        "@href": "/build/609201749"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184968501,
+        "sha": "018f0683db97ce45458bdb653a81ae79483bd020",
+        "ref": "refs/heads/feature/compat_golang_1_12",
+        "message": "Add support for GoLang 1.12",
+        "compare_url": "https://github.com/nbedos/citop/compare/a3dcd8977c39^...018f0683db97",
+        "committed_at": "2019-11-08T11:59:57Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": {
+        "@type": "stage",
+        "@representation": "minimal",
+        "id": 11287340,
+        "number": 2,
+        "name": "Tests",
+        "state": "passed",
+        "started_at": "2019-11-08T12:03:03Z",
+        "finished_at": "2019-11-08T12:05:28Z"
+      },
+      "created_at": "2019-11-08T12:00:26.000Z",
+      "updated_at": "2019-11-08T12:04:28.261Z",
+      "private": false,
+      "config": {
+        "go": "1.12.x",
+        "os": "linux",
+        "dist": "trusty",
+        "name": "GoLang 1.12 on Ubuntu Trusty",
+        "group": "stable",
+        "stage": "tests",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/609201752",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 609201752,
+      "allow_failure": false,
+      "number": "66.3",
+      "state": "passed",
+      "started_at": "2019-11-08T12:22:31Z",
+      "finished_at": "2019-11-08T12:23:41Z",
+      "build": {
+        "@href": "/build/609201749"
+      },
+      "queue": "builds.macstadium6",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184968501,
+        "sha": "018f0683db97ce45458bdb653a81ae79483bd020",
+        "ref": "refs/heads/feature/compat_golang_1_12",
+        "message": "Add support for GoLang 1.12",
+        "compare_url": "https://github.com/nbedos/citop/compare/a3dcd8977c39^...018f0683db97",
+        "committed_at": "2019-11-08T11:59:57Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": {
+        "@type": "stage",
+        "@representation": "minimal",
+        "id": 11287340,
+        "number": 2,
+        "name": "Tests",
+        "state": "passed",
+        "started_at": "2019-11-08T12:03:03Z",
+        "finished_at": "2019-11-08T12:05:28Z"
+      },
+      "created_at": "2019-11-08T12:00:26.017Z",
+      "updated_at": "2019-11-08T12:05:03.045Z",
+      "private": false,
+      "config": {
+        "go": "1.13.x",
+        "os": "osx",
+        "name": "GoLang 1.13 on macOS 10.13",
+        "stage": "tests",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go",
+        "osx_image": "xcode9.4"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/609201753",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 609201753,
+      "allow_failure": false,
+      "number": "66.4",
+      "state": "passed",
+      "started_at": "2019-11-08T12:03:41Z",
+      "finished_at": "2019-11-08T12:05:28Z",
+      "build": {
+        "@href": "/build/609201749"
+      },
+      "queue": "builds.macstadium6",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 184968501,
+        "sha": "018f0683db97ce45458bdb653a81ae79483bd020",
+        "ref": "refs/heads/feature/compat_golang_1_12",
+        "message": "Add support for GoLang 1.12",
+        "compare_url": "https://github.com/nbedos/citop/compare/a3dcd8977c39^...018f0683db97",
+        "committed_at": "2019-11-08T11:59:57Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": {
+        "@type": "stage",
+        "@representation": "minimal",
+        "id": 11287340,
+        "number": 2,
+        "name": "Tests",
+        "state": "passed",
+        "started_at": "2019-11-08T12:03:03Z",
+        "finished_at": "2019-11-08T12:05:28Z"
+      },
+      "created_at": "2019-11-08T12:00:26.025Z",
+      "updated_at": "2019-11-08T12:05:28.477Z",
+      "private": false,
+      "config": {
+        "go": "1.12.x",
+        "os": "osx",
+        "name": "GoLang 1.12 on macOS 10.13",
+        "stage": "tests",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go",
+        "osx_image": "xcode9.4"
+      }
+    }
+  ],
+  "stages": [
+    {
+      "@type": "stage",
+      "@representation": "minimal",
+      "id": 11287340,
+      "number": 2,
+      "name": "Tests",
+      "state": "passed",
+      "started_at": "2019-11-08T12:03:03Z",
+      "finished_at": "2019-11-08T12:05:28Z"
+    },
+    {
+      "@type": "stage",
+      "@representation": "minimal",
+      "id": 11287339,
+      "number": 1,
+      "name": "Test",
+      "state": "passed",
+      "started_at": "2019-11-08T12:01:33Z",
+      "finished_at": "2019-11-08T12:02:34Z"
+    }
+  ],
+  "created_by": {
+    "@type": "user",
+    "@href": "/user/1072861",
+    "@representation": "minimal",
+    "id": 1072861,
+    "login": "nbedos"
+  },
+  "updated_at": "2019-11-08T12:05:28.514Z"
+}

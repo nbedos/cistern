@@ -1,0 +1,193 @@
+{
+  "@type": "build",
+  "@href": "/build/597713086",
+  "@representation": "standard",
+  "@permissions": {
+    "read": true,
+    "cancel": false,
+    "restart": false
+  },
+  "id": 597713086,
+  "number": "43",
+  "state": "failed",
+  "duration": 185,
+  "event_type": "push",
+  "previous_state": "failed",
+  "pull_request_title": null,
+  "pull_request_number": null,
+  "started_at": "2019-10-14T16:06:58Z",
+  "finished_at": "2019-10-14T16:08:39Z",
+  "private": false,
+  "repository": {
+    "@type": "repository",
+    "@href": "/repo/25564643",
+    "@representation": "minimal",
+    "id": 25564643,
+    "name": "citop",
+    "slug": "nbedos/citop"
+  },
+  "branch": {
+    "@type": "branch",
+    "@href": "/repo/25564643/branch/azure-pipelines",
+    "@representation": "minimal",
+    "name": "azure-pipelines"
+  },
+  "tag": null,
+  "commit": {
+    "@type": "commit",
+    "@representation": "standard",
+    "id": 181230864,
+    "sha": "e4f7b185158f9b7d92630b6e8e2cfe646b15b89b",
+    "ref": "refs/heads/azure-pipelines",
+    "message": "Update azure-pipelines.yml",
+    "compare_url": "https://github.com/nbedos/citop/compare/c3fbcfa320b7...e4f7b185158f",
+    "committed_at": "2019-10-14T16:06:23Z",
+    "committer": {
+      "name": "GitHub",
+      "avatar_url": "https://0.gravatar.com/avatar/9181eb84f9c35729a3bad740fb7f9d93"
+    },
+    "author": {
+      "name": "Nicolas Bedos",
+      "avatar_url": "https://0.gravatar.com/avatar/8dee202d6d1567598d5776c84ac0c596"
+    }
+  },
+  "jobs": [
+    {
+      "@type": "job",
+      "@href": "/job/597713087",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 597713087,
+      "allow_failure": false,
+      "number": "43.1",
+      "state": "failed",
+      "started_at": "2019-10-14T16:07:01Z",
+      "finished_at": "2019-10-14T16:08:25Z",
+      "build": {
+        "@href": "/build/597713086"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181230864,
+        "sha": "e4f7b185158f9b7d92630b6e8e2cfe646b15b89b",
+        "ref": "refs/heads/azure-pipelines",
+        "message": "Update azure-pipelines.yml",
+        "compare_url": "https://github.com/nbedos/citop/compare/c3fbcfa320b7...e4f7b185158f",
+        "committed_at": "2019-10-14T16:06:23Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": null,
+      "created_at": "2019-10-14T16:06:26.076Z",
+      "updated_at": "2019-10-14T16:08:26.104Z",
+      "private": false,
+      "config": {
+        "go": "1.11.x",
+        "os": "linux",
+        "dist": "trusty",
+        "group": "stable",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    },
+    {
+      "@type": "job",
+      "@href": "/job/597713088",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "delete_log": false,
+        "debug": false,
+        "cancel": false,
+        "restart": false
+      },
+      "id": 597713088,
+      "allow_failure": false,
+      "number": "43.2",
+      "state": "failed",
+      "started_at": "2019-10-14T16:06:58Z",
+      "finished_at": "2019-10-14T16:08:39Z",
+      "build": {
+        "@href": "/build/597713086"
+      },
+      "queue": "builds.gce",
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181230864,
+        "sha": "e4f7b185158f9b7d92630b6e8e2cfe646b15b89b",
+        "ref": "refs/heads/azure-pipelines",
+        "message": "Update azure-pipelines.yml",
+        "compare_url": "https://github.com/nbedos/citop/compare/c3fbcfa320b7...e4f7b185158f",
+        "committed_at": "2019-10-14T16:06:23Z"
+      },
+      "owner": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "stage": null,
+      "created_at": "2019-10-14T16:06:26.081Z",
+      "updated_at": "2019-10-14T16:08:39.779Z",
+      "private": false,
+      "config": {
+        "go": "1.12.x",
+        "os": "linux",
+        "dist": "trusty",
+        "group": "stable",
+        "script": [
+          "make tests"
+        ],
+        ".result": "configured",
+        "install": true,
+        "language": "go"
+      }
+    }
+  ],
+  "stages": [
+
+  ],
+  "created_by": {
+    "@type": "user",
+    "@href": "/user/1072861",
+    "@representation": "minimal",
+    "id": 1072861,
+    "login": "nbedos"
+  },
+  "updated_at": "2019-10-14T16:08:39.794Z"
+}
