@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +16,7 @@ import (
 	"github.com/nbedos/citop/utils"
 )
 
-func Test_TravisClientfetchBuild(t *testing.T) {
+func TestTravisClientfetchBuild(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && r.URL.Path == "/build/609256446" {
 			bs, err := ioutil.ReadFile("data/build_609256446.json")
@@ -28,7 +27,6 @@ func Test_TravisClientfetchBuild(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		w.WriteHeader(404)
 	}))
 	defer ts.Close()
 
@@ -236,7 +234,7 @@ func Test_TravisClientfetchBuild(t *testing.T) {
 	}
 }
 
-func Test_TravisClientRepository(t *testing.T) {
+func TestTravisClientRepository(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && r.URL.Path == "/repo/nbedos/citop" {
 			bs, err := ioutil.ReadFile("data/repo_25564643.json")
@@ -294,7 +292,7 @@ func Test_TravisClientRepository(t *testing.T) {
 	})
 }
 
-func Test_TravisClientFetchBuilds(t *testing.T) {
+func TestTravisClientFetchBuilds(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		if r.Method == "GET" && r.URL.Path == "/repo/nbedos/citop/builds" {
@@ -341,25 +339,23 @@ func Test_TravisClientFetchBuilds(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ids := make([]int, 0, len(builds))
+	ids := make(map[int]struct{}, len(builds))
 	for _, build := range builds {
-		ids = append(ids, build.ID)
+		ids[build.ID] = struct{}{}
 	}
-	sort.Ints(ids)
 
-	expectedIDs := []int{
-		607359944,
-		607356631,
-		607060646,
-		607059776,
-		606103420,
-		605628645,
-		599340942,
-		599339545,
-		598815592,
-		598749982,
+	expectedIDs := map[int]struct{}{
+		607359944: {},
+		607356631: {},
+		607060646: {},
+		607059776: {},
+		606103420: {},
+		605628645: {},
+		599340942: {},
+		599339545: {},
+		598815592: {},
+		598749982: {},
 	}
-	sort.Ints(expectedIDs)
 
 	if diff := deep.Equal(expectedIDs, ids); len(diff) > 0 {
 		for _, line := range diff {
@@ -369,13 +365,13 @@ func Test_TravisClientFetchBuilds(t *testing.T) {
 	}
 }
 
-func Test_TravisClientRepositoryBuilds(t *testing.T) {
+func TestTravisClientRepositoryBuilds(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		q := r.URL.Query()
 		var filename string
 		switch {
 		case r.Method == "GET" && r.URL.Path == "/repo/nbedos/citop/builds":
 			filenameFmt := "data/repo_25564643_builds?offset=%s&limit=%s.json"
+			q := r.URL.Query()
 			filename = fmt.Sprintf(filenameFmt, q.Get("offset"), q.Get("limit"))
 
 		case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/build/"):

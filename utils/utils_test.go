@@ -182,3 +182,50 @@ func TestGitOriginURL(t *testing.T) {
 		t.Fatalf("expected url to contain 'nbedos/citop' but got '%s'", u)
 	}
 }
+
+func TestRepositorySlugFromURL(t *testing.T) {
+	urls := []string{
+		// SSH git URL
+		"git@github.com:nbedos/citop.git",
+		"git@github.com:nbedos/citop",
+		// HTTPS git URL
+		"https://github.com/nbedos/citop.git",
+		// Host shouldn't matter
+		"git@gitlab.com:nbedos/citop.git",
+		// Web URLs should work too
+		"https://gitlab.com/nbedos/citop",
+		// Extraneous path components should be ignored
+		"https://gitlab.com/nbedos/citop/tree/master/cache",
+		// URL scheme shouldn't matter
+		"http://gitlab.com/nbedos/citop",
+		"gitlab.com/nbedos/citop",
+	}
+	expected := "nbedos/citop"
+
+	for _, u := range urls {
+		t.Run(fmt.Sprintf("URL: %v", u), func(t *testing.T) {
+			slug, err := RepositorySlugFromURL(u)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if slug != expected {
+				t.Fatalf("expected '%s' but got '%s' for URL %s", expected, slug, u)
+			}
+		})
+	}
+
+	urls = []string{
+		// Missing 1 path component
+		"git@github.com:nbedos.git",
+		// Invalid URL (colon)
+		"https://github.com:nbedos/citop.git",
+	}
+
+	for _, u := range urls {
+		t.Run(fmt.Sprintf("URL: %v", u), func(t *testing.T) {
+			if _, err := RepositorySlugFromURL(u); err == nil {
+				t.Fatalf("expected error but got nil for URL %s", u)
+			}
+		})
+	}
+}

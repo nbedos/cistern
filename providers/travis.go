@@ -341,8 +341,6 @@ func (c TravisClient) Builds(ctx context.Context, repositoryURL string, maxAge t
 eventLoop:
 	for {
 		select {
-		case <-ctx.Done():
-			err = ctx.Err()
 		case errEvent := <-errc:
 			if err == nil {
 				err = errEvent

@@ -131,8 +131,9 @@ func RepositorySlugFromURL(repositoryURL string) (string, error) {
 
 	components := strings.Split(u.Path, "/")
 	if len(components) < 3 {
-		return "", fmt.Errorf("invalid repository path: '%s' (expected at least three components)",
+		err := fmt.Errorf("invalid repository path: '%s' (expected at least three components)",
 			u.Path)
+		return "", err
 	}
 
 	return strings.Join(components[1:3], "/"), nil
@@ -207,8 +208,6 @@ func MaxNullTime(times ...NullTime) NullTime {
 var deleteEraseInLine = regexp.MustCompile(".*\x1b\\[0K")
 var deleteUntilCarriageReturn = regexp.MustCompile(`.*\r([^\r\n])`)
 
-// Is this specific to Travis?
-// FIXME Does not work for streaming
 func PostProcess(line string) string {
 	tmp := deleteEraseInLine.ReplaceAllString(line, "")
 	return deleteUntilCarriageReturn.ReplaceAllString(tmp, "$1")

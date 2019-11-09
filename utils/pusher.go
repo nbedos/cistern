@@ -52,7 +52,7 @@ type PusherEvent struct {
 	Data    json.RawMessage `json:"data"`
 }
 
-func UnmarshalPayload(data []byte, v interface{}) error {
+func unmarshalPayload(data []byte, v interface{}) error {
 	// data might be a valid JSON object...
 	if err := json.Unmarshal(data, v); err == nil {
 		return nil
@@ -147,40 +147,43 @@ func (p *PusherClient) Close() error {
 	return nil
 }
 
-func (p *PusherClient) NextEvent(ctx context.Context) (event PusherEvent, err error) {
+func (p *PusherClient) NextEvent(ctx context.Context) (PusherEvent, error) {
+	var err error
+	var event PusherEvent
 	if err = p.readJSON(ctx, &event); err != nil {
-		return
+		return event, err
 	}
 
 	switch event.Event {
 	case ConnectionEstablished:
 		payload := ConnectionEstablishedPayload{}
-		if err = UnmarshalPayload(event.Data, &payload); err != nil {
-			break
+		if err = unmarshalPayload(event.Data, &payload); err != nil {
+			return event, err
 		}
-
 		p.connected = true
 		p.timeout = payload.ActivityTimeout
 		p.socketID = payload.SocketID
 	case SubscriptionSucceeded, PublicSubscriptionSucceeded:
-		p.channels[event.Channel] = true
+		if _, exists := p.channels[event.Channel]; !exists {
+			return event, fmt.Errorf("received unexpected event %v", event)
+		}
 	case Ping:
 		err = p.send(ctx, Pong, "", "{}")
 	case MemberAdded:
 	case MemberRemoved:
 	case Error:
 		payload := ErrorPayload{}
-		if err = UnmarshalPayload(event.Data, &payload); err != nil {
-			break
+		if err = unmarshalPayload(event.Data, &payload); err != nil {
+			return event, err
 		}
-		err = fmt.Errorf("received error %d: '%s'", payload.Code, payload.Message)
+		return event, fmt.Errorf("received error %d: '%s'", payload.Code, payload.Message)
 	default:
 		if strings.HasPrefix(event.Event, "pusher:") || strings.HasPrefix(event.Event, "pusher_internal:") {
-			err = fmt.Errorf("unhandled event type: '%v'", event.Event)
+			return event, fmt.Errorf("unhandled event type: '%v'", event.Event)
 		}
 	}
 
-	return
+	return event, err
 }
 
 func (p *PusherClient) Subscribe(ctx context.Context, channel string) (err error) {
@@ -240,7 +243,7 @@ func (p *PusherClient) Authenticate(ctx context.Context, channel string) (string
 	}
 	req.WithContext(ctx)
 
-	req.Header.Add("Content-type_", "application/json; charset=utf-8")
+	req.Header.Add("Content-type", "application/json; charset=utf-8")
 	for k, v := range p.authHeader {
 		req.Header.Add(k, v)
 	}
