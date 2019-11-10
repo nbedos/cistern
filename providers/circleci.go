@@ -230,7 +230,7 @@ func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (c
 	components := strings.Split(slug, "/")
 	if len(components) != 2 {
 		return cache.Repository{}, fmt.Errorf("invalid repository slug "+
-			"(expected two path components): '%s' ", slug)
+			"(expected two path components): %q ", slug)
 	}
 	owner, name := components[0], components[1]
 

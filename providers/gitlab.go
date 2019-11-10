@@ -213,7 +213,7 @@ func (c GitLabClient) Repository(ctx context.Context, repositoryURL string) (cac
 
 	splitPath := strings.SplitN(project.PathWithNamespace, "/", 2)
 	if len(splitPath) != 2 {
-		return cache.Repository{}, fmt.Errorf("invalid repository path: '%s'", project.PathWithNamespace)
+		return cache.Repository{}, fmt.Errorf("invalid repository path: %q", project.PathWithNamespace)
 	}
 
 	return cache.Repository{

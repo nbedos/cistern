@@ -257,7 +257,6 @@ func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, m
 			if err == ErrRepositoryNotFound {
 				repositoryNotFoundCount++
 			}
-			// FIXME We probably want to log this
 			if err != nil && (err != ErrRepositoryNotFound || repositoryNotFoundCount == len(c.providers)) {
 				errc <- err
 			}
@@ -297,6 +296,7 @@ func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, m
 	for e := range errc {
 		if err == nil && e != nil {
 			err = e
+			// FIXME We should also cancel if all Builds() exit with nil
 			cancel()
 		}
 	}
@@ -349,7 +349,7 @@ func (c *Cache) WriteLog(ctx context.Context, key JobKey, writer io.Writer) erro
 		accountID := job.Build.Repository.AccountID
 		provider, exists := c.providers[accountID]
 		if !exists {
-			return fmt.Errorf("no matching provider found in cache for account ID '%s'", accountID)
+			return fmt.Errorf("no matching provider found in cache for account ID %q", accountID)
 		}
 		log, err := provider.Log(ctx, *job.Build.Repository, job.ID)
 		if err != nil {
@@ -379,7 +379,7 @@ func (c Cache) StreamLog(ctx context.Context, key JobKey, writer io.WriteCloser)
 
 	provider, exists := c.providers[key.AccountID]
 	if !exists {
-		return fmt.Errorf("no matching provider found for account ID '%s'", key.AccountID)
+		return fmt.Errorf("no matching provider found for account ID %q", key.AccountID)
 	}
 
 	return provider.StreamLog(ctx, job.Build.Repository.ID, job.ID, writer)

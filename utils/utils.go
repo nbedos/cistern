@@ -131,7 +131,7 @@ func RepositorySlugFromURL(repositoryURL string) (string, error) {
 
 	components := strings.Split(u.Path, "/")
 	if len(components) < 3 {
-		err := fmt.Errorf("invalid repository path: '%s' (expected at least three components)",
+		err := fmt.Errorf("invalid repository path: %q (expected at least three components)",
 			u.Path)
 		return "", err
 	}
@@ -271,7 +271,7 @@ func GitOriginURL(path string) (string, error) {
 	}
 
 	if len(remote.Config().URLs) == 0 {
-		return "", fmt.Errorf("GIT repository '%s': remote 'origin' has no associated URL", path)
+		return "", fmt.Errorf("GIT repository %q: remote 'origin' has no associated URL", path)
 	}
 
 	return remote.Config().URLs[0], nil

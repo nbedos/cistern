@@ -16,6 +16,17 @@ import (
 )
 
 func TestPusherClientSendReadJSON(t *testing.T) {
+	done := make(chan struct{})
+	data, err := json.Marshal("data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := PusherEvent{
+		Event:   "event",
+		Channel: "channel",
+		Data:    data,
+	}
+
 	upgrader := websocket.Upgrader{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := upgrader.Upgrade(w, r, nil)
@@ -23,16 +34,20 @@ func TestPusherClientSendReadJSON(t *testing.T) {
 			return
 		}
 		defer c.Close()
-		for {
-			mt, message, err := c.ReadMessage()
-			if err != nil {
-				break
-			}
-			err = c.WriteMessage(mt, message)
-			if err != nil {
-				break
-			}
+
+		var event PusherEvent
+		if err := c.ReadJSON(&event); err != nil {
+			t.Fatal(err)
 		}
+
+		if diff := deep.Equal(event, expected); len(diff) > 0 {
+			for _, line := range diff {
+				t.Log(line)
+			}
+			t.Fatalf("expected %+v but got %+v", expected, event)
+		}
+
+		close(done)
 	}))
 	defer ts.Close()
 
@@ -44,30 +59,11 @@ func TestPusherClientSendReadJSON(t *testing.T) {
 	}
 	defer client.Close()
 
-	data, err := json.Marshal("data")
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := PusherEvent{
-		Event:   "event",
-		Channel: "channel",
-		Data:    data,
-	}
 	if err := client.send(context.Background(), expected.Event, expected.Channel, expected.Data); err != nil {
 		t.Fatal(err)
 	}
 
-	var event PusherEvent
-	if err := client.readJSON(context.Background(), &event); err != nil {
-		t.Fatal(err)
-	}
-
-	if diff := deep.Equal(event, expected); len(diff) > 0 {
-		for _, line := range diff {
-			t.Log(line)
-		}
-		t.Fatalf("expected %+v but got %+v", expected, event)
-	}
+	<-done
 }
 
 func TestPusherClientNextEvent(t *testing.T) {
@@ -129,7 +125,7 @@ func TestPusherClientNextEvent(t *testing.T) {
 
 		for _, testCase := range testCases {
 			if err = c.WriteMessage(websocket.TextMessage, []byte(testCase.message)); err != nil {
-				break
+				t.Fatal(err)
 			}
 		}
 	}))
@@ -142,8 +138,6 @@ func TestPusherClientNextEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	client.channels["presence-example-channel"] = false
-	client.channels["private-presence-example-channel"] = false
 
 	for _, testCase := range testCases {
 		event, err := client.NextEvent(context.Background())
@@ -156,7 +150,7 @@ func TestPusherClientNextEvent(t *testing.T) {
 				t.Fatal(err)
 			}
 			if event.Event != testCase.event {
-				t.Fatalf("expected %s but got %s", testCase.event, event.Event)
+				t.Fatalf("expected %q but got %q", testCase.event, event.Event)
 			}
 		}
 	}
@@ -201,6 +195,7 @@ func TestPusherClient_Authenticate(t *testing.T) {
 			if _, err := fmt.Fprint(w, string(s)); err != nil {
 				t.Fatal(err)
 			}
+
 			return
 		}
 		t.Fatalf("invalid request: %+v", r)
@@ -232,6 +227,73 @@ func TestPusherClient_Authenticate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if s != auth {
-		t.Fatalf("expected '%s' but got '%s'", auth, s)
+		t.Fatalf("expected %q but got %q", auth, s)
 	}
+}
+
+func TestPusherClient_SubscribeUnsubscribe(t *testing.T) {
+	channel := "channel"
+	done := make(chan struct{})
+
+	upgrader := websocket.Upgrader{}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer c.Close()
+
+		e := PusherEvent{}
+		if err := c.ReadJSON(&e); err != nil {
+			t.Fatal(err)
+		}
+		if e.Event != "pusher:subscribe" {
+			t.Fatalf("expected %+v but got %+v", "pusher:subscribe", e.Event)
+		}
+		payload := fmt.Sprintf(`{"event": "pusher_internal:subscription_succeeded", "channel": "%s"}`, channel)
+		if err := c.WriteMessage(websocket.TextMessage, []byte(payload)); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := c.ReadJSON(&e); err != nil {
+			t.Fatal(err)
+		}
+		if e.Event != "pusher:unsubscribe" {
+			t.Fatalf("expected %q but got %q", "pusher:unsubscribe", e.Event)
+		}
+
+		close(done)
+	}))
+	defer ts.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http")
+	limiter := time.Tick(time.Millisecond)
+	client, err := NewPusherClient(context.Background(), wsURL, "", nil, limiter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	if err := client.Subscribe(context.Background(), channel); err != nil {
+		t.Fatal(err)
+	}
+
+	event, err := client.NextEvent(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if event.Event != SubscriptionSucceeded {
+		t.Fatalf("expected %q but got %q", SubscriptionSucceeded, event.Event)
+	}
+	if !client.channels[channel] {
+		t.Fatalf("channel %q missing from client.channels following subscription", channel)
+	}
+	if err := client.Unsubscribe(context.Background(), channel); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := client.channels[channel]; exists {
+		t.Fatalf("channel %q was not deleted from client.channels following unsubscription", channel)
+	}
+
+	<-done
 }

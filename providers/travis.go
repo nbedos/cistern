@@ -485,7 +485,7 @@ type HTTPError struct {
 }
 
 func (err HTTPError) Error() string {
-	return fmt.Sprintf("%s %s returned an error: status %d (%s)",
+	return fmt.Sprintf("%q %s returned an error: status %d (%s)",
 		err.Method, err.URL, err.Status, err.Message)
 }
 

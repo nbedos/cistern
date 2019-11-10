@@ -167,7 +167,7 @@ func TestDepthFirstTraversal(t *testing.T) {
 	expectedvalues := []string{"root", "a", "aa", "ab", "b", "c", "ca", "cb", "cc"}
 	for i, n := range DepthFirstTraversal(&node, false) {
 		if fmt.Sprintf("%s", n) != expectedvalues[i] {
-			t.Fatalf("unexpected node: %s", n)
+			t.Fatalf("unexpected node: %q", n)
 		}
 	}
 }
@@ -179,7 +179,7 @@ func TestGitOriginURL(t *testing.T) {
 	}
 
 	if !strings.Contains(u, "nbedos/citop") {
-		t.Fatalf("expected url to contain 'nbedos/citop' but got '%s'", u)
+		t.Fatalf("expected url to contain 'nbedos/citop' but got %q", u)
 	}
 }
 
@@ -209,7 +209,7 @@ func TestRepositorySlugFromURL(t *testing.T) {
 				t.Fatal(err)
 			}
 			if slug != expected {
-				t.Fatalf("expected '%s' but got '%s' for URL %s", expected, slug, u)
+				t.Fatalf("expected %q but got %q for URL %q", expected, slug, u)
 			}
 		})
 	}
@@ -224,7 +224,7 @@ func TestRepositorySlugFromURL(t *testing.T) {
 	for _, u := range urls {
 		t.Run(fmt.Sprintf("URL: %v", u), func(t *testing.T) {
 			if _, err := RepositorySlugFromURL(u); err == nil {
-				t.Fatalf("expected error but got nil for URL %s", u)
+				t.Fatalf("expected error but got nil for URL %q", u)
 			}
 		})
 	}

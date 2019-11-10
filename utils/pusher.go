@@ -1,3 +1,6 @@
+// Incomplete implementation of the Channels protocol
+// https://pusher.com/docs/channels/library_auth_reference/pusher-websockets-protocol
+
 package utils
 
 import (
@@ -93,7 +96,7 @@ func NewPusherClient(ctx context.Context, wsURL string, authURL string, authHead
 		authLimiter: authLimiter,
 		httpClient:  &http.Client{Timeout: 10 * time.Second},
 		connected:   false,
-		channels:    map[string]bool{},
+		channels:    make(map[string]bool),
 	}, nil
 }
 
@@ -164,8 +167,8 @@ func (p *PusherClient) NextEvent(ctx context.Context) (PusherEvent, error) {
 		p.timeout = payload.ActivityTimeout
 		p.socketID = payload.SocketID
 	case SubscriptionSucceeded, PublicSubscriptionSucceeded:
-		if _, exists := p.channels[event.Channel]; !exists {
-			return event, fmt.Errorf("received unexpected event %v", event)
+		if _, exists := p.channels[event.Channel]; exists {
+			p.channels[event.Channel] = true
 		}
 	case Ping:
 		err = p.send(ctx, Pong, "", "{}")
@@ -176,7 +179,7 @@ func (p *PusherClient) NextEvent(ctx context.Context) (PusherEvent, error) {
 		if err = unmarshalPayload(event.Data, &payload); err != nil {
 			return event, err
 		}
-		return event, fmt.Errorf("received error %d: '%s'", payload.Code, payload.Message)
+		return event, fmt.Errorf("received error %d: %q", payload.Code, payload.Message)
 	default:
 		if strings.HasPrefix(event.Event, "pusher:") || strings.HasPrefix(event.Event, "pusher_internal:") {
 			return event, fmt.Errorf("unhandled event type: '%v'", event.Event)
@@ -219,7 +222,7 @@ func (p *PusherClient) Expect(ctx context.Context, eventType string) (event Push
 	}
 
 	if event.Event != eventType {
-		err = fmt.Errorf("expected '%s' but received '%s'", eventType, event.Event)
+		err = fmt.Errorf("expected %q but received %q", eventType, event.Event)
 		return
 	}
 
