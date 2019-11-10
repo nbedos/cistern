@@ -184,23 +184,32 @@ func NewCache(providers []Provider) Cache {
 	}
 }
 
-type InvalidBuild struct {
-	cause string
-}
-
-func (e InvalidBuild) Error() string { return e.cause }
-
-func (c *Cache) Save(build *Build) error {
+func (c *Cache) Save(build Build) error {
 	if build.Repository == nil {
-		return InvalidBuild{cause: "build.Repository must not be nil"}
+		return errors.New("build.Repository must not be nil")
+	}
+
+	if build.Jobs == nil {
+		build.Jobs = make(map[int]*Job)
+	}
+	if build.Stages == nil {
+		build.Stages = make(map[int]*Stage)
+	} else {
+		for _, stage := range build.Stages {
+			if stage.Jobs == nil {
+				stage.Jobs = make(map[int]*Job)
+			}
+		}
 	}
 
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+
 	c.builds[buildKey{
 		AccountID: build.Repository.AccountID,
 		BuildID:   build.ID,
-	}] = build
+	}] = &build
+
 	return nil
 }
 
@@ -243,68 +252,60 @@ func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, m
 	defer cancel()
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
-	buildc := make(chan Build)
 
-	repositoryNotFoundCount := 0
 	for _, provider := range c.providers {
 		wg.Add(1)
 		go func(p Provider) {
 			defer wg.Done()
-			err := p.Builds(subCtx, repositoryURL, maxAge, buildc)
-			if err == ErrRepositoryNotFound {
-				repositoryNotFoundCount++
-			}
-			if err != nil && (err != ErrRepositoryNotFound || repositoryNotFoundCount == len(c.providers)) {
-				errc <- err
-			}
-		}(provider)
-	}
+			buildc := make(chan Build)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case build := <-buildc:
-				if err := c.Save(&build); err != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer close(buildc)
+				errc <- p.Builds(subCtx, repositoryURL, maxAge, buildc)
+			}()
+
+			for build := range buildc {
+				if err := c.Save(build); err != nil {
 					errc <- err
 					return
 				}
-				// Signal change on update channel but don't block current goroutine
-				wg.Add(1)
 				go func() {
-					defer wg.Done()
 					select {
 					case updates <- time.Now():
 					case <-subCtx.Done():
 					}
 				}()
-			case <-subCtx.Done():
-				errc <- subCtx.Err()
-				return
 			}
-		}
-	}()
+		}(provider)
+	}
 
 	go func() {
 		wg.Wait()
 		close(errc)
-		close(updates)
 	}()
 
 	var err error
+	notFound := 0
 	for e := range errc {
-		if err == nil && e != nil {
-			err = e
-			// FIXME We should also cancel if all Builds() exit with nil
+		switch e {
+		case nil:
+			// Do nothing
+		case ErrRepositoryNotFound:
+			if notFound++; notFound == len(c.providers) {
+				err = ErrRepositoryNotFound
+			}
+		default:
 			cancel()
+			if err == nil {
+				err = e
+			}
 		}
 	}
 
 	return err
 }
-
-var ErrNoJobFound = errors.New("no job found")
 
 func (c *Cache) fetchBuild(accountID string, buildID string) (Build, bool) {
 	c.mutex.Lock()
@@ -321,18 +322,13 @@ func (c *Cache) fetchBuild(accountID string, buildID string) (Build, bool) {
 	return Build{}, false
 }
 
-func (c *Cache) fetchJob(accountID string, buildID string, stageID int, jobID int) (Job, error) {
+func (c *Cache) fetchJob(accountID string, buildID string, stageID int, jobID int) (Job, bool) {
 	build, exists := c.fetchBuild(accountID, buildID)
 	if !exists {
-		return Job{}, ErrNoJobFound
+		return Job{}, false
 	}
 
-	job, exists := build.Get(stageID, jobID)
-	if !exists {
-		return Job{}, ErrNoJobFound
-	}
-
-	return job, nil
+	return build.Get(stageID, jobID)
 }
 
 var ErrIncompleteLog = errors.New("log not complete")
@@ -342,9 +338,9 @@ func (c *Cache) WriteLog(ctx context.Context, accountID string, buildID string, 
 	if !exists {
 		return fmt.Errorf("no matching build for %v %v", accountID, buildID)
 	}
-	job, err := c.fetchJob(accountID, buildID, stageID, jobID)
-	if err != nil {
-		return err
+	job, exists := c.fetchJob(accountID, buildID, stageID, jobID)
+	if !exists {
+		return fmt.Errorf("no matching job for %v %v %v %v", accountID, buildID, stageID, jobID)
 	}
 	if job.State.IsActive() {
 		return ErrIncompleteLog
@@ -371,18 +367,18 @@ func (c *Cache) WriteLog(ctx context.Context, accountID string, buildID string, 
 		log = log + "\n"
 	}
 	processedLog := utils.PostProcess(log)
-	_, err = writer.Write([]byte(processedLog))
+	_, err := writer.Write([]byte(processedLog))
 	return err
 }
 
-func (c Cache) StreamLog(ctx context.Context, accountID string, buildID string, stageID int, jobID int, writer io.WriteCloser) error {
+func (c Cache) StreamLog(ctx context.Context, accountID string, buildID string, stageID int, jobID int, writer io.Writer) error {
 	build, exists := c.fetchBuild(accountID, buildID)
 	if !exists {
 		return fmt.Errorf("no matching build for %v %v", accountID, buildID)
 	}
-	job, err := c.fetchJob(accountID, buildID, stageID, jobID)
-	if err != nil {
-		return err
+	job, exists := c.fetchJob(accountID, buildID, stageID, jobID)
+	if !exists {
+		return fmt.Errorf("no matching job for %v %v %v %v", accountID, buildID, stageID, jobID)
 	}
 
 	provider, exists := c.providers[accountID]

@@ -375,10 +375,9 @@ func (c CircleCIClient) fetchWorkflow(ctx context.Context, projectEndpoint url.U
 		Duration:        utils.NullDuration{},
 		WebURL:          webURL.String(),
 		Stages:          nil,
-		Jobs:            nil,
+		Jobs:            make(map[int]*cache.Job, len(buildIDs)),
 	}
 
-	build.Jobs = make(map[int]*cache.Job, len(buildIDs))
 	jobs := make([]cache.Statuser, 0, len(buildIDs))
 	for i, id := range buildIDs {
 		job, ref, err := c.fetchJob(ctx, projectEndpoint, id, log)
