@@ -96,7 +96,6 @@ func TestTravisClientfetchBuild(t *testing.T) {
 
 	expectedBuild.Stages = map[int]*cache.Stage{
 		11290169: {
-			Build: &expectedBuild,
 			ID:    11290169,
 			Name:  "Tests",
 			State: cache.Failed,
@@ -105,8 +104,6 @@ func TestTravisClientfetchBuild(t *testing.T) {
 	}
 	expectedBuild.Stages[11290169].Jobs = map[int]*cache.Job{
 		609256447: {
-			Build: &expectedBuild,
-			Stage: expectedBuild.Stages[11290169],
 			ID:    609256447,
 			State: cache.Failed,
 			Name:  "GoLang 1.13 on Ubuntu Bionic",
@@ -131,8 +128,6 @@ func TestTravisClientfetchBuild(t *testing.T) {
 			AllowFailure: false,
 		},
 		609256448: {
-			Build: &expectedBuild,
-			Stage: expectedBuild.Stages[11290169],
 			ID:    609256448,
 			State: cache.Failed,
 			Name:  "GoLang 1.12 on Ubuntu Trusty",
@@ -157,8 +152,6 @@ func TestTravisClientfetchBuild(t *testing.T) {
 			AllowFailure: false,
 		},
 		609256449: {
-			Build: &expectedBuild,
-			Stage: expectedBuild.Stages[11290169],
 			ID:    609256449,
 			State: cache.Failed,
 			Name:  "GoLang 1.13 on macOS 10.14",
@@ -183,8 +176,6 @@ func TestTravisClientfetchBuild(t *testing.T) {
 			AllowFailure: false,
 		},
 		609256450: {
-			Build: &expectedBuild,
-			Stage: expectedBuild.Stages[11290169],
 			ID:    609256450,
 			State: cache.Failed,
 			Name:  "GoLang 1.12 on macOS 10.13",
@@ -208,22 +199,6 @@ func TestTravisClientfetchBuild(t *testing.T) {
 			WebURL:       fmt.Sprintf("%s/nbedos/citop/jobs/609256450", ts.URL),
 			AllowFailure: false,
 		},
-	}
-
-	// Remove self references that cause infinite cycles during comparison
-	for _, stage := range expectedBuild.Stages {
-		stage.Build = nil
-		for _, job := range stage.Jobs {
-			job.Build = nil
-			job.Stage = nil
-		}
-	}
-	for _, stage := range build.Stages {
-		stage.Build = nil
-		for _, job := range stage.Jobs {
-			job.Build = nil
-			job.Stage = nil
-		}
 	}
 
 	if diff := deep.Equal(expectedBuild, build); diff != nil {

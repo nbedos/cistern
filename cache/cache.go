@@ -118,47 +118,33 @@ type Build struct {
 func (b Build) Status() State        { return b.State }
 func (b Build) AllowedFailure() bool { return false }
 
-func (b Build) Get(key JobKey) (*Job, bool) {
-	if key.AccountID != b.Repository.AccountID || key.BuildID != b.ID {
-		return nil, false
-	}
-
+func (b Build) Get(stageID int, jobID int) (Job, bool) {
 	var jobs map[int]*Job
-	if key.StageID == 0 {
+	if stageID == 0 {
 		jobs = b.Jobs
 	} else {
-		stage, exists := b.Stages[key.StageID]
+		stage, exists := b.Stages[stageID]
 		if !exists {
-			return nil, false
+			return Job{}, false
 		}
 		jobs = stage.Jobs
 	}
 
-	job, exists := jobs[key.ID]
+	job, exists := jobs[jobID]
 	if !exists {
-		return nil, false
+		return Job{}, false
 	}
-	return job, true
+	return *job, true
 }
 
 type Stage struct {
-	Build *Build
 	ID    int
 	Name  string
 	State State
 	Jobs  map[int]*Job
 }
 
-type JobKey struct {
-	AccountID string
-	BuildID   string
-	StageID   int
-	ID        int
-}
-
 type Job struct {
-	Build        *Build
-	Stage        *Stage // nil if the Job is only linked to a Build
 	ID           int
 	State        State
 	Name         string
@@ -198,32 +184,43 @@ func NewCache(providers []Provider) Cache {
 	}
 }
 
-func (c *Cache) Save(build *Build) {
+type InvalidBuild struct {
+	cause string
+}
+
+func (e InvalidBuild) Error() string { return e.cause }
+
+func (c *Cache) Save(build *Build) error {
+	if build.Repository == nil {
+		return InvalidBuild{cause: "build.Repository must not be nil"}
+	}
+
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.builds[buildKey{
 		AccountID: build.Repository.AccountID,
 		BuildID:   build.ID,
 	}] = build
+	return nil
 }
 
-func (c *Cache) SaveJob(job Job) error {
+func (c *Cache) SaveJob(accountID string, buildID string, stageID int, job Job) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	key := buildKey{
-		AccountID: job.Build.Repository.AccountID,
-		BuildID:   job.Build.ID,
+		AccountID: accountID,
+		BuildID:   buildID,
 	}
 	build, exists := c.builds[key]
 	if !exists {
 		return fmt.Errorf("no matching build found in cache for key %v", key)
 	}
-	if job.Stage == nil {
+	if stageID == 0 {
 		build.Jobs[job.ID] = &job
 	} else {
-		stage, exists := build.Stages[job.Stage.ID]
+		stage, exists := build.Stages[stageID]
 		if !exists {
-			return fmt.Errorf("build has no stage %d", job.Stage.ID)
+			return fmt.Errorf("build has no stage %d", stageID)
 		}
 		stage.Jobs[job.ID] = &job
 	}
@@ -269,7 +266,10 @@ func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, m
 		for {
 			select {
 			case build := <-buildc:
-				c.Save(&build)
+				if err := c.Save(&build); err != nil {
+					errc <- err
+					return
+				}
 				// Signal change on update channel but don't block current goroutine
 				wg.Add(1)
 				go func() {
@@ -306,38 +306,43 @@ func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, m
 
 var ErrNoJobFound = errors.New("no job found")
 
-func (c *Cache) fetchJob(key JobKey) (Job, error) {
+func (c *Cache) fetchBuild(accountID string, buildID string) (Build, bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	build, exists := c.builds[buildKey{
-		AccountID: key.AccountID,
-		BuildID:   key.BuildID,
+		AccountID: accountID,
+		BuildID:   buildID,
 	}]
 	if exists {
-		if key.StageID == 0 {
-			job, exists := build.Jobs[key.ID]
-			if exists {
-				return *job, nil
-			}
-		} else {
-			stage, exists := build.Stages[key.StageID]
-			if exists {
-				job, exists := stage.Jobs[key.ID]
-				if exists {
-					return *job, nil
-				}
-			}
-		}
+		return *build, exists
 	}
 
-	return Job{}, ErrNoJobFound
+	return Build{}, false
+}
+
+func (c *Cache) fetchJob(accountID string, buildID string, stageID int, jobID int) (Job, error) {
+	build, exists := c.fetchBuild(accountID, buildID)
+	if !exists {
+		return Job{}, ErrNoJobFound
+	}
+
+	job, exists := build.Get(stageID, jobID)
+	if !exists {
+		return Job{}, ErrNoJobFound
+	}
+
+	return job, nil
 }
 
 var ErrIncompleteLog = errors.New("log not complete")
 
-func (c *Cache) WriteLog(ctx context.Context, key JobKey, writer io.Writer) error {
-	job, err := c.fetchJob(key)
+func (c *Cache) WriteLog(ctx context.Context, accountID string, buildID string, stageID int, jobID int, writer io.Writer) error {
+	build, exists := c.fetchBuild(accountID, buildID)
+	if !exists {
+		return fmt.Errorf("no matching build for %v %v", accountID, buildID)
+	}
+	job, err := c.fetchJob(accountID, buildID, stageID, jobID)
 	if err != nil {
 		return err
 	}
@@ -346,18 +351,17 @@ func (c *Cache) WriteLog(ctx context.Context, key JobKey, writer io.Writer) erro
 	}
 
 	if !job.Log.Valid {
-		accountID := job.Build.Repository.AccountID
 		provider, exists := c.providers[accountID]
 		if !exists {
 			return fmt.Errorf("no matching provider found in cache for account ID %q", accountID)
 		}
-		log, err := provider.Log(ctx, *job.Build.Repository, job.ID)
+		log, err := provider.Log(ctx, *build.Repository, job.ID)
 		if err != nil {
 			return err
 		}
 
 		job.Log = utils.NullString{String: log, Valid: true}
-		if err = c.SaveJob(job); err != nil {
+		if err = c.SaveJob(accountID, buildID, stageID, job); err != nil {
 			return err
 		}
 	}
@@ -371,16 +375,20 @@ func (c *Cache) WriteLog(ctx context.Context, key JobKey, writer io.Writer) erro
 	return err
 }
 
-func (c Cache) StreamLog(ctx context.Context, key JobKey, writer io.WriteCloser) error {
-	job, err := c.fetchJob(key)
+func (c Cache) StreamLog(ctx context.Context, accountID string, buildID string, stageID int, jobID int, writer io.WriteCloser) error {
+	build, exists := c.fetchBuild(accountID, buildID)
+	if !exists {
+		return fmt.Errorf("no matching build for %v %v", accountID, buildID)
+	}
+	job, err := c.fetchJob(accountID, buildID, stageID, jobID)
 	if err != nil {
 		return err
 	}
 
-	provider, exists := c.providers[key.AccountID]
+	provider, exists := c.providers[accountID]
 	if !exists {
-		return fmt.Errorf("no matching provider found for account ID %q", key.AccountID)
+		return fmt.Errorf("no matching provider found for account ID %q", accountID)
 	}
 
-	return provider.StreamLog(ctx, job.Build.Repository.ID, job.ID, writer)
+	return provider.StreamLog(ctx, build.Repository.ID, job.ID, writer)
 }

@@ -384,10 +384,9 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 	for _, job := range jobs {
 		if _, exists := stagesByName[job.Stage]; !exists {
 			stage := cache.Stage{
-				Build: &build,
-				ID:    len(stagesByName) + 1,
-				Name:  job.Stage,
-				Jobs:  make(map[int]*cache.Job),
+				ID:   len(stagesByName) + 1,
+				Name: job.Stage,
+				Jobs: make(map[int]*cache.Job),
 			}
 			stagesByName[job.Stage] = &stage
 			build.Stages[stage.ID] = &stage
@@ -396,8 +395,6 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 
 	for _, gitlabJob := range jobs {
 		job := cache.Job{
-			Build:      &build,
-			Stage:      stagesByName[gitlabJob.Stage],
 			ID:         gitlabJob.ID,
 			State:      FromGitLabState(gitlabJob.Status),
 			Name:       gitlabJob.Name,
@@ -412,7 +409,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 			WebURL:       gitlabJob.WebURL,
 			AllowFailure: gitlabJob.AllowFailure,
 		}
-		build.Stages[job.Stage.ID].Jobs[job.ID] = &job
+		stagesByName[gitlabJob.Stage].Jobs[job.ID] = &job
 	}
 
 	// Compute stage state

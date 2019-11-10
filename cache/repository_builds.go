@@ -166,6 +166,7 @@ func Ref(ref string, tag bool) string {
 }
 
 func buildRowFromBuild(b Build) buildRow {
+	ref := Ref(b.Ref, b.IsTag)
 	row := buildRow{
 		key: buildRowKey{
 			sha:       b.Commit.Sha,
@@ -174,7 +175,7 @@ func buildRowFromBuild(b Build) buildRow {
 		},
 		type_:      "P",
 		state:      string(b.State),
-		ref:        Ref(b.Ref, b.IsTag),
+		ref:        ref,
 		createdAt:  b.CreatedAt,
 		startedAt:  b.StartedAt,
 		finishedAt: b.FinishedAt,
@@ -197,7 +198,8 @@ func buildRowFromBuild(b Build) buildRow {
 	}
 	sort.Ints(jobIDs)
 	for _, jobID := range jobIDs {
-		row.children = append(row.children, buildRowFromJob(*b.Jobs[jobID]))
+		child := buildRowFromJob(b.Repository.AccountID, b.Commit.Sha, ref, b.ID, 0, *b.Jobs[jobID])
+		row.children = append(row.children, child)
 	}
 
 	stageIDs := make([]int, 0, len(b.Stages))
@@ -206,26 +208,27 @@ func buildRowFromBuild(b Build) buildRow {
 	}
 	sort.Ints(stageIDs)
 	for _, stageID := range stageIDs {
-		row.children = append(row.children, buildRowFromStage(*b.Stages[stageID]))
+		child := buildRowFromStage(b.Repository.AccountID, b.Commit.Sha, ref, b.ID, b.WebURL, *b.Stages[stageID])
+		row.children = append(row.children, child)
 	}
 
 	return row
 }
 
-func buildRowFromStage(s Stage) buildRow {
+func buildRowFromStage(accountID string, sha string, ref string, buildID string, webURL string, s Stage) buildRow {
 	row := buildRow{
 		key: buildRowKey{
-			sha:       s.Build.Commit.Sha,
-			accountID: s.Build.Repository.AccountID,
-			buildID:   s.Build.ID,
+			sha:       sha,
+			accountID: accountID,
+			buildID:   buildID,
 			stageID:   s.ID,
 		},
 		type_:    "S",
 		state:    string(s.State),
-		ref:      Ref(s.Build.Ref, s.Build.IsTag),
+		ref:      ref,
 		name:     s.Name,
-		url:      s.Build.WebURL,
-		provider: s.Build.Repository.AccountID,
+		url:      webURL,
+		provider: accountID,
 	}
 
 	jobIDs := make([]int, 0, len(s.Jobs))
@@ -257,36 +260,33 @@ func buildRowFromStage(s Stage) buildRow {
 
 	sort.Ints(jobIDs)
 	for _, id := range jobIDs {
-		row.children = append(row.children, buildRowFromJob(*s.Jobs[id]))
+		child := buildRowFromJob(accountID, sha, ref, buildID, s.ID, *s.Jobs[id])
+		row.children = append(row.children, child)
 	}
 
 	return row
 }
 
-func buildRowFromJob(j Job) buildRow {
-	stageID := 0
-	if j.Stage != nil {
-		stageID = j.Stage.ID
-	}
+func buildRowFromJob(accountID string, sha string, ref string, buildID string, stageID int, j Job) buildRow {
 	return buildRow{
 		key: buildRowKey{
-			sha:       j.Build.Commit.Sha,
-			accountID: j.Build.Repository.AccountID,
-			buildID:   j.Build.ID,
+			sha:       sha,
+			accountID: accountID,
+			buildID:   buildID,
 			stageID:   stageID,
 			jobID:     j.ID,
 		},
 		type_:      "J",
 		state:      string(j.State),
 		name:       fmt.Sprintf("%s (#%d)", j.Name, j.ID),
-		ref:        Ref(j.Build.Ref, j.Build.IsTag),
+		ref:        ref,
 		createdAt:  j.CreatedAt,
 		startedAt:  j.StartedAt,
 		finishedAt: j.FinishedAt,
 		updatedAt:  utils.MaxNullTime(j.FinishedAt, j.StartedAt, j.CreatedAt),
 		url:        j.WebURL,
 		duration:   j.Duration,
-		provider:   j.Build.Repository.AccountID,
+		provider:   accountID,
 	}
 }
 
@@ -588,26 +588,24 @@ func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{},
 		return "", nil, ErrNoLogHere
 	}
 
-	jobKey := JobKey{
-		AccountID: row.key.accountID,
-		BuildID:   row.key.buildID,
-		StageID:   row.key.stageID,
-		ID:        row.key.jobID,
-	}
+	accountID := row.key.accountID
+	buildID := row.key.buildID
+	stageID := row.key.stageID
+	jobID := row.key.jobID
 
-	pattern := fmt.Sprintf("job_%d_*.log", jobKey.ID)
+	pattern := fmt.Sprintf("job_%d_*.log", jobID)
 	file, err := ioutil.TempFile(dir, pattern)
 	if err != nil {
 		return "", nil, err
 	}
 	logPath := path.Join(dir, filepath.Base(file.Name()))
 
-	switch err := s.cache.WriteLog(ctx, jobKey, file); err {
+	switch err := s.cache.WriteLog(ctx, accountID, buildID, stageID, jobID, file); err {
 	case ErrIncompleteLog:
 		stream := func(ctx context.Context) error {
 			defer file.Close()
 			w := utils.NewANSIStripper(file)
-			return s.cache.StreamLog(ctx, jobKey, w)
+			return s.cache.StreamLog(ctx, accountID, buildID, stageID, jobID, w)
 		}
 		return logPath, stream, nil
 	case nil:

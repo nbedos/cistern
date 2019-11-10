@@ -211,7 +211,7 @@ func (c CircleCIClient) StreamLog(ctx context.Context, repositoryID int, jobID i
 
 func (c CircleCIClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, error) {
 	endPoint := c.projectEndpoint(repository.Owner, repository.Name)
-	job, err := c.fetchJob(ctx, endPoint, jobID, true)
+	job, _, err := c.fetchJob(ctx, endPoint, jobID, true)
 	if err != nil {
 		return "", err
 	}
@@ -230,7 +230,7 @@ func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (c
 	components := strings.Split(slug, "/")
 	if len(components) != 2 {
 		return cache.Repository{}, fmt.Errorf("invalid repository slug "+
-			"(expected two path components): %q ", slug)
+			"(expected two path components): '%s' ", slug)
 	}
 	owner, name := components[0], components[1]
 
@@ -346,6 +346,12 @@ func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository ca
 	return active, nil
 }
 
+type circleRef struct {
+	commit cache.Commit
+	ref    string
+	isTag  bool
+}
+
 func (c CircleCIClient) fetchWorkflow(ctx context.Context, projectEndpoint url.URL, id string, buildIDs []int, repository *cache.Repository, log bool) (build cache.Build, err error) {
 	if len(buildIDs) == 0 {
 		return cache.Build{}, nil
@@ -375,16 +381,15 @@ func (c CircleCIClient) fetchWorkflow(ctx context.Context, projectEndpoint url.U
 	build.Jobs = make(map[int]*cache.Job, len(buildIDs))
 	jobs := make([]cache.Statuser, 0, len(buildIDs))
 	for i, id := range buildIDs {
-		job, err := c.fetchJob(ctx, projectEndpoint, id, log)
+		job, ref, err := c.fetchJob(ctx, projectEndpoint, id, log)
 		if err != nil {
 			return build, err
 		}
 		if i == 0 {
-			build.Commit = job.Build.Commit
-			build.Ref = job.Build.Ref
-			build.IsTag = job.Build.IsTag
+			build.Commit = ref.commit
+			build.Ref = ref.ref
+			build.IsTag = ref.isTag
 		}
-		job.Build = &build
 		build.Jobs[job.ID] = &job
 
 		build.CreatedAt = utils.MinNullTime(build.CreatedAt, job.CreatedAt)
@@ -412,28 +417,39 @@ func (c CircleCIClient) fetchWorkflow(ctx context.Context, projectEndpoint url.U
 	return build, nil
 }
 
-func (c CircleCIClient) fetchJob(ctx context.Context, projectEndpoint url.URL, jobID int, log bool) (job cache.Job, err error) {
+func (c CircleCIClient) fetchJob(ctx context.Context, projectEndpoint url.URL, jobID int, log bool) (cache.Job, circleRef, error) {
+	var err error
+	var ref circleRef
+	var job cache.Job
+
 	projectEndpoint.Path += fmt.Sprintf("/%d", jobID)
 	body, err := c.get(ctx, projectEndpoint)
 	if err != nil {
-		return job, err
+		return job, ref, err
 	}
 
 	var circleCIBuild circleCIBuild
 	if err := json.Unmarshal(body.Bytes(), &circleCIBuild); err != nil {
-		return job, err
+		return job, ref, err
 	}
 
 	job, err = circleCIBuild.ToCacheJob()
 	if err != nil {
-		return job, err
+		return job, ref, err
 	}
 
-	build, err := circleCIBuild.ToCacheBuild("", nil)
-	if err != nil {
-		return job, err
+	ref.ref = circleCIBuild.Branch
+	if circleCIBuild.Tag != "" {
+		ref.isTag = true
+		ref.ref = circleCIBuild.Tag
 	}
-	job.Build = &build
+	ref.commit = cache.Commit{
+		Sha:     circleCIBuild.Sha,
+		Message: circleCIBuild.Message,
+	}
+	if ref.commit.Date, err = utils.NullTimeFromString(circleCIBuild.CommittedAt); err != nil {
+		return job, ref, err
+	}
 
 	if log {
 		// FIXME Prefix each line by the name of the step in a way compatible with carriage returns
@@ -450,7 +466,7 @@ func (c CircleCIClient) fetchJob(ctx context.Context, projectEndpoint url.URL, j
 				if action.LogURL != "" {
 					log, err := c.fetchLog(ctx, action.LogURL)
 					if err != nil {
-						return job, err
+						return job, ref, err
 					}
 
 					fullLog.WriteString(utils.Prefix(log, prefix))
@@ -460,7 +476,7 @@ func (c CircleCIClient) fetchJob(ctx context.Context, projectEndpoint url.URL, j
 		job.Log = utils.NullString{String: fullLog.String(), Valid: true}
 	}
 
-	return job, nil
+	return job, ref, nil
 }
 
 type circleCIBuild struct {

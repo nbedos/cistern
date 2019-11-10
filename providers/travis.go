@@ -228,8 +228,6 @@ func (j travisJob) toCacheJob(build *cache.Build, stage *cache.Stage, webURL str
 	}
 
 	job := cache.Job{
-		Build:        build,
-		Stage:        stage,
 		ID:           j.ID,
 		State:        fromTravisState(j.State),
 		Name:         name,
@@ -269,7 +267,6 @@ type travisStage struct {
 
 func (s travisStage) toCacheStage(build *cache.Build) cache.Stage {
 	return cache.Stage{
-		Build: build,
 		ID:    s.ID,
 		Name:  s.Name,
 		State: fromTravisState(s.State),
@@ -361,17 +358,17 @@ eventLoop:
 					err = ctx.Err()
 				}
 			case travisJobUpdate:
-				var job *cache.Job
-				build, exists := builds[event.buildRemoteID]
+				var job cache.Job
+				build, exists := builds[event.buildID]
 				if exists {
-					job, exists = build.Get(event.jobKey)
+					job, exists = build.Get(event.stageID, event.ID)
 				}
 
 				if exists {
 					job.State = event.state
 				} else {
 					var build cache.Build
-					if build, err = c.fetchBuild(ctx, &repository, event.buildRemoteID); err != nil {
+					if build, err = c.fetchBuild(ctx, &repository, event.buildID); err != nil {
 						cancel()
 						break
 					}
@@ -379,7 +376,7 @@ eventLoop:
 				}
 
 				select {
-				case buildc <- *builds[event.buildRemoteID]:
+				case buildc <- *builds[event.buildID]:
 				case <-ctx.Done():
 					err = ctx.Err()
 				}
@@ -746,9 +743,11 @@ type travisBuildUpdate struct {
 func (travisBuildUpdate) isTravisEvent() {}
 
 type travisJobUpdate struct {
-	buildRemoteID string
-	jobKey        cache.JobKey
-	state         cache.State
+	accountID string
+	buildID   string
+	stageID   int
+	ID        int
+	state     cache.State
 }
 
 func (travisJobUpdate) isTravisEvent() {}
@@ -827,14 +826,11 @@ func (c TravisClient) events(ctx context.Context, p utils.PusherClient, teventc 
 			}
 
 			tevent := travisJobUpdate{
-				buildRemoteID: strconv.Itoa(data.BuildID),
-				jobKey: cache.JobKey{
-					AccountID: c.accountID,
-					BuildID:   strconv.Itoa(data.BuildID),
-					StageID:   stageID,
-					ID:        data.ID,
-				},
-				state: fromTravisState(data.State),
+				accountID: c.accountID,
+				buildID:   strconv.Itoa(data.BuildID),
+				stageID:   stageID,
+				ID:        data.ID,
+				state:     fromTravisState(data.State),
 			}
 
 			select {
