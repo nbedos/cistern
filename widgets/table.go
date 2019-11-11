@@ -1,7 +1,10 @@
 package widgets
 
 import (
+	"context"
 	"errors"
+	"os"
+	"path"
 
 	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/cache"
@@ -12,8 +15,6 @@ import (
 type Table struct {
 	Source     cache.HierarchicalTabularDataSource
 	ActiveLine int
-	columns    []string
-	alignment  map[string]text.Alignment
 	Rows       []cache.TabularSourceRow
 	height     int
 	width      int
@@ -21,7 +22,7 @@ type Table struct {
 	maxWidths  map[string]int
 }
 
-func NewTable(source cache.HierarchicalTabularDataSource, columns []string, alignment map[string]text.Alignment, width int, height int, sep string) (Table, error) {
+func NewTable(source cache.HierarchicalTabularDataSource, width int, height int, sep string) (Table, error) {
 	if width < 0 || height < 0 {
 		return Table{}, errors.New("table width and height must be >= 0")
 	}
@@ -30,8 +31,6 @@ func NewTable(source cache.HierarchicalTabularDataSource, columns []string, alig
 		Source:    source,
 		height:    height,
 		width:     width,
-		columns:   columns,
-		alignment: alignment,
 		sep:       sep,
 		maxWidths: make(map[string]int),
 	}
@@ -41,7 +40,7 @@ func NewTable(source cache.HierarchicalTabularDataSource, columns []string, alig
 		return table, err
 	}
 
-	table.setRows(res)
+	table.setRows(res, 0)
 
 	return table, nil
 }
@@ -71,8 +70,7 @@ func (t *Table) Refresh() error {
 		activeLine = 0
 	}
 
-	t.setRows(rows)
-	t.setActiveLine(activeLine)
+	t.setRows(rows, activeLine)
 
 	return nil
 }
@@ -91,8 +89,7 @@ func (t *Table) SetFold(open bool, recursive bool) error {
 		return err
 	}
 
-	t.setRows(rows)
-	t.setActiveLine(activeline)
+	t.setRows(rows, activeline)
 
 	return nil
 }
@@ -113,8 +110,7 @@ func (t *Table) NextMatch(s string, ascending bool) bool {
 	if err == cache.ErrNoMatchFound {
 		return false
 	}
-	t.setRows(rows)
-	t.setActiveLine(i)
+	t.setRows(rows, i)
 	return true
 }
 
@@ -137,8 +133,7 @@ func (t *Table) Resize(width int, height int) error {
 	}
 
 	t.width, t.height = width, height
-	t.setRows(rows)
-	t.setActiveLine(activeline)
+	t.setRows(rows, activeline)
 
 	return nil
 }
@@ -149,8 +144,7 @@ func (t *Table) Top() error {
 		return err
 	}
 
-	t.setRows(res)
-	t.setActiveLine(0)
+	t.setRows(res, 0)
 	return nil
 }
 
@@ -160,8 +154,7 @@ func (t *Table) Bottom() error {
 		return err
 	}
 
-	t.setRows(res)
-	t.setActiveLine(len(t.Rows) - 1)
+	t.setRows(res, -1)
 	return nil
 }
 
@@ -201,26 +194,26 @@ func (t *Table) Scroll(amount int) error {
 				rows = rows[:t.nbrRows()]
 			}
 		}
-		t.setRows(rows)
+		t.setRows(rows, activeLine)
 	}
 	t.setActiveLine(activeLine)
 
 	return nil
 }
 
-func (t *Table) setRows(rows []cache.TabularSourceRow) {
+func (t *Table) setRows(rows []cache.TabularSourceRow, activeline int) {
 	if len(t.Rows) > t.height {
 		t.Rows = rows[:t.height-1]
 	} else {
 		t.Rows = rows
 	}
 
-	t.setActiveLine(t.ActiveLine)
+	t.setActiveLine(activeline)
 	t.computeMaxWidths()
 }
 
 func (t *Table) computeMaxWidths() {
-	for _, header := range t.columns {
+	for _, header := range t.Source.Headers() {
 		t.maxWidths[header] = utils.MaxInt(t.maxWidths[header], runewidth.StringWidth(header))
 	}
 	for _, row := range t.Rows {
@@ -235,11 +228,11 @@ func (t *Table) setActiveLine(activeLine int) {
 }
 
 func (t Table) stringFromColumns(values map[string]text.StyledString, header bool) text.StyledString {
-	paddedColumns := make([]text.StyledString, len(t.columns))
-	for j, name := range t.columns {
+	paddedColumns := make([]text.StyledString, len(t.Source.Headers()))
+	for j, name := range t.Source.Headers() {
 		alignment := text.Left
 		if !header {
-			alignment = t.alignment[name]
+			alignment = t.Source.Alignment()[name]
 		}
 		paddedColumns[j] = values[name]
 		paddedColumns[j].Align(alignment, t.maxWidths[name])
@@ -251,11 +244,11 @@ func (t Table) stringFromColumns(values map[string]text.StyledString, header boo
 	return line
 }
 
-func (t *Table) Text() ([]text.LocalizedStyledString, error) {
+func (t *Table) Text() []text.LocalizedStyledString {
 	texts := make([]text.LocalizedStyledString, 0, len(t.Rows))
 
 	headers := make(map[string]text.StyledString)
-	for _, header := range t.columns {
+	for _, header := range t.Source.Headers() {
 		headers[header] = text.NewStyledString(header)
 	}
 
@@ -281,5 +274,32 @@ func (t *Table) Text() ([]text.LocalizedStyledString, error) {
 		texts = append(texts, tx)
 	}
 
-	return texts, nil
+	return texts
+}
+
+func (t Table) OpenInBrowser(browser string) error {
+	if t.ActiveLine >= 0 && t.ActiveLine < len(t.Rows) {
+		if url := t.Rows[t.ActiveLine].URL(); url != "" {
+			argv := []string{path.Base(browser), url}
+			process, err := os.StartProcess(browser, argv, &os.ProcAttr{})
+			if err != nil {
+				return err
+			}
+
+			if err := process.Release(); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (t *Table) WriteToDisk(ctx context.Context, dir string) (string, cache.Streamer, error) {
+	if t.ActiveLine < 0 || t.ActiveLine >= len(t.Rows) {
+		return "", nil, errors.New("t.Activeline is out of range")
+	}
+
+	key := t.Rows[t.ActiveLine].Key()
+	return t.Source.WriteToDisk(ctx, key, dir)
 }

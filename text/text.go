@@ -109,19 +109,15 @@ type LocalizedStyledString struct {
 	S StyledString
 }
 
-func Draw(texts []LocalizedStyledString, screen tcell.Screen, style tcell.Style, styleSheet StyleSheet) error {
+func Draw(texts []LocalizedStyledString, screen tcell.Screen, style tcell.Style, styleSheet StyleSheet) {
 	for _, t := range texts {
-		if err := t.Draw(screen, style, styleSheet); err != nil {
-			return err
-		}
+		t.Draw(screen, style, styleSheet)
 	}
-
-	return nil
 }
 
 type StyleSheet = map[Class]func(s tcell.Style) tcell.Style
 
-func (t LocalizedStyledString) Draw(screen tcell.Screen, style tcell.Style, styleSheet StyleSheet) error {
+func (t LocalizedStyledString) Draw(screen tcell.Screen, style tcell.Style, styleSheet StyleSheet) {
 	x, y := t.X, t.Y
 	for _, component := range t.S.components {
 		s := style
@@ -137,8 +133,6 @@ func (t LocalizedStyledString) Draw(screen tcell.Screen, style tcell.Style, styl
 			x += runewidth.RuneWidth(r)
 		}
 	}
-
-	return nil
 }
 
 type Alignment int

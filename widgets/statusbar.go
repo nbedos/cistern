@@ -51,13 +51,13 @@ func (s *StatusBar) Resize(width int, height int) error {
 	return nil
 }
 
-func (s StatusBar) Text() ([]text.LocalizedStyledString, error) {
+func (s StatusBar) Text() []text.LocalizedStyledString {
 	if s.ShowInput {
 		return []text.LocalizedStyledString{{
 			X: 0,
 			Y: utils.MaxInt(s.height-1, 0),
 			S: text.NewStyledString(fmt.Sprintf("%s%s", s.inputPrefix, s.InputBuffer)),
-		}}, nil
+		}}
 	}
 
 	texts := make([]text.LocalizedStyledString, 0)
@@ -69,6 +69,5 @@ func (s StatusBar) Text() ([]text.LocalizedStyledString, error) {
 			S: text.NewStyledString(s.outputBuffer[i]),
 		})
 	}
-
-	return texts, nil
+	return texts
 }

@@ -4,6 +4,6 @@ import "github.com/nbedos/citop/text"
 
 type Widget interface {
 	Resize(width int, height int) error
-	Text() ([]text.LocalizedStyledString, error)
+	Text() []text.LocalizedStyledString
 	Size() (width int, height int)
 }

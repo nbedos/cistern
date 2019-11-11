@@ -71,7 +71,7 @@ func RunWidgetApp(repositoryURL string, travisToken string, gitlabToken string, 
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cacheDB := cache.NewCache(CIProviders)
-	source := cacheDB.NewRepositoryBuilds(repositoryURL)
+	source := cacheDB.BuildsByCommit(repositoryURL)
 
 	ui, err := NewTUI(defaultStyle, styleSheet)
 	if err != nil {
@@ -163,14 +163,10 @@ func (t TUI) poll() {
 	}
 }
 
-func (t TUI) Draw(texts ...text.LocalizedStyledString) error {
+func (t TUI) Draw(texts ...text.LocalizedStyledString) {
 	t.screen.Clear()
-	if err := text.Draw(texts, t.screen, t.defaultStyle, t.styleSheet); err != nil {
-		return err
-	}
+	text.Draw(texts, t.screen, t.defaultStyle, t.styleSheet)
 	t.screen.Show()
-
-	return nil
 }
 
 type errStream struct{ error }

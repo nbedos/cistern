@@ -65,12 +65,13 @@ func (b buildRow) Children() []utils.TreeNode {
 func (b buildRow) Tabular() map[string]text.StyledString {
 	const nullPlaceholder = "-"
 
-	nullTimeToString := func(t utils.NullTime) string {
+	nullTimeToString := func(t utils.NullTime) text.StyledString {
+		s := nullPlaceholder
 		if t.Valid {
 			t := t.Time.Local().Truncate(time.Second)
-			return t.Format("Jan _2 15:04")
+			s = t.Format("Jan _2 15:04")
 		}
-		return nullPlaceholder
+		return text.NewStyledString(s)
 	}
 
 	var state text.StyledString
@@ -105,10 +106,10 @@ func (b buildRow) Tabular() map[string]text.StyledString {
 		"TYPE":     text.NewStyledString(b.type_),
 		"STATE":    state,
 		"NAME":     name,
-		"CREATED":  text.NewStyledString(nullTimeToString(b.createdAt)),
-		"STARTED":  text.NewStyledString(nullTimeToString(b.startedAt)),
-		"FINISHED": text.NewStyledString(nullTimeToString(b.finishedAt)),
-		"UPDATED":  text.NewStyledString(nullTimeToString(b.updatedAt)),
+		"CREATED":  nullTimeToString(b.createdAt),
+		"STARTED":  nullTimeToString(b.startedAt),
+		"FINISHED": nullTimeToString(b.finishedAt),
+		"UPDATED":  nullTimeToString(b.updatedAt),
 		"DURATION": text.NewStyledString(b.duration.String()),
 	}
 }
@@ -121,7 +122,7 @@ func (b buildRow) URL() string {
 	return b.url
 }
 
-type RepositoryBuilds struct {
+type BuildsByCommit struct {
 	cache         Cache
 	repositoryURL string
 	rows          []buildRow
@@ -131,14 +132,32 @@ type RepositoryBuilds struct {
 	dfsUpToDate   bool
 }
 
-func (c *Cache) NewRepositoryBuilds(repositoryURL string) RepositoryBuilds {
-	return RepositoryBuilds{
+func (c *Cache) BuildsByCommit(repositoryURL string) BuildsByCommit {
+	return BuildsByCommit{
 		cache:         *c,
 		repositoryURL: repositoryURL,
 	}
 }
 
-func (s *RepositoryBuilds) SetTraversable(key interface{}, traversable bool, recursive bool) error {
+func (s BuildsByCommit) Headers() []string {
+	return []string{"REF", "COMMIT", "TYPE", "STATE", "CREATED", "DURATION", "NAME"}
+}
+
+func (s BuildsByCommit) Alignment() map[string]text.Alignment {
+	return map[string]text.Alignment{
+		"REF":      text.Left,
+		"COMMIT":   text.Left,
+		"TYPE":     text.Right,
+		"STATE":    text.Left,
+		"CREATED":  text.Left,
+		"STARTED":  text.Left,
+		"UPDATED":  text.Left,
+		"DURATION": text.Right,
+		"NAME":     text.Left,
+	}
+}
+
+func (s *BuildsByCommit) SetTraversable(key interface{}, traversable bool, recursive bool) error {
 	buildKey, ok := key.(buildRowKey)
 	if !ok {
 		return fmt.Errorf("expected key of concrete type %T but got %v", buildKey, key)
@@ -354,7 +373,7 @@ func commitRowFromBuilds(builds []Build) buildRow {
 	return row
 }
 
-func (s *RepositoryBuilds) FetchRows() {
+func (s *BuildsByCommit) FetchRows() {
 	// Save traversable state of current nodes
 	traversables := make(map[buildRowKey]bool)
 	for i := range s.rows {
@@ -419,7 +438,7 @@ func (s *RepositoryBuilds) FetchRows() {
 	s.dfsUpToDate = false
 }
 
-func (s *RepositoryBuilds) prefixAndIndex() {
+func (s *BuildsByCommit) prefixAndIndex() {
 	s.dfsTraversal = make([]*buildRow, 0)
 	s.dfsIndex = make(map[buildRowKey]int)
 
@@ -438,7 +457,7 @@ func (s *RepositoryBuilds) prefixAndIndex() {
 	s.dfsUpToDate = true
 }
 
-func (s *RepositoryBuilds) NextMatch(top, bottom, active interface{}, search string, ascending bool) ([]TabularSourceRow, int, error) {
+func (s *BuildsByCommit) NextMatch(top, bottom, active interface{}, search string, ascending bool) ([]TabularSourceRow, int, error) {
 	activeKey, ok := active.(buildRowKey)
 	if !ok {
 		return nil, 0, fmt.Errorf("casting key %v to buildRowKey failed", active)
@@ -488,7 +507,7 @@ func (s *RepositoryBuilds) NextMatch(top, bottom, active interface{}, search str
 	return nil, 0, ErrNoMatchFound
 }
 
-func (s *RepositoryBuilds) SelectFirst(limit int) ([]TabularSourceRow, error) {
+func (s *BuildsByCommit) SelectFirst(limit int) ([]TabularSourceRow, error) {
 	if !s.dfsUpToDate {
 		s.prefixAndIndex()
 	}
@@ -500,7 +519,7 @@ func (s *RepositoryBuilds) SelectFirst(limit int) ([]TabularSourceRow, error) {
 	return rows, err
 }
 
-func (s *RepositoryBuilds) SelectLast(limit int) ([]TabularSourceRow, error) {
+func (s *BuildsByCommit) SelectLast(limit int) ([]TabularSourceRow, error) {
 	if !s.dfsUpToDate {
 		s.prefixAndIndex()
 	}
@@ -512,7 +531,7 @@ func (s *RepositoryBuilds) SelectLast(limit int) ([]TabularSourceRow, error) {
 	return rows, err
 }
 
-func (s *RepositoryBuilds) Select(key interface{}, nbrBefore int, nbrAfter int) ([]TabularSourceRow, int, error) {
+func (s *BuildsByCommit) Select(key interface{}, nbrBefore int, nbrAfter int) ([]TabularSourceRow, int, error) {
 	buildKey, ok := key.(buildRowKey)
 	if !ok {
 		return nil, 0, errors.New("casting key to buildRowKey failed")
@@ -549,7 +568,6 @@ func (s *RepositoryBuilds) Select(key interface{}, nbrBefore int, nbrAfter int) 
 			break
 		}
 	}
-
 	if !exists {
 		return nil, 0, fmt.Errorf("key '%v' not found", buildKey)
 	}
@@ -572,7 +590,7 @@ func (s *RepositoryBuilds) Select(key interface{}, nbrBefore int, nbrAfter int) 
 
 var ErrNoLogHere = errors.New("no log is associated to this row")
 
-func (s RepositoryBuilds) WriteToDirectory(ctx context.Context, key interface{}, dir string) (string, Streamer, error) {
+func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir string) (string, Streamer, error) {
 	// TODO Allow filtering for errored jobs
 	buildKey, ok := key.(buildRowKey)
 	if !ok {
