@@ -12,13 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/text"
 	"github.com/nbedos/citop/utils"
 )
 
 var shaLength = 7
-
-var ErrNoMatchFound = errors.New("no match found")
 
 type buildRowKey struct {
 	sha       string
@@ -41,7 +40,7 @@ type buildRow struct {
 	finishedAt  utils.NullTime
 	updatedAt   utils.NullTime
 	duration    utils.NullDuration
-	children    []buildRow
+	children    []*buildRow
 	traversable bool
 	url         string
 }
@@ -50,14 +49,10 @@ func (b buildRow) Traversable() bool {
 	return b.traversable
 }
 
-func (b *buildRow) SetPrefix(prefix string) {
-	b.prefix = prefix
-}
-
 func (b buildRow) Children() []utils.TreeNode {
 	children := make([]utils.TreeNode, len(b.children))
 	for i := range b.children {
-		children[i] = &b.children[i]
+		children[i] = b.children[i]
 	}
 	return children
 }
@@ -122,20 +117,66 @@ func (b buildRow) URL() string {
 	return b.url
 }
 
-type BuildsByCommit struct {
-	cache         Cache
-	repositoryURL string
-	rows          []buildRow
-	treeIndex     map[buildRowKey]*buildRow
-	dfsTraversal  []*buildRow
-	dfsIndex      map[buildRowKey]int
-	dfsUpToDate   bool
+func (b *buildRow) SetTraversable(traversable bool, recursive bool) {
+	b.traversable = traversable
+	if recursive {
+		for _, child := range b.children {
+			child.SetTraversable(traversable, recursive)
+		}
+	}
 }
 
-func (c *Cache) BuildsByCommit(repositoryURL string) BuildsByCommit {
+func (b *buildRow) Prefix(indent string, last bool) {
+	var prefix string
+	// Special behavior for the root node which is prefixed by "+" if its children are hidden
+	if indent == "" {
+		switch {
+		case len(b.Children()) == 0:
+			prefix = " "
+		case b.Traversable():
+			prefix = "-"
+		default:
+			prefix = "+"
+		}
+	} else {
+		if last {
+			prefix = "└─"
+		} else {
+			prefix = "├─"
+		}
+
+		if len(b.Children()) == 0 || b.Traversable() {
+			prefix += "─ "
+		} else {
+			prefix += "+ "
+		}
+	}
+
+	b.prefix = indent + prefix
+
+	if b.Traversable() {
+		for i, child := range b.children {
+			var childIndent string
+			if last {
+				childIndent = " "
+			} else {
+				childIndent = "│"
+			}
+
+			paddingLength := runewidth.StringWidth(prefix) - runewidth.StringWidth(childIndent)
+			childIndent += strings.Repeat(" ", paddingLength)
+			child.Prefix(indent+childIndent, i == len(b.children)-1)
+		}
+	}
+}
+
+type BuildsByCommit struct {
+	cache Cache
+}
+
+func (c *Cache) BuildsByCommit() BuildsByCommit {
 	return BuildsByCommit{
-		cache:         *c,
-		repositoryURL: repositoryURL,
+		cache: *c,
 	}
 }
 
@@ -155,26 +196,6 @@ func (s BuildsByCommit) Alignment() map[string]text.Alignment {
 		"DURATION": text.Right,
 		"NAME":     text.Left,
 	}
-}
-
-func (s *BuildsByCommit) SetTraversable(key interface{}, traversable bool, recursive bool) error {
-	buildKey, ok := key.(buildRowKey)
-	if !ok {
-		return fmt.Errorf("expected key of concrete type %T but got %v", buildKey, key)
-	}
-	if row, exists := s.treeIndex[buildKey]; exists {
-		row.traversable = traversable
-		s.dfsUpToDate = false
-		if recursive {
-			for _, child := range utils.DepthFirstTraversal(row, true) {
-				if child, ok := child.(*buildRow); ok {
-					child.traversable = traversable
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
 func Ref(ref string, tag bool) string {
@@ -218,7 +239,7 @@ func buildRowFromBuild(b Build) buildRow {
 	sort.Ints(jobIDs)
 	for _, jobID := range jobIDs {
 		child := buildRowFromJob(b.Repository.AccountID, b.Commit.Sha, ref, b.ID, 0, *b.Jobs[jobID])
-		row.children = append(row.children, child)
+		row.children = append(row.children, &child)
 	}
 
 	stageIDs := make([]int, 0, len(b.Stages))
@@ -228,7 +249,7 @@ func buildRowFromBuild(b Build) buildRow {
 	sort.Ints(stageIDs)
 	for _, stageID := range stageIDs {
 		child := buildRowFromStage(b.Repository.AccountID, b.Commit.Sha, ref, b.ID, b.WebURL, *b.Stages[stageID])
-		row.children = append(row.children, child)
+		row.children = append(row.children, &child)
 	}
 
 	return row
@@ -252,8 +273,7 @@ func buildRowFromStage(accountID string, sha string, ref string, buildID string,
 
 	jobIDs := make([]int, 0, len(s.Jobs))
 	// We aggregate jobs by name and only keep the most recent to weed out previous runs of the job.
-	// This is mainly for GitLab which keeps jobs after they are restarted. Maybe we should add
-	// date fields to Stage and have providers fill them instead of computing them here.
+	// This is mainly for GitLab which keeps jobs after they are restarted.
 	jobByName := make(map[string]*Job, len(s.Jobs))
 	for ID, job := range s.Jobs {
 		jobIDs = append(jobIDs, ID)
@@ -280,7 +300,7 @@ func buildRowFromStage(accountID string, sha string, ref string, buildID string,
 	sort.Ints(jobIDs)
 	for _, id := range jobIDs {
 		child := buildRowFromJob(accountID, sha, ref, buildID, s.ID, *s.Jobs[id])
-		row.children = append(row.children, child)
+		row.children = append(row.children, &child)
 	}
 
 	return row
@@ -322,14 +342,15 @@ func commitRowFromBuilds(builds []Build) buildRow {
 		type_:       "C",
 		ref:         Ref(builds[0].Ref, builds[0].IsTag),
 		name:        messageLines[0],
-		children:    make([]buildRow, 0, len(builds)),
+		children:    make([]*buildRow, 0, len(builds)),
 		traversable: false,
 		provider:    "",
 	}
 
 	latestBuildByProvider := make(map[string]Build)
 	for _, build := range builds {
-		row.children = append(row.children, buildRowFromBuild(build))
+		child := buildRowFromBuild(build)
+		row.children = append(row.children, &child)
 
 		latestBuild, exists := latestBuildByProvider[build.Repository.AccountID]
 		if !exists || latestBuild.StartedAt.Valid && build.StartedAt.Valid && latestBuild.StartedAt.Time.Before(build.StartedAt.Time) {
@@ -373,17 +394,7 @@ func commitRowFromBuilds(builds []Build) buildRow {
 	return row
 }
 
-func (s *BuildsByCommit) FetchRows() {
-	// Save traversable state of current nodes
-	traversables := make(map[buildRowKey]bool)
-	for i := range s.rows {
-		rowTraversal := utils.DepthFirstTraversal(&s.rows[i], true)
-		for j := range rowTraversal {
-			if row := rowTraversal[j].(*buildRow); row.traversable {
-				traversables[row.key] = true
-			}
-		}
-	}
+func (s *BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 	type Ref struct {
 		sha   string
 		ref   string
@@ -399,65 +410,34 @@ func (s *BuildsByCommit) FetchRows() {
 		buildsPerRef[ref] = append(buildsPerRef[ref], build)
 	}
 
-	rows := make([]buildRow, 0, len(buildsPerRef))
+	rows := make([]HierarchicalTabularSourceRow, 0, len(buildsPerRef))
 	for _, builds := range buildsPerRef {
-		rows = append(rows, commitRowFromBuilds(builds))
+		row := commitRowFromBuilds(builds)
+		rows = append(rows, &row)
 	}
 
 	sort.Slice(rows, func(i, j int) bool {
+		ri, rj := rows[i].(*buildRow), rows[j].(*buildRow)
 		ti := utils.MinNullTime(
-			rows[i].createdAt,
-			rows[i].startedAt,
-			rows[i].updatedAt,
-			rows[i].finishedAt)
+			ri.createdAt,
+			ri.startedAt,
+			ri.updatedAt,
+			ri.finishedAt)
 
 		tj := utils.MinNullTime(
-			rows[i].createdAt,
-			rows[j].startedAt,
-			rows[j].updatedAt,
-			rows[j].finishedAt)
+			rj.createdAt,
+			rj.startedAt,
+			rj.updatedAt,
+			rj.finishedAt)
 
 		return ti.Time.After(tj.Time)
 	})
 
-	treeIndex := make(map[buildRowKey]*buildRow)
-	for i := range rows {
-		traversal := utils.DepthFirstTraversal(&rows[i], true)
-		for j := range traversal {
-			row := traversal[j].(*buildRow)
-			treeIndex[row.key] = row
-			// Restore traversable state of node
-			if value, exists := traversables[row.key]; exists {
-				row.traversable = value
-			}
-		}
-	}
-
-	s.rows = rows
-	s.treeIndex = treeIndex
-	s.dfsUpToDate = false
+	return rows
 }
 
-func (s *BuildsByCommit) prefixAndIndex() {
-	s.dfsTraversal = make([]*buildRow, 0)
-	s.dfsIndex = make(map[buildRowKey]int)
-
-	for i := range s.rows {
-		row := &s.rows[i]
-		utils.DepthFirstTraversalPrefixing(row)
-
-		tmpRows := utils.DepthFirstTraversal(row, false)
-		for j := range tmpRows {
-			tmpRow := tmpRows[j].(*buildRow)
-			s.dfsTraversal = append(s.dfsTraversal, tmpRow)
-			s.dfsIndex[tmpRow.key] = len(s.dfsTraversal) - 1
-		}
-	}
-
-	s.dfsUpToDate = true
-}
-
-func (s *BuildsByCommit) NextMatch(top, bottom, active interface{}, search string, ascending bool) ([]TabularSourceRow, int, error) {
+/*
+func (s *BuildsByCommit) NextMatch(top, bottom, active interface{}, search string, ascending bool) ([]HierarchicalTabularSourceRow, int, error) {
 	activeKey, ok := active.(buildRowKey)
 	if !ok {
 		return nil, 0, fmt.Errorf("casting key %v to buildRowKey failed", active)
@@ -505,88 +485,7 @@ func (s *BuildsByCommit) NextMatch(top, bottom, active interface{}, search strin
 	}
 
 	return nil, 0, ErrNoMatchFound
-}
-
-func (s *BuildsByCommit) SelectFirst(limit int) ([]TabularSourceRow, error) {
-	if !s.dfsUpToDate {
-		s.prefixAndIndex()
-	}
-	if len(s.dfsTraversal) == 0 {
-		return nil, nil
-	}
-
-	rows, _, err := s.Select(s.dfsTraversal[0].Key(), 0, limit-1)
-	return rows, err
-}
-
-func (s *BuildsByCommit) SelectLast(limit int) ([]TabularSourceRow, error) {
-	if !s.dfsUpToDate {
-		s.prefixAndIndex()
-	}
-	if len(s.dfsTraversal) == 0 {
-		return nil, nil
-	}
-
-	rows, _, err := s.Select(s.dfsTraversal[len(s.dfsTraversal)-1].Key(), limit-1, 0)
-	return rows, err
-}
-
-func (s *BuildsByCommit) Select(key interface{}, nbrBefore int, nbrAfter int) ([]TabularSourceRow, int, error) {
-	buildKey, ok := key.(buildRowKey)
-	if !ok {
-		return nil, 0, errors.New("casting key to buildRowKey failed")
-	}
-
-	if !s.dfsUpToDate {
-		s.prefixAndIndex()
-	}
-
-	if len(s.dfsTraversal) == 0 {
-		return nil, 0, nil
-	}
-
-	// Also list parents as candidates since buildKey might refer to a row that is now hidden
-	keys := []buildRowKey{
-		buildKey,
-		{
-			sha:       buildKey.sha,
-			accountID: buildKey.accountID,
-			buildID:   buildKey.buildID,
-			stageID:   buildKey.stageID,
-		},
-		{
-			sha:       buildKey.sha,
-			accountID: buildKey.accountID,
-			buildID:   buildKey.buildID,
-		},
-	}
-
-	var keyIndex int
-	exists := false
-	for _, key := range keys {
-		if keyIndex, exists = s.dfsIndex[key]; exists {
-			break
-		}
-	}
-	if !exists {
-		return nil, 0, fmt.Errorf("key '%v' not found", buildKey)
-	}
-
-	lower := utils.Bounded(keyIndex-nbrBefore, 0, len(s.dfsTraversal))
-	upper := utils.Bounded(lower+nbrBefore+nbrAfter+1, 0, len(s.dfsTraversal))
-	lower = utils.Bounded(upper-(nbrBefore+nbrAfter+1), 0, len(s.dfsTraversal))
-
-	selectedRows := make([]TabularSourceRow, upper-lower)
-	var index int
-	for i, row := range s.dfsTraversal[lower:upper] {
-		if row == s.dfsTraversal[keyIndex] {
-			index = i
-		}
-		selectedRows[i] = *row
-	}
-
-	return selectedRows, index, nil
-}
+}*/
 
 var ErrNoLogHere = errors.New("no log is associated to this row")
 
@@ -597,19 +496,14 @@ func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir st
 		return "", nil, fmt.Errorf("key conversion to buildRowKey failed: '%v'", key)
 	}
 
-	row, exists := s.treeIndex[buildKey]
-	if !exists {
-		return "", nil, fmt.Errorf("no row associated to key '%v'", key)
-	}
-
-	if row.type_ != "J" {
+	if buildKey.jobID == 0 {
 		return "", nil, ErrNoLogHere
 	}
 
-	accountID := row.key.accountID
-	buildID := row.key.buildID
-	stageID := row.key.stageID
-	jobID := row.key.jobID
+	accountID := buildKey.accountID
+	buildID := buildKey.buildID
+	stageID := buildKey.stageID
+	jobID := buildKey.jobID
 
 	pattern := fmt.Sprintf("job_%d_*.log", jobID)
 	file, err := ioutil.TempFile(dir, pattern)

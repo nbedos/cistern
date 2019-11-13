@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mattn/go-runewidth"
 	"gopkg.in/src-d/go-git.v4"
 )
 
@@ -43,7 +42,7 @@ func Bounded(a, lower, upper int) int {
 type TreeNode interface {
 	Children() []TreeNode
 	Traversable() bool
-	SetPrefix(prefix string) // meh. This forces us to pass a pointer to DepthFirstTraversal which is read only.
+	SetTraversable(traversable bool, recursive bool)
 }
 
 func DepthFirstTraversal(node TreeNode, traverseAll bool) []TreeNode {
@@ -64,56 +63,6 @@ func DepthFirstTraversal(node TreeNode, traverseAll bool) []TreeNode {
 	}
 
 	return explored
-}
-
-func DepthFirstTraversalPrefixing(node TreeNode) {
-	depthFirstTraversalPrefixing(node, "", true)
-}
-
-func depthFirstTraversalPrefixing(node TreeNode, indent string, last bool) {
-	var prefix string
-	// Special behavior for the root node which is prefixed by "+" if its children are hidden
-	if indent == "" {
-		switch {
-		case len(node.Children()) == 0:
-			prefix = " "
-		case node.Traversable():
-			prefix = "-"
-		default:
-			prefix = "+"
-		}
-	} else {
-		if last {
-			prefix = "└─"
-		} else {
-			prefix = "├─"
-		}
-
-		if len(node.Children()) == 0 || node.Traversable() {
-			prefix += "─ "
-		} else {
-			prefix += "+ "
-		}
-	}
-
-	node.SetPrefix(indent + prefix)
-
-	if node.Traversable() {
-		children := node.Children()
-		for i := range children {
-			var childIndent string
-			if last {
-				childIndent = " "
-			} else {
-				childIndent = "│"
-			}
-
-			paddingLength := runewidth.StringWidth(prefix) - runewidth.StringWidth(childIndent)
-			childIndent += strings.Repeat(" ", paddingLength)
-
-			depthFirstTraversalPrefixing(children[i], indent+childIndent, i == len(children)-1)
-		}
-	}
 }
 
 func RepositorySlugFromURL(repositoryURL string) (string, error) {

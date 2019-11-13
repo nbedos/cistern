@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 type TestNode struct {
@@ -31,81 +29,13 @@ func (n TestNode) Traversable() bool {
 	return n.traversable
 }
 
-func (n *TestNode) SetPrefix(prefix string) {
-	n.prefix = prefix
-}
-
-func TestPrintFoldableTree(t *testing.T) {
-	root := TestNode{
-		value:       "root",
-		traversable: true,
-		children: []TestNode{
-			{
-				value: "a",
-				children: []TestNode{
-					{
-						value:       "aa",
-						traversable: true,
-						children: []TestNode{
-							{value: "aaa"},
-							{value: "aab"},
-							{value: "aac"},
-						},
-					},
-					{value: "ab"},
-				},
-				traversable: true,
-			},
-			{value: "b"},
-			{
-				value: "c",
-				children: []TestNode{
-					{value: "ca"},
-					{value: "cb"},
-				},
-				traversable: false,
-			},
-			{
-				value: "d",
-				children: []TestNode{
-					{value: "da"},
-					{value: "db"},
-				},
-				traversable: true,
-			},
-		},
-	}
-
-	DepthFirstTraversalPrefixing(&root)
-	result := make([]string, 0)
-	for _, node := range DepthFirstTraversal(&root, false) {
-		switch n := node.(type) {
-		case *TestNode:
-			result = append(result, fmt.Sprintf("%s%s", n.prefix, n.value))
+func (n *TestNode) SetTraversable(open bool, recursive bool) {
+	n.traversable = open
+	if recursive {
+		for _, node := range n.children {
+			node.SetTraversable(open, recursive)
 		}
-
 	}
-
-	expected := strings.Split(`-root
- ├── a
- │   ├── aa
- │   │   ├── aaa
- │   │   ├── aab
- │   │   └── aac
- │   └── ab
- ├── b
- ├─+ c
- └── d
-     ├── da
-     └── db`, "\n")
-
-	if !cmp.Equal(result, expected) {
-		for _, line := range result {
-			t.Log(line)
-		}
-		t.Fatal("invalid result")
-	}
-
 }
 
 func TestDepthFirstTraversal(t *testing.T) {

@@ -13,226 +13,168 @@ import (
 )
 
 type Table struct {
-	Source     cache.HierarchicalTabularDataSource
-	ActiveLine int
-	Rows       []cache.TabularSourceRow
+	source     cache.HierarchicalTabularDataSource
+	nodes      []cache.HierarchicalTabularSourceRow
+	rows       []cache.HierarchicalTabularSourceRow
+	topLine    int
+	activeLine int
 	height     int
 	width      int
 	sep        string
 	maxWidths  map[string]int
 }
 
-func NewTable(source cache.HierarchicalTabularDataSource, width int, height int, sep string) (Table, error) {
+func NewTable(source cache.HierarchicalTabularDataSource, width int, height int) (Table, error) {
 	if width < 0 || height < 0 {
 		return Table{}, errors.New("table width and height must be >= 0")
 	}
 
 	table := Table{
-		Source:    source,
+		source:    source,
 		height:    height,
 		width:     width,
-		sep:       sep,
 		maxWidths: make(map[string]int),
+		sep:       "  ", // FIXME Move this out of here
 	}
 
-	res, err := table.Source.SelectFirst(table.nbrRows())
-	if err != nil {
-		return table, err
-	}
-
-	table.setRows(res, 0)
+	table.Refresh()
 
 	return table, nil
 }
 
-func (t Table) nbrRows() int {
+func (t Table) NbrRows() int {
 	return utils.MaxInt(0, t.height-1)
 }
 
-func (t *Table) Refresh() error {
-	t.Source.FetchRows()
-
-	var err error
-	var rows []cache.TabularSourceRow
-	activeLine := t.ActiveLine
-	if len(t.Rows) > 0 && t.ActiveLine > 0 {
-		activeKey := t.Rows[t.ActiveLine].Key()
-		rows, activeLine, err = t.Source.Select(activeKey, t.ActiveLine, t.nbrRows()-t.ActiveLine-1)
-	} else {
-		rows, err = t.Source.SelectFirst(t.nbrRows())
-	}
-
-	if err != nil {
-		return err
-	}
-
-	if t.ActiveLine == 0 {
-		activeLine = 0
-	}
-
-	t.setRows(rows, activeLine)
-
-	return nil
-}
-
-func (t *Table) SetFold(open bool, recursive bool) error {
-	if t.ActiveLine < 0 || t.ActiveLine >= len(t.Rows) {
-		return nil
-	}
-
-	activeKey := t.Rows[t.ActiveLine].Key()
-	if err := t.Source.SetTraversable(activeKey, open, recursive); err != nil {
-		return err
-	}
-	rows, activeline, err := t.Source.Select(activeKey, t.ActiveLine, t.nbrRows()-t.ActiveLine-1)
-	if err != nil {
-		return err
-	}
-
-	t.setRows(rows, activeline)
-
-	return nil
-}
-
-func (t Table) Size() (int, int) {
-	return t.width, t.height
-}
-
-func (t *Table) NextMatch(s string, ascending bool) bool {
-	if len(t.Rows) == 0 {
-		return false
-	}
-
-	top := t.Rows[0].Key()
-	bottom := t.Rows[len(t.Rows)-1].Key()
-	active := t.Rows[t.ActiveLine].Key()
-	rows, i, err := t.Source.NextMatch(top, bottom, active, s, ascending)
-	if err == cache.ErrNoMatchFound {
-		return false
-	}
-	t.setRows(rows, i)
-	return true
-}
-
-func (t *Table) Resize(width int, height int) error {
-	if width < 0 || height < 0 {
-		return errors.New("width and height must be >= 0")
-	}
-
-	var rows []cache.TabularSourceRow
-	var err error
-	var activeline int
-	if len(t.Rows) > 0 && t.ActiveLine > 0 {
-		key := t.Rows[t.ActiveLine].Key()
-		rows, activeline, err = t.Source.Select(key, t.ActiveLine, height-2-t.ActiveLine)
-	} else {
-		rows, err = t.Source.SelectFirst(t.nbrRows())
-	}
-	if err != nil {
-		return err
-	}
-
-	t.width, t.height = width, height
-	t.setRows(rows, activeline)
-
-	return nil
-}
-
-func (t *Table) Top() error {
-	res, err := t.Source.SelectFirst(t.nbrRows())
-	if err != nil {
-		return err
-	}
-
-	t.setRows(res, 0)
-	return nil
-}
-
-func (t *Table) Bottom() error {
-	res, err := t.Source.SelectLast(t.nbrRows())
-	if err != nil {
-		return err
-	}
-
-	t.setRows(res, -1)
-	return nil
-}
-
-func (t *Table) Scroll(amount int) error {
-	if len(t.Rows) == 0 {
-		return nil
-	}
-	activeLine := t.ActiveLine + amount
-
-	if activeLine < 0 {
-		activeLine = 0
-	} else if activeLine > len(t.Rows)-1 {
-		activeLine = len(t.Rows) - 1
-	}
-
-	scrollAmount := amount - (activeLine - t.ActiveLine)
-	// If we've reached the top or the bottom, fetch new data
-	if scrollAmount != 0 {
-		var rows []cache.TabularSourceRow
-		var err error
-		if scrollAmount > 0 {
-			rows, _, err = t.Source.Select(t.Rows[0].Key(), 0, t.nbrRows()+scrollAmount-1)
-			if err != nil {
-				return err
-			}
-			if len(rows) > t.nbrRows() {
-				rows = rows[len(rows)-t.nbrRows():]
-			}
-		} else if scrollAmount < 0 {
-			scrollAmount *= -1
-			key := t.Rows[len(t.Rows)-1].Key()
-			rows, _, err = t.Source.Select(key, t.nbrRows()+scrollAmount-1, 0)
-			if err != nil {
-				return err
-			}
-			if len(rows) > t.nbrRows() {
-				rows = rows[:t.nbrRows()]
-			}
-		}
-		t.setRows(rows, activeLine)
-	}
-	t.setActiveLine(activeLine)
-
-	return nil
-}
-
-func (t *Table) setRows(rows []cache.TabularSourceRow, activeline int) {
-	if len(t.Rows) > t.height {
-		t.Rows = rows[:t.height-1]
-	} else {
-		t.Rows = rows
-	}
-
-	t.setActiveLine(activeline)
-	t.computeMaxWidths()
-}
-
 func (t *Table) computeMaxWidths() {
-	for _, header := range t.Source.Headers() {
+	for _, header := range t.source.Headers() {
 		t.maxWidths[header] = utils.MaxInt(t.maxWidths[header], runewidth.StringWidth(header))
 	}
-	for _, row := range t.Rows {
+	for _, row := range t.rows {
 		for header, value := range row.Tabular() {
 			t.maxWidths[header] = utils.MaxInt(t.maxWidths[header], value.Length())
 		}
 	}
 }
 
-func (t *Table) setActiveLine(activeLine int) {
-	t.ActiveLine = utils.Bounded(activeLine, 0, len(t.Rows)-1)
+func (t *Table) Refresh() {
+	// Save traversable state of current nodes
+	traversables := make(map[interface{}]struct{})
+	for i := range t.nodes {
+		rowTraversal := utils.DepthFirstTraversal(t.nodes[i], true)
+		for j := range rowTraversal {
+			if row := rowTraversal[j].(cache.HierarchicalTabularSourceRow); row.Traversable() {
+				traversables[row.Key()] = struct{}{}
+			}
+		}
+	}
+
+	// Fetch all nodes from DataSource and restore traversable state
+	nodes := t.source.Rows()
+	t.nodes = make([]cache.HierarchicalTabularSourceRow, 0, len(nodes))
+	for _, node := range nodes {
+		for _, childRow := range utils.DepthFirstTraversal(node, true) {
+			childRow := childRow.(cache.HierarchicalTabularSourceRow)
+			_, exists := traversables[childRow.Key()]
+			childRow.SetTraversable(exists, false)
+		}
+		t.nodes = append(t.nodes, node)
+	}
+
+	// Traverse all nodes in depth-first order to build t.rows
+	var activeKey interface{} = nil
+	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
+		activeKey = t.rows[t.activeLine].Key()
+	}
+	t.rows = make([]cache.HierarchicalTabularSourceRow, 0, len(t.nodes))
+	for _, node := range t.nodes {
+		node.Prefix("", true)
+		for _, childRow := range utils.DepthFirstTraversal(node, false) {
+			t.rows = append(t.rows, childRow.(cache.HierarchicalTabularSourceRow))
+			// change t.activeline so that the same row stays active, except if t.activeLine == 0
+			if t.activeLine != 0 && activeKey != nil && t.rows[len(t.rows)-1].Key() == activeKey {
+				t.activeLine = len(t.rows) - 1
+			}
+		}
+	}
+
+	if len(t.rows) == 0 {
+		t.topLine = 0
+		t.activeLine = 0
+	} else {
+		t.topLine = utils.Bounded(t.topLine, 0, len(t.rows)-1)
+		if t.NbrRows() == 0 {
+			t.activeLine = t.topLine
+		} else {
+			t.activeLine = utils.Bounded(t.activeLine, t.topLine, t.topLine+t.NbrRows())
+		}
+	}
+
+	t.computeMaxWidths()
+}
+
+func (t *Table) SetTraversable(open bool, recursive bool) {
+	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
+		t.rows[t.activeLine].SetTraversable(open, recursive)
+		t.Refresh() // meh. That's simpler but not needed
+	}
+}
+
+func (t *Table) Scroll(amount int) {
+	activeLine := utils.Bounded(t.activeLine+amount, 0, len(t.rows)-1)
+	switch {
+	case activeLine < t.topLine:
+		t.topLine = activeLine
+		t.activeLine = activeLine
+	case activeLine > t.topLine+t.NbrRows()-1:
+		scrollAmount := activeLine - (t.topLine + t.NbrRows() - 1)
+		t.topLine = utils.Bounded(t.topLine+scrollAmount, 0, len(t.rows)-1)
+		t.activeLine = t.topLine + t.NbrRows() - 1
+	default:
+		t.activeLine = activeLine
+	}
+}
+
+func (t *Table) Top() {
+	t.Scroll(-len(t.rows))
+}
+
+func (t *Table) Bottom() {
+	t.Scroll(len(t.rows))
+}
+
+func (t *Table) NextMatch(s string, ascending bool) bool {
+	if len(t.rows) == 0 {
+		return false
+	}
+
+	step := 1
+	if !ascending {
+		step = -1
+	}
+	start := utils.Modulo(t.activeLine+step, len(t.rows))
+	next := func(i int) int {
+		return utils.Modulo(i+step, len(t.rows))
+	}
+	for i := start; i != t.activeLine; i = next(i) {
+		row := t.rows[i]
+		for _, styledString := range row.Tabular() {
+			if styledString.Contains(s) {
+				t.Scroll(i - t.activeLine)
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (t Table) stringFromColumns(values map[string]text.StyledString, header bool) text.StyledString {
-	paddedColumns := make([]text.StyledString, len(t.Source.Headers()))
-	for j, name := range t.Source.Headers() {
+	paddedColumns := make([]text.StyledString, len(t.source.Headers()))
+	for j, name := range t.source.Headers() {
 		alignment := text.Left
 		if !header {
-			alignment = t.Source.Alignment()[name]
+			alignment = t.source.Alignment()[name]
 		}
 		paddedColumns[j] = values[name]
 		paddedColumns[j].Align(alignment, t.maxWidths[name])
@@ -244,42 +186,64 @@ func (t Table) stringFromColumns(values map[string]text.StyledString, header boo
 	return line
 }
 
-func (t *Table) Text() []text.LocalizedStyledString {
-	texts := make([]text.LocalizedStyledString, 0, len(t.Rows))
+func (t Table) Size() (int, int) {
+	return t.width, t.height
+}
 
-	headers := make(map[string]text.StyledString)
-	for _, header := range t.Source.Headers() {
-		headers[header] = text.NewStyledString(header)
+func (t *Table) Resize(width int, height int) error {
+	if width < 0 || height < 0 {
+		return errors.New("width and height must be >= 0")
 	}
 
-	s := t.stringFromColumns(headers, true)
-	s.Add(text.TableHeader)
-	texts = append(texts, text.LocalizedStyledString{
-		X: 0,
-		Y: 0,
-		S: s,
-	})
+	if height == 0 {
+		t.activeLine = 0
+	} else {
+		t.activeLine = utils.Bounded(t.activeLine, t.topLine, t.topLine+height-1)
+	}
+	t.width, t.height = width, height
 
-	for i, row := range t.Rows {
-		tx := text.LocalizedStyledString{
+	return nil
+}
+
+func (t *Table) Text() []text.LocalizedStyledString {
+	texts := make([]text.LocalizedStyledString, 0, len(t.rows))
+
+	if t.height > 0 {
+		headers := make(map[string]text.StyledString)
+		for _, header := range t.source.Headers() {
+			headers[header] = text.NewStyledString(header)
+		}
+
+		s := t.stringFromColumns(headers, true)
+		s.Add(text.TableHeader)
+		texts = append(texts, text.LocalizedStyledString{
+			X: 0,
+			Y: 0,
+			S: s,
+		})
+	}
+
+	for i := 0; i < t.NbrRows() && t.topLine+i < len(t.rows); i++ {
+		row := t.rows[t.topLine+i]
+		s := text.LocalizedStyledString{
 			X: 0,
 			Y: i + 1,
 			S: t.stringFromColumns(row.Tabular(), false),
 		}
 
-		if tx.Y == t.ActiveLine+1 {
-			tx.S.Add(text.ActiveRow)
+		if t.topLine+i == t.activeLine {
+			s.S.Add(text.ActiveRow)
 		}
 
-		texts = append(texts, tx)
+		texts = append(texts, s)
 	}
 
 	return texts
 }
 
 func (t Table) OpenInBrowser(browser string) error {
-	if t.ActiveLine >= 0 && t.ActiveLine < len(t.Rows) {
-		if url := t.Rows[t.ActiveLine].URL(); url != "" {
+	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
+		if url := t.rows[t.activeLine].URL(); url != "" {
 			argv := []string{path.Base(browser), url}
 			process, err := os.StartProcess(browser, argv, &os.ProcAttr{})
 			if err != nil {
@@ -296,10 +260,9 @@ func (t Table) OpenInBrowser(browser string) error {
 }
 
 func (t *Table) WriteToDisk(ctx context.Context, dir string) (string, cache.Streamer, error) {
-	if t.ActiveLine < 0 || t.ActiveLine >= len(t.Rows) {
-		return "", nil, errors.New("t.Activeline is out of range")
-	}
+	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
 
-	key := t.Rows[t.ActiveLine].Key()
-	return t.Source.WriteToDisk(ctx, key, dir)
+	}
+	key := t.rows[t.activeLine].Key()
+	return t.source.WriteToDisk(ctx, key, dir)
 }

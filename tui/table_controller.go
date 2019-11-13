@@ -30,7 +30,7 @@ type TableController struct {
 func NewTableController(tui *TUI, source cache.HierarchicalTabularDataSource, tempDir string, defaultStatus string) (TableController, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := 10, 10
-	table, err := widgets.NewTable(source, width, height, "  ")
+	table, err := widgets.NewTable(source, width, height)
 	if err != nil {
 		return TableController{}, err
 	}
@@ -56,10 +56,7 @@ func (c *TableController) Run(ctx context.Context, updates <-chan time.Time) err
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-updates:
-			texts, err := c.refresh()
-			if err != nil {
-				return err
-			}
+			texts := c.refresh()
 			c.tui.Draw(texts...)
 		case event := <-c.tui.eventc:
 			switch err := c.process(ctx, event); err {
@@ -84,12 +81,10 @@ func (c *TableController) clearStatus() {
 	c.setStatus(c.defaultStatus)
 }
 
-func (c *TableController) refresh() ([]text.LocalizedStyledString, error) {
-	if err := c.table.Refresh(); err != nil {
-		return nil, err
-	}
+func (c *TableController) refresh() []text.LocalizedStyledString {
+	c.table.Refresh()
 
-	return c.text(), nil
+	return c.text()
 }
 
 func (c TableController) text() []text.LocalizedStyledString {
@@ -143,19 +138,17 @@ func (c *TableController) process(ctx context.Context, event tcell.Event) error 
 	case *tcell.EventKey:
 		switch ev.Key() {
 		case tcell.KeyDown:
-			return c.table.Scroll(+1)
+			c.table.Scroll(+1)
 		case tcell.KeyUp:
-			return c.table.Scroll(-1)
+			c.table.Scroll(-1)
 		case tcell.KeyPgDn:
-			_, height := c.table.Size()
-			return c.table.Scroll(utils.MaxInt(1, height-2))
+			c.table.Scroll(c.table.NbrRows())
 		case tcell.KeyPgUp:
-			_, height := c.table.Size()
-			return c.table.Scroll(-utils.MaxInt(1, height-2))
+			c.table.Scroll(-c.table.NbrRows())
 		case tcell.KeyHome:
-			return c.table.Top()
+			c.table.Top()
 		case tcell.KeyEnd:
-			return c.table.Bottom()
+			c.table.Bottom()
 		case tcell.KeyEsc:
 			if c.inputMode {
 				c.inputMode = false
@@ -197,29 +190,17 @@ func (c *TableController) process(ctx context.Context, event tcell.Event) error 
 					return err
 				}
 			case 'j':
-				if err := c.table.Scroll(+1); err != nil {
-					return err
-				}
+				c.table.Scroll(+1)
 			case 'k':
-				if err := c.table.Scroll(-1); err != nil {
-					return err
-				}
+				c.table.Scroll(-1)
 			case 'c':
-				if err := c.table.SetFold(false, false); err != nil {
-					return err
-				}
+				c.table.SetTraversable(false, false)
 			case 'C', '-':
-				if err := c.table.SetFold(false, true); err != nil {
-					return err
-				}
+				c.table.SetTraversable(false, true)
 			case 'o':
-				if err := c.table.SetFold(true, false); err != nil {
-					return err
-				}
+				c.table.SetTraversable(true, false)
 			case 'O', '+':
-				if err := c.table.SetFold(true, true); err != nil {
-					return err
-				}
+				c.table.SetTraversable(true, true)
 			case 'n', 'N':
 				if c.status.InputBuffer != "" {
 					_ = c.table.NextMatch(c.status.InputBuffer, ev.Rune() == 'n')

@@ -71,7 +71,7 @@ func RunWidgetApp(repositoryURL string, travisToken string, gitlabToken string, 
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cacheDB := cache.NewCache(CIProviders)
-	source := cacheDB.BuildsByCommit(repositoryURL)
+	source := cacheDB.BuildsByCommit()
 
 	ui, err := NewTUI(defaultStyle, styleSheet)
 	if err != nil {
