@@ -88,7 +88,7 @@ func (t *Table) Refresh() {
 	}
 	t.rows = make([]cache.HierarchicalTabularSourceRow, 0, len(t.nodes))
 	for _, node := range t.nodes {
-		node.Prefix("", true)
+		cache.Prefix(node, "", true)
 		for _, childRow := range utils.DepthFirstTraversal(node, false) {
 			t.rows = append(t.rows, childRow.(cache.HierarchicalTabularSourceRow))
 			// change t.activeline so that the same row stays active, except if t.activeLine == 0

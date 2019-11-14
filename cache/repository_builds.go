@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mattn/go-runewidth"
+	"github.com/google/go-cmp/cmp"
 	"github.com/nbedos/citop/text"
 	"github.com/nbedos/citop/utils"
 )
@@ -30,7 +30,7 @@ type buildRowKey struct {
 type buildRow struct {
 	key         buildRowKey
 	type_       string
-	state       string
+	state       State
 	ref         string
 	name        string
 	provider    string
@@ -43,6 +43,11 @@ type buildRow struct {
 	children    []*buildRow
 	traversable bool
 	url         string
+}
+
+func (b buildRow) Diff(other buildRow) string {
+	options := cmp.AllowUnexported(buildRowKey{}, buildRow{})
+	return cmp.Diff(b, other, options)
 }
 
 func (b buildRow) Traversable() bool {
@@ -69,30 +74,22 @@ func (b buildRow) Tabular() map[string]text.StyledString {
 		return text.NewStyledString(s)
 	}
 
-	var state text.StyledString
+	state := text.NewStyledString(string(b.state))
 	switch b.state {
-	case "failed", "canceled":
-		state = text.NewStyledString(b.state, text.StatusFailed)
-	case "passed":
-		state = text.NewStyledString(b.state, text.StatusPassed)
-	case "pending", "running":
-		state = text.NewStyledString(b.state, text.StatusRunning)
-	default:
-		state = text.NewStyledString(b.state)
+	case Failed, Canceled:
+		state.Add(text.StatusFailed)
+	case Passed:
+		state.Add(text.StatusPassed)
+	case Pending, Running:
+		state.Add(text.StatusRunning)
 	}
 
-	var name text.StyledString
-	switch b.type_ {
-	case "P":
-		name = text.NewStyledString(b.prefix)
+	name := text.NewStyledString(b.prefix)
+	if b.type_ == "P" {
 		name.Append(b.provider, text.Provider)
 		name.Append(fmt.Sprintf(" (%s)", b.name))
-	default:
-		prefix := b.prefix
-		if prefix == "" {
-			prefix = nullPlaceholder
-		}
-		name = text.NewStyledString(fmt.Sprintf("%s%s", prefix, b.name))
+	} else {
+		name.Append(b.name)
 	}
 
 	return map[string]text.StyledString{
@@ -126,79 +123,11 @@ func (b *buildRow) SetTraversable(traversable bool, recursive bool) {
 	}
 }
 
-func (b *buildRow) Prefix(indent string, last bool) {
-	var prefix string
-	// Special behavior for the root node which is prefixed by "+" if its children are hidden
-	if indent == "" {
-		switch {
-		case len(b.Children()) == 0:
-			prefix = " "
-		case b.Traversable():
-			prefix = "-"
-		default:
-			prefix = "+"
-		}
-	} else {
-		if last {
-			prefix = "└─"
-		} else {
-			prefix = "├─"
-		}
-
-		if len(b.Children()) == 0 || b.Traversable() {
-			prefix += "─ "
-		} else {
-			prefix += "+ "
-		}
-	}
-
-	b.prefix = indent + prefix
-
-	if b.Traversable() {
-		for i, child := range b.children {
-			var childIndent string
-			if last {
-				childIndent = " "
-			} else {
-				childIndent = "│"
-			}
-
-			paddingLength := runewidth.StringWidth(prefix) - runewidth.StringWidth(childIndent)
-			childIndent += strings.Repeat(" ", paddingLength)
-			child.Prefix(indent+childIndent, i == len(b.children)-1)
-		}
-	}
+func (b *buildRow) SetPrefix(s string) {
+	b.prefix = s
 }
 
-type BuildsByCommit struct {
-	cache Cache
-}
-
-func (c *Cache) BuildsByCommit() BuildsByCommit {
-	return BuildsByCommit{
-		cache: *c,
-	}
-}
-
-func (s BuildsByCommit) Headers() []string {
-	return []string{"REF", "COMMIT", "TYPE", "STATE", "CREATED", "DURATION", "NAME"}
-}
-
-func (s BuildsByCommit) Alignment() map[string]text.Alignment {
-	return map[string]text.Alignment{
-		"REF":      text.Left,
-		"COMMIT":   text.Left,
-		"TYPE":     text.Right,
-		"STATE":    text.Left,
-		"CREATED":  text.Left,
-		"STARTED":  text.Left,
-		"UPDATED":  text.Left,
-		"DURATION": text.Right,
-		"NAME":     text.Left,
-	}
-}
-
-func Ref(ref string, tag bool) string {
+func ref(ref string, tag bool) string {
 	if tag {
 		return fmt.Sprintf("tag: %s", ref)
 	}
@@ -206,7 +135,7 @@ func Ref(ref string, tag bool) string {
 }
 
 func buildRowFromBuild(b Build) buildRow {
-	ref := Ref(b.Ref, b.IsTag)
+	ref := ref(b.Ref, b.IsTag)
 	row := buildRow{
 		key: buildRowKey{
 			sha:       b.Commit.Sha,
@@ -214,7 +143,7 @@ func buildRowFromBuild(b Build) buildRow {
 			buildID:   b.ID,
 		},
 		type_:      "P",
-		state:      string(b.State),
+		state:      b.State,
 		ref:        ref,
 		createdAt:  b.CreatedAt,
 		startedAt:  b.StartedAt,
@@ -264,7 +193,7 @@ func buildRowFromStage(accountID string, sha string, ref string, buildID string,
 			stageID:   s.ID,
 		},
 		type_:    "S",
-		state:    string(s.State),
+		state:    s.State,
 		ref:      ref,
 		name:     s.Name,
 		url:      webURL,
@@ -316,7 +245,7 @@ func buildRowFromJob(accountID string, sha string, ref string, buildID string, s
 			jobID:     j.ID,
 		},
 		type_:      "J",
-		state:      string(j.State),
+		state:      j.State,
 		name:       fmt.Sprintf("%s (#%d)", j.Name, j.ID),
 		ref:        ref,
 		createdAt:  j.CreatedAt,
@@ -340,7 +269,7 @@ func commitRowFromBuilds(builds []Build) buildRow {
 			sha: builds[0].Commit.Sha,
 		},
 		type_:       "C",
-		ref:         Ref(builds[0].Ref, builds[0].IsTag),
+		ref:         ref(builds[0].Ref, builds[0].IsTag),
 		name:        messageLines[0],
 		children:    make([]*buildRow, 0, len(builds)),
 		traversable: false,
@@ -373,7 +302,7 @@ func commitRowFromBuilds(builds []Build) buildRow {
 		}
 	}
 
-	row.state = string(AggregateStatuses(latestBuilds))
+	row.state = AggregateStatuses(latestBuilds)
 
 	sort.Slice(row.children, func(i, j int) bool {
 		ti := utils.MinNullTime(
@@ -394,7 +323,35 @@ func commitRowFromBuilds(builds []Build) buildRow {
 	return row
 }
 
-func (s *BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
+type BuildsByCommit struct {
+	cache Cache
+}
+
+func (c *Cache) BuildsByCommit() BuildsByCommit {
+	return BuildsByCommit{
+		cache: *c,
+	}
+}
+
+func (s BuildsByCommit) Headers() []string {
+	return []string{"REF", "COMMIT", "TYPE", "STATE", "CREATED", "DURATION", "NAME"}
+}
+
+func (s BuildsByCommit) Alignment() map[string]text.Alignment {
+	return map[string]text.Alignment{
+		"REF":      text.Left,
+		"COMMIT":   text.Left,
+		"TYPE":     text.Right,
+		"STATE":    text.Left,
+		"CREATED":  text.Left,
+		"STARTED":  text.Left,
+		"UPDATED":  text.Left,
+		"DURATION": text.Right,
+		"NAME":     text.Left,
+	}
+}
+
+func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 	type Ref struct {
 		sha   string
 		ref   string
@@ -435,57 +392,6 @@ func (s *BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 
 	return rows
 }
-
-/*
-func (s *BuildsByCommit) NextMatch(top, bottom, active interface{}, search string, ascending bool) ([]HierarchicalTabularSourceRow, int, error) {
-	activeKey, ok := active.(buildRowKey)
-	if !ok {
-		return nil, 0, fmt.Errorf("casting key %v to buildRowKey failed", active)
-	}
-	topKey, ok := top.(buildRowKey)
-	if !ok {
-		return nil, 0, fmt.Errorf("casting key %v to buildRowKey failed", top)
-	}
-	bottomKey, ok := bottom.(buildRowKey)
-	if !ok {
-		return nil, 0, fmt.Errorf("casting key %v to buildRowKey failed", bottom)
-	}
-
-	var next func(int) int
-	var start int
-	if ascending {
-		start = utils.Modulo(s.dfsIndex[activeKey]+1, len(s.dfsTraversal))
-		next = func(i int) int {
-			return utils.Modulo(i+1, len(s.dfsTraversal))
-		}
-	} else {
-		start = utils.Modulo(s.dfsIndex[activeKey]-1, len(s.dfsTraversal))
-		next = func(i int) int {
-			return utils.Modulo(i-1, len(s.dfsTraversal))
-		}
-	}
-
-	for i := start; i != s.dfsIndex[activeKey]; i = next(i) {
-		row := s.dfsTraversal[i]
-		for _, styledString := range row.Tabular() {
-			if styledString.Contains(search) {
-				nbrRows := s.dfsIndex[bottomKey] - s.dfsIndex[topKey] + 1
-				var maxIndex, minIndex int
-				if i > s.dfsIndex[activeKey] {
-					maxIndex = utils.MaxInt(s.dfsIndex[bottomKey], i)
-					minIndex = utils.MaxInt(s.dfsIndex[topKey], maxIndex-nbrRows+1)
-				} else {
-					minIndex = utils.MinInt(s.dfsIndex[topKey], i)
-					maxIndex = utils.MinInt(s.dfsIndex[bottomKey], minIndex+nbrRows-1)
-				}
-
-				return s.Select(row.key, i-minIndex, maxIndex-i)
-			}
-		}
-	}
-
-	return nil, 0, ErrNoMatchFound
-}*/
 
 var ErrNoLogHere = errors.New("no log is associated to this row")
 

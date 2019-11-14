@@ -31,6 +31,14 @@ type StyledString struct {
 	components []elementaryString
 }
 
+func (s StyledString) String() string {
+	buf := bytes.Buffer{}
+	for _, c := range s.components {
+		buf.WriteString(c.Content)
+	}
+	return buf.String()
+}
+
 func (s *StyledString) Add(c Class) {
 	for i := range s.components {
 		s.components[i].Classes = append(s.components[i].Classes, c)

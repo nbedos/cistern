@@ -42,7 +42,9 @@ func (r *testRow) SetTraversable(open bool, recursive bool) {
 	}
 }
 
-func (r *testRow) Prefix(indent string, last bool) {}
+func (r *testRow) SetPrefix(s string) {
+	r.prefix = s
+}
 
 func (r *testRow) Tabular() map[string]text.StyledString {
 	return map[string]text.StyledString{
