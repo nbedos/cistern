@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/gdamore/tcell"
+	"github.com/nbedos/citop/cache"
+	"github.com/nbedos/citop/providers"
 	"github.com/nbedos/citop/tui"
 	"github.com/nbedos/citop/utils"
 )
@@ -52,7 +57,28 @@ func main() {
 		}
 	}
 
-	if err := tui.RunWidgetApp(repository, travisToken, gitlabToken, circleCIToken); err != nil {
+	CIProviders := []cache.Provider{
+		providers.NewTravisClient(
+			providers.TravisOrgURL,
+			providers.TravisPusherHost,
+			travisToken,
+			"travis",
+			50*time.Millisecond),
+
+		providers.NewGitLabClient(
+			"gitlab",
+			gitlabToken,
+			100*time.Millisecond),
+
+		providers.NewCircleCIClient(
+			providers.CircleCIURL,
+			"circleci",
+			circleCIToken,
+			100*time.Millisecond),
+	}
+
+	ctx := context.Background()
+	if err := tui.RunApplication(ctx, tcell.NewScreen, repository, CIProviders); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}

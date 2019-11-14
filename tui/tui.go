@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -12,18 +13,21 @@ import (
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/encoding"
 	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/providers"
 	"github.com/nbedos/citop/text"
 )
 
 type ExecCmd struct {
 	name   string
 	args   []string
-	dir    string
 	stream cache.Streamer
 }
 
-func RunWidgetApp(repositoryURL string, travisToken string, gitlabToken string, circleciToken string) (err error) {
+var ErrNoProvider = errors.New("list of providers must not be empty")
+
+func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repositoryURL string, providers []cache.Provider) (err error) {
+	if len(providers) == 0 {
+		return ErrNoProvider
+	}
 	// FIXME Discard log until the status bar is implemented in order to hide the "Unsolicited response received on
 	//  idle HTTP channel" from GitLab's HTTP client
 	log.SetOutput(ioutil.Discard)
@@ -49,31 +53,11 @@ func RunWidgetApp(repositoryURL string, travisToken string, gitlabToken string, 
 	}
 	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  b:Browser  ?:Help  q:Quit"
 
-	CIProviders := []cache.Provider{
-		providers.NewTravisClient(
-			providers.TravisOrgURL,
-			providers.TravisPusherHost,
-			travisToken,
-			"travis",
-			50*time.Millisecond),
-
-		providers.NewGitLabClient(
-			"gitlab",
-			gitlabToken,
-			100*time.Millisecond),
-
-		providers.NewCircleCIClient(
-			providers.CircleCIURL,
-			"circleci",
-			circleciToken,
-			100*time.Millisecond),
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cacheDB := cache.NewCache(CIProviders)
+	ctx, cancel := context.WithCancel(ctx)
+	cacheDB := cache.NewCache(providers)
 	source := cacheDB.BuildsByCommit()
 
-	ui, err := NewTUI(defaultStyle, styleSheet)
+	ui, err := NewTUI(newScreen, defaultStyle, styleSheet)
 	if err != nil {
 		return err
 	}
@@ -86,21 +70,33 @@ func RunWidgetApp(repositoryURL string, travisToken string, gitlabToken string, 
 		return err
 	}
 
-	errc := make(chan error)
+	errCache := make(chan error)
 	updates := make(chan time.Time)
 	go func() {
-		errc <- cacheDB.UpdateFromProviders(ctx, repositoryURL, 7*24*time.Hour, updates)
+		errCache <- cacheDB.UpdateFromProviders(ctx, repositoryURL, 7*24*time.Hour, updates)
 	}()
 
+	errController := make(chan error)
 	go func() {
-		errc <- controller.Run(ctx, updates)
+		errController <- controller.Run(ctx, updates)
 	}()
 
+	var e error
+	errSet := false
 	for i := 0; i < 2; i++ {
-		e := <-errc
-		if i == 0 {
-			cancel()
-			err = e
+		select {
+		case e = <-errCache:
+			if e != nil && !errSet {
+				cancel()
+				err = e
+				errSet = true
+			}
+		case e = <-errController:
+			if !errSet {
+				cancel()
+				err = e
+				errSet = true
+			}
 		}
 	}
 
@@ -108,14 +104,16 @@ func RunWidgetApp(repositoryURL string, travisToken string, gitlabToken string, 
 }
 
 type TUI struct {
+	newScreen    func() (tcell.Screen, error)
 	screen       tcell.Screen
 	defaultStyle tcell.Style
 	styleSheet   text.StyleSheet
 	eventc       chan tcell.Event
 }
 
-func NewTUI(defaultStyle tcell.Style, styleSheet text.StyleSheet) (TUI, error) {
+func NewTUI(newScreen func() (tcell.Screen, error), defaultStyle tcell.Style, styleSheet text.StyleSheet) (TUI, error) {
 	ui := TUI{
+		newScreen:    newScreen,
 		defaultStyle: defaultStyle,
 		styleSheet:   styleSheet,
 		eventc:       make(chan tcell.Event),
@@ -127,7 +125,7 @@ func NewTUI(defaultStyle tcell.Style, styleSheet text.StyleSheet) (TUI, error) {
 
 func (t *TUI) init() error {
 	var err error
-	t.screen, err = tcell.NewScreen()
+	t.screen, err = t.newScreen()
 	if err != nil {
 		return err
 	}
@@ -178,7 +176,13 @@ type errCmd struct{ error }
 func (e errCmd) Error() string { return e.error.Error() }
 
 func (t *TUI) Exec(ctx context.Context, e ExecCmd) error {
+	var err error
 	t.Finish()
+	defer func() {
+		if e := t.init(); err == nil {
+			err = e
+		}
+	}()
 
 	cmdCtx, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(cmdCtx, e.name, e.args...)
@@ -208,7 +212,6 @@ func (t *TUI) Exec(ctx context.Context, e ExecCmd) error {
 		close(errc)
 	}()
 
-	var err error
 	errSet := false
 	for e := range errc {
 		switch e := e.(type) {
@@ -228,9 +231,6 @@ func (t *TUI) Exec(ctx context.Context, e ExecCmd) error {
 			}
 		}
 	}
-	if err != nil {
-		return err
-	}
 
-	return t.init()
+	return err
 }

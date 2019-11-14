@@ -224,7 +224,6 @@ func (c *TableController) process(ctx context.Context, event tcell.Event) error 
 				cmd := ExecCmd{
 					name:   "less",
 					args:   []string{path.Join(c.tempDir, path.Base(file.Name()))},
-					dir:    c.tempDir,
 					stream: nil,
 				}
 				if err := c.tui.Exec(ctx, cmd); err != nil {
@@ -257,7 +256,6 @@ func (c *TableController) process(ctx context.Context, event tcell.Event) error 
 				cmd := ExecCmd{
 					name:   "less",
 					args:   append(args, logPath),
-					dir:    c.tempDir,
 					stream: stream,
 				}
 

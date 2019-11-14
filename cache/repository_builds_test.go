@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"io/ioutil"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -374,6 +375,7 @@ func TestBuildsByCommit_WriteToDisk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer os.RemoveAll(dir)
 
 	t.Run("no log is associated to builds", func(t *testing.T) {
 		_, _, err := source.WriteToDisk(context.Background(), buildAsRow.Key(), dir)
@@ -399,7 +401,6 @@ func TestBuildsByCommit_WriteToDisk(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		if log := "provider\n"; string(p) != log {
 			t.Fatalf("expected %q but got %q", log, string(p))
 		}
