@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
 	"github.com/gorilla/websocket"
 )
 
@@ -40,10 +40,8 @@ func TestPusherClientSendReadJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if diff := deep.Equal(event, expected); len(diff) > 0 {
-			for _, line := range diff {
-				t.Log(line)
-			}
+		if diff := cmp.Diff(event, expected); diff != "" {
+			t.Log(diff)
 			t.Fatalf("expected %+v but got %+v", expected, event)
 		}
 

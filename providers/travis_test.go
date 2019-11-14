@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
 )
@@ -201,10 +201,8 @@ func TestTravisClientfetchBuild(t *testing.T) {
 		},
 	}
 
-	if diff := deep.Equal(expectedBuild, build); diff != nil {
-		for _, line := range diff {
-			t.Log(line)
-		}
+	if diff := cmp.Diff(expectedBuild, build); diff != "" {
+		t.Log(diff)
 		t.Fatal("invalid build")
 	}
 }
@@ -254,8 +252,9 @@ func TestTravisClientRepository(t *testing.T) {
 			Name:      "citop",
 		}
 
-		if diff := deep.Equal(expected, repository); len(diff) > 0 {
-			t.Fatal(diff)
+		if diff := cmp.Diff(expected, repository); diff != "" {
+			t.Log(diff)
+			t.Fail()
 		}
 	})
 
@@ -332,10 +331,8 @@ func TestTravisClientFetchBuilds(t *testing.T) {
 		598749982: {},
 	}
 
-	if diff := deep.Equal(expectedIDs, ids); len(diff) > 0 {
-		for _, line := range diff {
-			t.Log(line)
-		}
+	if diff := cmp.Diff(expectedIDs, ids); diff != "" {
+		t.Log(diff)
 		t.Fatal("invalid id")
 	}
 }
