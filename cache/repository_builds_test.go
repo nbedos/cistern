@@ -378,21 +378,21 @@ func TestBuildsByCommit_WriteToDisk(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	t.Run("no log is associated to builds", func(t *testing.T) {
-		_, _, err := source.WriteToDisk(context.Background(), buildAsRow.Key(), dir)
+		_, err := source.WriteToDisk(context.Background(), buildAsRow.Key(), dir)
 		if err != ErrNoLogHere {
 			t.Fatalf("expected %v but got %v", ErrNoLogHere, err)
 		}
 	})
 
 	t.Run("no log is associated to stages", func(t *testing.T) {
-		_, _, err := source.WriteToDisk(context.Background(), stageAsRow.Key(), dir)
+		_, err := source.WriteToDisk(context.Background(), stageAsRow.Key(), dir)
 		if err != ErrNoLogHere {
 			t.Fatalf("expected %v but got %v", ErrNoLogHere, err)
 		}
 	})
 
 	t.Run("log of job must be written to disk", func(t *testing.T) {
-		path, _, err := source.WriteToDisk(context.Background(), jobAsRow.Key(), dir)
+		path, err := source.WriteToDisk(context.Background(), jobAsRow.Key(), dir)
 		if err != nil {
 			t.Fatal(err)
 		}

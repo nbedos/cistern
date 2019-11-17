@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"time"
@@ -26,6 +25,8 @@ type TableController struct {
 	inputMode     bool
 	defaultStatus string
 }
+
+var ErrExit = errors.New("exit")
 
 func NewTableController(tui *TUI, source cache.HierarchicalTabularDataSource, tempDir string, defaultStatus string) (TableController, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
@@ -51,26 +52,23 @@ func NewTableController(tui *TUI, source cache.HierarchicalTabularDataSource, te
 }
 
 func (c *TableController) Run(ctx context.Context, updates <-chan time.Time) error {
-	for exit := false; !exit; {
+	var err error
+	for err == nil {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			err = ctx.Err()
 		case <-updates:
-			texts := c.refresh()
-			c.tui.Draw(texts...)
+			c.refresh()
+			c.draw()
 		case event := <-c.tui.eventc:
-			switch err := c.process(ctx, event); err {
-			case nil:
-				// Do nothing
-			case ErrExit:
-				exit = true
-			default:
-				return err
-			}
+			err = c.process(ctx, event)
 		}
 	}
 
-	return nil
+	if err == ErrExit {
+		return nil
+	}
+	return err
 }
 
 func (c *TableController) setStatus(s string) {
@@ -81,10 +79,8 @@ func (c *TableController) clearStatus() {
 	c.setStatus(c.defaultStatus)
 }
 
-func (c *TableController) refresh() []text.LocalizedStyledString {
+func (c *TableController) refresh() {
 	c.table.Refresh()
-
-	return c.text()
 }
 
 func (c TableController) text() []text.LocalizedStyledString {
@@ -103,38 +99,27 @@ func (c TableController) text() []text.LocalizedStyledString {
 	return texts
 }
 
-func (c *TableController) resize(width int, height int) error {
-	if width < 0 || height < 0 {
-		return errors.New("width and height must be >=0")
-	}
+func (c *TableController) resize(width int, height int) {
+	width = utils.MaxInt(width, 0)
+	height = utils.MaxInt(height, 0)
+
 	tableHeight := utils.MaxInt(0, height-1)
 	statusHeight := height - tableHeight
 
-	if err := c.table.Resize(width, tableHeight); err != nil {
-		return err
-	}
-
-	if err := c.status.Resize(width, statusHeight); err != nil {
-		return err
-	}
-
-	return nil
+	c.table.Resize(width, tableHeight)
+	c.status.Resize(width, statusHeight)
 }
 
 func (c *TableController) draw() {
 	c.tui.Draw(c.text()...)
 }
 
-var ErrExit = errors.New("exit")
-
 func (c *TableController) process(ctx context.Context, event tcell.Event) error {
 	c.clearStatus()
 	switch ev := event.(type) {
 	case *tcell.EventResize:
 		sx, sy := ev.Size()
-		if err := c.resize(sx, sy); err != nil {
-			log.Fatal(err)
-		}
+		c.resize(sx, sy)
 	case *tcell.EventKey:
 		switch ev.Key() {
 		case tcell.KeyDown:
@@ -222,15 +207,14 @@ func (c *TableController) process(ctx context.Context, event tcell.Event) error 
 				}
 
 				cmd := ExecCmd{
-					name:   "less",
-					args:   []string{path.Join(c.tempDir, path.Base(file.Name()))},
-					stream: nil,
+					name: "less",
+					args: []string{path.Join(c.tempDir, path.Base(file.Name()))},
 				}
 				if err := c.tui.Exec(ctx, cmd); err != nil {
 					return err
 				}
 
-			case 'e', 'v':
+			case 'v':
 				c.setStatus("Fetching logs...")
 				c.draw()
 				defer func() {
@@ -238,7 +222,7 @@ func (c *TableController) process(ctx context.Context, event tcell.Event) error 
 					c.draw()
 				}()
 
-				logPath, stream, err := c.table.WriteToDisk(ctx, c.tempDir)
+				logPath, err := c.table.WriteToDisk(ctx, c.tempDir)
 				if err != nil {
 					if err == cache.ErrNoLogHere {
 						return nil
@@ -246,17 +230,9 @@ func (c *TableController) process(ctx context.Context, event tcell.Event) error 
 					return err
 				}
 
-				var args []string
-				if stream == nil {
-					args = []string{"-R"}
-				} else {
-					args = []string{"+F", "-R"}
-				}
-
 				cmd := ExecCmd{
-					name:   "less",
-					args:   append(args, logPath),
-					stream: stream,
+					name: "less",
+					args: []string{"-R", logPath},
 				}
 
 				return c.tui.Exec(ctx, cmd)

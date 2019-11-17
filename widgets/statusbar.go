@@ -42,13 +42,9 @@ func (s StatusBar) Size() (int, int) {
 	return s.width, s.height
 }
 
-func (s *StatusBar) Resize(width int, height int) error {
-	if width < 0 || height < 0 {
-		return errors.New("width and height must be >= 0")
-	}
-
-	s.width, s.height = width, height
-	return nil
+func (s *StatusBar) Resize(width int, height int) {
+	s.width = utils.MaxInt(0, width)
+	s.height = utils.MaxInt(0, height)
 }
 
 func (s StatusBar) Text() []text.LocalizedStyledString {

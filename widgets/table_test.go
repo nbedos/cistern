@@ -78,8 +78,8 @@ func (s testSource) Alignment() map[string]text.Alignment {
 	return map[string]text.Alignment{"VALUE": text.Left}
 }
 
-func (r testSource) WriteToDisk(ctx context.Context, key interface{}, dir string) (string, cache.Streamer, error) {
-	return "", nil, nil
+func (r testSource) WriteToDisk(ctx context.Context, key interface{}, dir string) (string, error) {
+	return "", nil
 }
 
 var source = testSource{
@@ -319,9 +319,7 @@ func TestTable_Resize(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := table.Resize(0, 0); err != nil {
-			t.Fatal()
-		}
+		table.Resize(0, 0)
 
 		for _, amount := range []int{0, 1, 999, -1, -999, 1, 0} {
 			table.Scroll(amount)
@@ -342,10 +340,7 @@ func TestTable_Text(t *testing.T) {
 		}
 
 		for _, height := range []int{0, 1, 5, 10} {
-			if err := table.Resize(10, height); err != nil {
-				t.Fatal(err)
-			}
-
+			table.Resize(10, height)
 			table.Text()
 
 			//TODO

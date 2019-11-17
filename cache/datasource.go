@@ -9,8 +9,6 @@ import (
 	"github.com/nbedos/citop/utils"
 )
 
-type Streamer func(context.Context) error
-
 type HierarchicalTabularSourceRow interface {
 	Tabular() map[string]text.StyledString
 	Key() interface{}
@@ -23,7 +21,7 @@ type HierarchicalTabularDataSource interface {
 	Rows() []HierarchicalTabularSourceRow
 	Headers() []string
 	Alignment() map[string]text.Alignment
-	WriteToDisk(ctx context.Context, key interface{}, tmpDir string) (string, Streamer, error)
+	WriteToDisk(ctx context.Context, key interface{}, tmpDir string) (string, error)
 }
 
 func Prefix(row HierarchicalTabularSourceRow, indent string, last bool) {

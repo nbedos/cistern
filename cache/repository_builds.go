@@ -312,7 +312,7 @@ func commitRowFromBuilds(builds []Build) buildRow {
 			row.children[i].finishedAt)
 
 		tj := utils.MinNullTime(
-			row.children[i].createdAt,
+			row.children[j].createdAt,
 			row.children[j].startedAt,
 			row.children[j].updatedAt,
 			row.children[j].finishedAt)
@@ -395,15 +395,15 @@ func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 
 var ErrNoLogHere = errors.New("no log is associated to this row")
 
-func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir string) (string, Streamer, error) {
+func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir string) (string, error) {
 	// TODO Allow filtering for errored jobs
 	buildKey, ok := key.(buildRowKey)
 	if !ok {
-		return "", nil, fmt.Errorf("key conversion to buildRowKey failed: '%v'", key)
+		return "", fmt.Errorf("key conversion to buildRowKey failed: '%v'", key)
 	}
 
 	if buildKey.jobID == 0 {
-		return "", nil, ErrNoLogHere
+		return "", ErrNoLogHere
 	}
 
 	accountID := buildKey.accountID
@@ -413,23 +413,13 @@ func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir st
 
 	pattern := fmt.Sprintf("job_%d_*.log", jobID)
 	file, err := ioutil.TempFile(dir, pattern)
+	w := utils.NewANSIStripper(file)
+	defer w.Close()
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 	logPath := path.Join(dir, filepath.Base(file.Name()))
 
-	switch err := s.cache.WriteLog(ctx, accountID, buildID, stageID, jobID, file); err {
-	case ErrIncompleteLog:
-		stream := func(ctx context.Context) error {
-			defer file.Close()
-			w := utils.NewANSIStripper(file)
-			return s.cache.StreamLog(ctx, accountID, buildID, stageID, jobID, w)
-		}
-		return logPath, stream, nil
-	case nil:
-		return logPath, nil, file.Close()
-	default:
-		file.Close()
-		return logPath, nil, err
-	}
+	err = s.cache.WriteLog(ctx, accountID, buildID, stageID, jobID, w)
+	return logPath, err
 }

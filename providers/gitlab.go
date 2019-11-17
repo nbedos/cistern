@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,7 +38,7 @@ func (c GitLabClient) AccountID() string {
 }
 
 // TODO Implement live updates once https://github.com/xanzy/go-gitlab/pull/731 is merged
-func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, maxAge time.Duration, buildc chan<- cache.Build) error {
+func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
 	repository, err := c.Repository(ctx, repositoryURL)
 	if err != nil {
 		return err
@@ -56,73 +55,11 @@ func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, maxAge t
 
 	var active bool
 	for {
-		if active, err = c.LastBuilds(ctx, repository, maxAge, buildc); err != nil {
+		if active, err = c.LastBuilds(ctx, repository, limit, buildc); err != nil {
 			return err
 		}
 		if active {
 			b.Reset()
-		}
-
-		waitTime := b.NextBackOff()
-		if waitTime == backoff.Stop {
-			break
-		}
-
-		select {
-		case <-time.After(waitTime):
-			// Do nothing
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-
-	return nil
-}
-
-func (c GitLabClient) StreamLog(ctx context.Context, repositoryID int, jobID int, writer io.Writer) error {
-	b := backoff.ExponentialBackOff{
-		InitialInterval:     10 * time.Second,
-		RandomizationFactor: backoff.DefaultRandomizationFactor,
-		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         time.Hour,
-		MaxElapsedTime:      0,
-		Clock:               backoff.SystemClock,
-	}
-	b.Reset()
-
-	contentLength := 0
-	traceLength := 0
-	jobIsRunning := true
-	for jobIsRunning {
-		job, _, err := c.GetJob(ctx, repositoryID, jobID)
-		if err != nil {
-			return err
-		}
-		jobIsRunning = FromGitLabState(job.Status).IsActive()
-
-		// Ideally we would use the Range HTTP request header to get the next part of the log
-		// but that is not supported by GitLab. So we rely on Content-Length to monitor log
-		// changes.
-		nextContentLength, _, err := c.GetTraceFileSize(ctx, repositoryID, jobID)
-		if err != nil {
-			return err
-		}
-		if nextContentLength > contentLength {
-			buf, n, _, err := c.GetTraceFile(ctx, repositoryID, jobID)
-			if err != nil {
-				return err
-			}
-			contentLength = n
-
-			if buf.Len() > traceLength {
-				b.Reset()
-				_ = buf.Next(traceLength)
-				written, err := buf.WriteTo(writer)
-				if err != nil {
-					return err
-				}
-				traceLength += int(written)
-			}
 		}
 
 		waitTime := b.NextBackOff()
@@ -148,28 +85,6 @@ func (c *GitLabClient) GetJob(ctx context.Context, repositoryID int, jobID int) 
 		return nil, nil, ctx.Err()
 	}
 	return c.remote.Jobs.GetJob(repositoryID, jobID, gitlab.WithContext(ctx))
-}
-
-func (c *GitLabClient) GetTraceFileSize(ctx context.Context, projectID int, jobID int) (int, *gitlab.Response, error) {
-	u := fmt.Sprintf("projects/%d/jobs/%d/trace", projectID, jobID)
-
-	req, err := c.remote.NewRequest("HEAD", u, nil, []gitlab.OptionFunc{gitlab.WithContext(ctx)})
-	if err != nil {
-		return 0, nil, err
-	}
-
-	traceBuf := new(bytes.Buffer)
-	resp, err := c.remote.Do(req, traceBuf)
-	if err != nil {
-		return 0, resp, err
-	}
-
-	contentLength, err := strconv.Atoi(resp.Header.Get("Content-Length"))
-	if err != nil {
-		return 0, resp, err
-	}
-
-	return contentLength, resp, err
 }
 
 func (c *GitLabClient) GetTraceFile(ctx context.Context, repositoryID int, jobID int) (bytes.Buffer, int, *gitlab.Response, error) {
@@ -246,17 +161,17 @@ func FromGitLabState(s string) cache.State {
 	}
 }
 
-func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) (bool, error) {
+func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repository, limit int, buildc chan<- cache.Build) (bool, error) {
+	defaultPageSize := 20
 	opt := gitlab.ListProjectPipelinesOptions{
 		ListOptions: gitlab.ListOptions{
-			Page:    0,
-			PerPage: 20,
+			Page: 0,
 		},
 	}
 	active := false
-	lastPage := false
 
-	for opt.ListOptions.Page = 0; !lastPage; opt.ListOptions.Page++ {
+	for opt.ListOptions.Page = 0; opt.ListOptions.Page*defaultPageSize < limit; opt.ListOptions.Page++ {
+		opt.ListOptions.PerPage = utils.MinInt(defaultPageSize, limit-opt.ListOptions.Page*defaultPageSize)
 		select {
 		case <-c.rateLimiter:
 		case <-ctx.Done():
@@ -268,20 +183,14 @@ func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repositor
 			return active, err
 		}
 		if len(pipelines) == 0 {
-			lastPage = true
-			continue
+			break
 		}
 
-	pipelines:
 		for _, minimalPipeline := range pipelines {
 			active = active || FromGitLabState(minimalPipeline.Status).IsActive()
-
-			if minimalPipeline.CreatedAt != nil && time.Since(*minimalPipeline.CreatedAt) > maxAge {
-				lastPage = true
-				continue pipelines
-			}
-
+			c.mux.Lock()
 			lastUpdate := c.updateTimePerBuildID[strconv.Itoa(minimalPipeline.ID)]
+			c.mux.Unlock()
 			if minimalPipeline.UpdatedAt != nil && minimalPipeline.UpdatedAt.After(lastUpdate) {
 				build, err := c.fetchBuild(ctx, &repository, minimalPipeline.ID)
 				if err != nil {

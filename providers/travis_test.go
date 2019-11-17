@@ -36,13 +36,13 @@ func TestTravisClientfetchBuild(t *testing.T) {
 	}
 
 	client := TravisClient{
-		baseURL:        *URL,
-		httpClient:     ts.Client(),
-		pusherHost:     "",
-		rateLimiter:    time.Tick(time.Millisecond),
-		token:          "token",
-		accountID:      "travis",
-		buildsPageSize: 10,
+		baseURL:              *URL,
+		httpClient:           ts.Client(),
+		rateLimiter:          time.Tick(time.Millisecond),
+		token:                "token",
+		accountID:            "travis",
+		buildsPageSize:       10,
+		updateTimePerBuildID: make(map[string]time.Time),
 	}
 
 	repository := cache.Repository{
@@ -229,13 +229,13 @@ func TestTravisClientRepository(t *testing.T) {
 	}
 
 	client := TravisClient{
-		baseURL:        *URL,
-		httpClient:     ts.Client(),
-		pusherHost:     "",
-		rateLimiter:    time.Tick(time.Millisecond),
-		token:          "token",
-		accountID:      "travis",
-		buildsPageSize: 10,
+		baseURL:              *URL,
+		httpClient:           ts.Client(),
+		rateLimiter:          time.Tick(time.Millisecond),
+		token:                "token",
+		accountID:            "travis",
+		buildsPageSize:       10,
+		updateTimePerBuildID: make(map[string]time.Time),
 	}
 
 	t.Run("Get nbedos/citop", func(t *testing.T) {
@@ -291,13 +291,13 @@ func TestTravisClientFetchBuilds(t *testing.T) {
 	}
 
 	client := TravisClient{
-		baseURL:        *URL,
-		httpClient:     ts.Client(),
-		pusherHost:     "",
-		rateLimiter:    time.Tick(time.Millisecond),
-		token:          "token",
-		accountID:      "travis",
-		buildsPageSize: 10,
+		baseURL:              *URL,
+		httpClient:           ts.Client(),
+		rateLimiter:          time.Tick(time.Millisecond),
+		token:                "token",
+		accountID:            "travis",
+		buildsPageSize:       10,
+		updateTimePerBuildID: make(map[string]time.Time),
 	}
 
 	repository := cache.Repository{
@@ -371,13 +371,13 @@ func TestTravisClientRepositoryBuilds(t *testing.T) {
 	}
 
 	client := TravisClient{
-		baseURL:        *URL,
-		httpClient:     ts.Client(),
-		pusherHost:     "",
-		rateLimiter:    time.Tick(time.Millisecond),
-		token:          "token",
-		accountID:      "travis",
-		buildsPageSize: 10,
+		baseURL:              *URL,
+		httpClient:           ts.Client(),
+		rateLimiter:          time.Tick(time.Millisecond),
+		token:                "token",
+		accountID:            "travis",
+		buildsPageSize:       10,
+		updateTimePerBuildID: make(map[string]time.Time),
 	}
 
 	repository := cache.Repository{
@@ -388,21 +388,20 @@ func TestTravisClientRepositoryBuilds(t *testing.T) {
 		Name:      "citop",
 	}
 
-	now := time.Now()
-	maxAge := now.Sub(time.Date(2019, 10, 14, 0, 0, 0, 0, time.UTC))
 	buildc := make(chan cache.Build)
 	var errRepositoryBuild error = nil
+	nbrBuilds := 25
 	go func() {
-		errRepositoryBuild = client.repositoryBuilds(context.Background(), &repository, maxAge, buildc)
+		errRepositoryBuild = client.repositoryBuilds(context.Background(), &repository, nbrBuilds, buildc)
 		close(buildc)
 	}()
 
+	builds := make([]cache.Build, 0)
 	for build := range buildc {
-		if build.StartedAt.Valid {
-			if age := now.Sub(build.StartedAt.Time); age > maxAge {
-				t.Fatalf("build is older than %v: %v", maxAge, age)
-			}
-		}
+		builds = append(builds, build)
+	}
+	if len(builds) != nbrBuilds {
+		t.Fatalf("expected %d builds but got %d", nbrBuilds, len(builds))
 	}
 
 	if errRepositoryBuild != nil {

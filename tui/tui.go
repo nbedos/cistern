@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"sync"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -17,9 +16,8 @@ import (
 )
 
 type ExecCmd struct {
-	name   string
-	args   []string
-	stream cache.Streamer
+	name string
+	args []string
 }
 
 var ErrNoProvider = errors.New("list of providers must not be empty")
@@ -73,7 +71,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 	errCache := make(chan error)
 	updates := make(chan time.Time)
 	go func() {
-		errCache <- cacheDB.UpdateFromProviders(ctx, repositoryURL, 7*24*time.Hour, updates)
+		errCache <- cacheDB.UpdateFromProviders(ctx, repositoryURL, 30, updates)
 	}()
 
 	errController := make(chan error)
@@ -167,14 +165,6 @@ func (t TUI) Draw(texts ...text.LocalizedStyledString) {
 	t.screen.Show()
 }
 
-type errStream struct{ error }
-
-func (e errStream) Error() string { return e.error.Error() }
-
-type errCmd struct{ error }
-
-func (e errCmd) Error() string { return e.error.Error() }
-
 func (t *TUI) Exec(ctx context.Context, e ExecCmd) error {
 	var err error
 	t.Finish()
@@ -184,53 +174,11 @@ func (t *TUI) Exec(ctx context.Context, e ExecCmd) error {
 		}
 	}()
 
-	cmdCtx, cancel := context.WithCancel(ctx)
-	cmd := exec.CommandContext(cmdCtx, e.name, e.args...)
+	cmd := exec.CommandContext(ctx, e.name, e.args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 
-	errc := make(chan error)
-	wg := sync.WaitGroup{}
-
-	if e.stream != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			errc <- errStream{error: e.stream(cmdCtx)}
-		}()
-	}
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		errc <- errCmd{error: cmd.Run()}
-	}()
-
-	go func() {
-		wg.Wait()
-		close(errc)
-	}()
-
-	errSet := false
-	for e := range errc {
-		switch e := e.(type) {
-		case errStream:
-			if e.error != nil {
-				cancel()
-				if !errSet {
-					errSet = true
-					err = e.error
-				}
-			}
-		case errCmd:
-			cancel()
-			if !errSet {
-				errSet = true
-				err = e.error
-			}
-		}
-	}
-
+	err = cmd.Run()
 	return err
 }

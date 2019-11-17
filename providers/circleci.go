@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -165,7 +164,7 @@ func (c CircleCIClient) AccountID() string {
 	return c.accountID
 }
 
-func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, maxAge time.Duration, buildc chan<- cache.Build) error {
+func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
 	repository, err := c.Repository(ctx, repositoryURL)
 	if err != nil {
 		return err
@@ -181,7 +180,7 @@ func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, maxAge
 	}
 
 	for {
-		active, err := c.fetchRepositoryBuilds(ctx, repository, maxAge, buildc)
+		active, err := c.fetchRepositoryBuilds(ctx, repository, limit, buildc)
 		if err != nil {
 			return err
 		}
@@ -202,10 +201,6 @@ func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, maxAge
 		}
 	}
 
-	return nil
-}
-
-func (c CircleCIClient) StreamLog(ctx context.Context, repositoryID int, jobID int, writer io.Writer) error {
 	return nil
 }
 
@@ -236,7 +231,7 @@ func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (c
 
 	// Validate repository existence on CircleCI
 	endPoint := c.projectEndpoint(owner, name)
-	if _, _, err = c.listRecentWorkflows(ctx, endPoint, 0, 1, time.Second); err != nil {
+	if _, _, err = c.listRecentWorkflows(ctx, endPoint, 0, 1); err != nil {
 		if err, ok := err.(HTTPError); ok && err.Status == 404 {
 			return cache.Repository{}, cache.ErrRepositoryNotFound
 		}
@@ -252,7 +247,7 @@ func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (c
 	}, nil
 }
 
-func (c CircleCIClient) listRecentWorkflows(ctx context.Context, projectEndpoint url.URL, offset int, limit int, maxAge time.Duration) (map[string][]int, bool, error) {
+func (c CircleCIClient) listRecentWorkflows(ctx context.Context, projectEndpoint url.URL, offset int, limit int) (map[string][]int, bool, error) {
 	active := false
 	parameters := projectEndpoint.Query()
 	parameters.Add("offset", strconv.Itoa(offset))
@@ -278,9 +273,6 @@ func (c CircleCIClient) listRecentWorkflows(ctx context.Context, projectEndpoint
 		if err != nil {
 			return nil, active, err
 		}
-		if !createdAt.Valid || time.Since(createdAt.Time) > maxAge {
-			continue
-		}
 		startedAt, err := utils.NullTimeFromString(build.StartedAt)
 		if err != nil {
 			return nil, active, err
@@ -304,25 +296,25 @@ func (c CircleCIClient) listRecentWorkflows(ctx context.Context, projectEndpoint
 	return buildIDsByWorkflow, active, nil
 }
 
-func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository cache.Repository, maxAge time.Duration, buildc chan<- cache.Build) (bool, error) {
+func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository cache.Repository, limit int, buildc chan<- cache.Build) (bool, error) {
 	projectEndpoint := c.projectEndpoint(repository.Owner, repository.Name)
 	pageSize := 20
 	active := false
 
-	/* This is all far from optimal. CircleCI REST API does not return workflows so we have to query
-	for jobs and then rebuild the corresponding workflows.
-	FIXME Are we reporting an incomplete workflow if it ran at the time of the cutoff specified by maxAge?
-	*/
+	// This is all far from optimal. CircleCI REST API does not return workflows so we have to query
+	// for jobs and then rebuild the corresponding workflows
 	workflows := make(map[string][]int)
-	for offset := 0; ; offset += pageSize {
-		pageWorkflows, pageActive, err := c.listRecentWorkflows(ctx, projectEndpoint, offset, pageSize, maxAge)
+	for offset := 0; offset*pageSize < limit; offset += pageSize {
+		pageLimit := utils.MinInt(pageSize, limit-offset)
+		pageWorkflows, pageActive, err := c.listRecentWorkflows(ctx, projectEndpoint, offset, pageLimit)
 		if err != nil {
 			return active, err
 		}
+		active = active || pageActive
+
 		if len(pageWorkflows) == 0 {
 			break
 		}
-		active = active || pageActive
 
 		for workflowID, jobIDs := range pageWorkflows {
 			workflows[workflowID] = append(workflows[workflowID], jobIDs...)

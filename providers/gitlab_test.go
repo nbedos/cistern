@@ -32,7 +32,7 @@ func TestGitLabGetUserBuilds(t *testing.T) {
 			errc <- err
 			return
 		}
-		_, err = client.LastBuilds(ctx, repository, 7*24*time.Hour, buildc)
+		_, err = client.LastBuilds(ctx, repository, 30, buildc)
 		close(buildc)
 		errc <- err
 	}()

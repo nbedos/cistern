@@ -60,7 +60,6 @@ func main() {
 	CIProviders := []cache.Provider{
 		providers.NewTravisClient(
 			providers.TravisOrgURL,
-			providers.TravisPusherHost,
 			travisToken,
 			"travis",
 			50*time.Millisecond),

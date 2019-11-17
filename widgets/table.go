@@ -190,10 +190,9 @@ func (t Table) Size() (int, int) {
 	return t.width, t.height
 }
 
-func (t *Table) Resize(width int, height int) error {
-	if width < 0 || height < 0 {
-		return errors.New("width and height must be >= 0")
-	}
+func (t *Table) Resize(width int, height int) {
+	width = utils.MaxInt(width, 0)
+	height = utils.MaxInt(height, 0)
 
 	if height == 0 {
 		t.activeLine = 0
@@ -201,8 +200,6 @@ func (t *Table) Resize(width int, height int) error {
 		t.activeLine = utils.Bounded(t.activeLine, t.topLine, t.topLine+height-1)
 	}
 	t.width, t.height = width, height
-
-	return nil
 }
 
 func (t *Table) Text() []text.LocalizedStyledString {
@@ -259,7 +256,7 @@ func (t Table) OpenInBrowser(browser string) error {
 	return nil
 }
 
-func (t *Table) WriteToDisk(ctx context.Context, dir string) (string, cache.Streamer, error) {
+func (t *Table) WriteToDisk(ctx context.Context, dir string) (string, error) {
 	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
 
 	}

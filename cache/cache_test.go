@@ -303,7 +303,7 @@ type mockProvider struct {
 }
 
 func (p mockProvider) AccountID() string { return p.id }
-func (p mockProvider) Builds(ctx context.Context, repositoryURL string, duration time.Duration, buildc chan<- Build) error {
+func (p mockProvider) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- Build) error {
 	for _, build := range p.builds {
 		select {
 		case <-ctx.Done():
@@ -328,7 +328,7 @@ type errProvider struct {
 }
 
 func (p errProvider) AccountID() string { return p.id }
-func (p errProvider) Builds(ctx context.Context, repositoryURL string, duration time.Duration, buildc chan<- Build) error {
+func (p errProvider) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- Build) error {
 	return p.err
 }
 func (p errProvider) Log(ctx context.Context, repository Repository, jobID int) (string, error) {
@@ -342,7 +342,7 @@ func TestCache_UpdateFromProviders(t *testing.T) {
 	t.Run("The absence of providers must cause the function to return instantly", func(t *testing.T) {
 		c := NewCache(nil)
 		updates := make(chan time.Time)
-		err := c.UpdateFromProviders(context.Background(), "url", time.Second, updates)
+		err := c.UpdateFromProviders(context.Background(), "url", 42, updates)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -369,7 +369,7 @@ func TestCache_UpdateFromProviders(t *testing.T) {
 			},
 		})
 		updates := make(chan time.Time)
-		err := c.UpdateFromProviders(context.Background(), "url", time.Second, updates)
+		err := c.UpdateFromProviders(context.Background(), "url", 4, updates)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -388,7 +388,7 @@ func TestCache_UpdateFromProviders(t *testing.T) {
 			errProvider{id: "provider4", err: ErrRepositoryNotFound},
 		})
 		updates := make(chan time.Time)
-		err := c.UpdateFromProviders(context.Background(), "url", time.Second, updates)
+		err := c.UpdateFromProviders(context.Background(), "url", 10, updates)
 		if err != ErrRepositoryNotFound {
 			t.Fatalf("expected %v but got %v", ErrRepositoryNotFound, err)
 		}
@@ -406,7 +406,7 @@ func TestCache_UpdateFromProviders(t *testing.T) {
 			errProvider{id: "provider4", err: ErrRepositoryNotFound},
 		})
 		updates := make(chan time.Time)
-		err := c.UpdateFromProviders(context.Background(), "url", time.Second, updates)
+		err := c.UpdateFromProviders(context.Background(), "url", 10, updates)
 		if err != nil {
 			t.Fatalf("expected %v but got %v", nil, err)
 		}
@@ -425,7 +425,7 @@ func TestCache_UpdateFromProviders(t *testing.T) {
 			},
 		})
 		updates := make(chan time.Time)
-		err := c.UpdateFromProviders(context.Background(), "url", time.Second, updates)
+		err := c.UpdateFromProviders(context.Background(), "url", 10, updates)
 		if err == nil {
 			t.Fatal("expected error but got nil")
 		}
@@ -578,102 +578,6 @@ func TestCache_WriteLog(t *testing.T) {
 
 		for _, testCase := range testCases {
 			err := c.WriteLog(context.Background(), testCase.accountID, testCase.buildID, testCase.stageID, testCase.jobID, nil)
-			if err == nil {
-				t.Fatal("expected error but got nil")
-			}
-		}
-	})
-}
-
-func TestCache_StreamLog(t *testing.T) {
-	t.Run("must return log returned by provider.StreamLog", func(t *testing.T) {
-		provider1 := mockProvider{id: "provider1"}
-		c := NewCache([]Provider{provider1})
-		build := Build{
-			Repository: &Repository{AccountID: "provider1"},
-			ID:         "1",
-			Jobs: map[int]*Job{
-				1: {
-					ID:    1,
-					State: Passed,
-					Log: utils.NullString{
-						Valid:  true,
-						String: "log1\n",
-					},
-				},
-			},
-		}
-		if err := c.Save(build); err != nil {
-			t.Fatal(err)
-		}
-		buf := bytes.Buffer{}
-		if err := c.StreamLog(context.Background(), "provider1", "1", 0, 1, &buf); err != nil {
-			t.Fatal(err)
-		}
-		// Value return by provider1.StreamLog()
-		expected := "provider1\n"
-		if buf.String() != expected {
-			t.Fatalf("expected %q but got %q", expected, buf.String())
-		}
-	})
-
-	t.Run("requesting stream of non existent job must return an error", func(t *testing.T) {
-		c := NewCache([]Provider{mockProvider{id: "provider1"}})
-		build := Build{
-			Repository: &Repository{AccountID: "provider1"},
-			ID:         "1",
-			Jobs: map[int]*Job{
-				1: {
-					ID:    1,
-					State: Passed,
-					Log: utils.NullString{
-						Valid:  true,
-						String: "log1\n",
-					},
-				},
-			},
-		}
-		if err := c.Save(build); err != nil {
-			t.Fatal(err)
-		}
-
-		testCases := []struct {
-			name      string
-			accountID string
-			buildID   string
-			stageID   int
-			jobID     int
-		}{
-			{
-				name:      "unknown provider",
-				buildID:   "1",
-				accountID: "404",
-				stageID:   0,
-				jobID:     1,
-			},
-			{
-				name:      "unknown build",
-				accountID: "provider1",
-				buildID:   "2",
-				stageID:   0,
-				jobID:     1,
-			},
-			{
-				name:      "unknown stage",
-				accountID: "provider1",
-				buildID:   "1",
-				stageID:   1,
-			},
-			{
-				name:      "unknown job",
-				accountID: "provider1",
-				buildID:   "1",
-				jobID:     404,
-			},
-		}
-
-		for _, testCase := range testCases {
-			err := c.StreamLog(context.Background(), testCase.accountID, testCase.buildID, testCase.stageID, testCase.jobID, nil)
 			if err == nil {
 				t.Fatal("expected error but got nil")
 			}

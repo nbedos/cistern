@@ -17,9 +17,8 @@ var ErrRepositoryNotFound = errors.New("repository not found")
 type Provider interface {
 	AccountID() string
 	// Builds should return err == ErrRepositoryNotFound when appropriate
-	Builds(ctx context.Context, repositoryURL string, duration time.Duration, buildc chan<- Build) error
+	Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- Build) error
 	Log(ctx context.Context, repository Repository, jobID int) (string, error)
-	StreamLog(ctx context.Context, repositoryID int, jobID int, writer io.Writer) error
 }
 
 type State string
@@ -247,7 +246,7 @@ func (c Cache) Builds() []Build {
 	return builds
 }
 
-func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, maxAge time.Duration, updates chan time.Time) error {
+func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, limit int, updates chan time.Time) error {
 	subCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	wg := sync.WaitGroup{}
@@ -263,7 +262,7 @@ func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, m
 			go func() {
 				defer wg.Done()
 				defer close(buildc)
-				errc <- p.Builds(subCtx, repositoryURL, maxAge, buildc)
+				errc <- p.Builds(subCtx, repositoryURL, limit, buildc)
 			}()
 
 			for build := range buildc {
@@ -369,22 +368,4 @@ func (c *Cache) WriteLog(ctx context.Context, accountID string, buildID string, 
 	processedLog := utils.PostProcess(log)
 	_, err := writer.Write([]byte(processedLog))
 	return err
-}
-
-func (c Cache) StreamLog(ctx context.Context, accountID string, buildID string, stageID int, jobID int, writer io.Writer) error {
-	build, exists := c.fetchBuild(accountID, buildID)
-	if !exists {
-		return fmt.Errorf("no matching build for %v %v", accountID, buildID)
-	}
-	job, exists := c.fetchJob(accountID, buildID, stageID, jobID)
-	if !exists {
-		return fmt.Errorf("no matching job for %v %v %v %v", accountID, buildID, stageID, jobID)
-	}
-
-	provider, exists := c.providers[accountID]
-	if !exists {
-		return fmt.Errorf("no matching provider found for account ID %q", accountID)
-	}
-
-	return provider.StreamLog(ctx, build.Repository.ID, job.ID, writer)
 }

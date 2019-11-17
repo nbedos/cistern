@@ -101,26 +101,6 @@ func TestTUI_Exec(t *testing.T) {
 		}
 	})
 
-	t.Run("Execute command with stream", func(t *testing.T) {
-		tui, err := NewTUI(newScreen, tcell.StyleDefault, text.StyleSheet{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			tui.Finish()
-		}()
-
-		err = tui.Exec(context.Background(), ExecCmd{
-			name: "date",
-			stream: func(ctx context.Context) error {
-				return nil
-			},
-		})
-		if err != nil {
-			t.Fatalf("expected nil but got %v", err)
-		}
-	})
-
 	t.Run("Exec must return when the context is cancelled", func(t *testing.T) {
 		tui, err := NewTUI(newScreen, tcell.StyleDefault, text.StyleSheet{})
 		if err != nil {
@@ -138,14 +118,6 @@ func TestTUI_Exec(t *testing.T) {
 			errc <- tui.Exec(ctx, ExecCmd{
 				name: "sleep",
 				args: []string{strconv.Itoa(int(d.Seconds()))},
-				stream: func(ctx context.Context) error {
-					select {
-					case <-ctx.Done():
-						return ctx.Err()
-					case <-time.After(d):
-					}
-					return nil
-				},
 			})
 		}()
 		cancel()
@@ -164,7 +136,7 @@ type mockProvider struct {
 }
 
 func (p mockProvider) AccountID() string { return p.id }
-func (p mockProvider) Builds(ctx context.Context, repositoryURL string, duration time.Duration, buildc chan<- cache.Build) error {
+func (p mockProvider) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
 	return nil
 }
 func (p mockProvider) Log(ctx context.Context, repository cache.Repository, jobID int) (string, error) {

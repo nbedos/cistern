@@ -1,0 +1,359 @@
+{
+  "@type": "builds",
+  "@href": "/repo/25564643/builds?offset=20&limit=10",
+  "@representation": "standard",
+  "@pagination": {
+    "limit": 5,
+    "offset": 20,
+    "count": 72,
+    "is_first": false,
+    "is_last": false,
+    "next": {
+      "@href": "/repo/25564643/builds?limit=10&offset=30",
+      "offset": 30,
+      "limit": 10
+    },
+    "prev": {
+      "@href": "/repo/25564643/builds?limit=10&offset=10",
+      "offset": 10,
+      "limit": 10
+    },
+    "first": {
+      "@href": "/repo/25564643/builds?limit=10&offset=0",
+      "offset": 0,
+      "limit": 10
+    },
+    "last": {
+      "@href": "/repo/25564643/builds?limit=10&offset=70",
+      "offset": 70,
+      "limit": 10
+    }
+  },
+  "builds": [
+    {
+      "@type": "build",
+      "@href": "/build/598748169",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 598748169,
+      "number": "52",
+      "state": "failed",
+      "duration": 84,
+      "event_type": "push",
+      "previous_state": "failed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-16T16:32:55Z",
+      "finished_at": "2019-10-16T16:34:19Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Fcircle_ci",
+        "@representation": "minimal",
+        "name": "feature/circle_ci"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181563815,
+        "sha": "1d24041038ed98daf0bf27dc2941cf793de40c7c",
+        "ref": "refs/heads/feature/circle_ci",
+        "message": "Integration with existing UI",
+        "compare_url": "https://github.com/nbedos/citop/compare/3c53d889f74d...1d24041038ed",
+        "committed_at": "2019-10-16T16:32:16Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/598748170",
+          "@representation": "minimal",
+          "id": 598748170
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-16T16:34:19.800Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/598744105",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 598744105,
+      "number": "51",
+      "state": "failed",
+      "duration": 81,
+      "event_type": "push",
+      "previous_state": "passed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-16T16:23:20Z",
+      "finished_at": "2019-10-16T16:24:41Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Fcircle_ci",
+        "@representation": "minimal",
+        "name": "feature/circle_ci"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181562561,
+        "sha": "3c53d889f74de71422d1e38018b37a02f3de0163",
+        "ref": "refs/heads/feature/circle_ci",
+        "message": "Integration with existing UI",
+        "compare_url": "https://github.com/nbedos/citop/compare/ceb2b34cf4b3...3c53d889f74d",
+        "committed_at": "2019-10-16T16:22:37Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/598744106",
+          "@representation": "minimal",
+          "id": 598744106
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-16T16:24:42.500Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/598129980",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 598129980,
+      "number": "50",
+      "state": "passed",
+      "duration": 93,
+      "event_type": "push",
+      "previous_state": "passed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-15T12:45:51Z",
+      "finished_at": "2019-10-15T12:47:24Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Fcircle_ci",
+        "@representation": "minimal",
+        "name": "feature/circle_ci"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181365838,
+        "sha": "ceb2b34cf4b30864056b930ca071454958bce991",
+        "ref": "refs/heads/feature/circle_ci",
+        "message": "Setup CI configuration",
+        "compare_url": "https://github.com/nbedos/citop/compare/72b93af2a63c...ceb2b34cf4b3",
+        "committed_at": "2019-10-15T12:45:13Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/598129981",
+          "@representation": "minimal",
+          "id": 598129981
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-15T12:47:24.616Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/598127205",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 598127205,
+      "number": "49",
+      "state": "passed",
+      "duration": 87,
+      "event_type": "push",
+      "previous_state": null,
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-15T12:39:40Z",
+      "finished_at": "2019-10-15T12:41:07Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/feature%2Fcircle_ci",
+        "@representation": "minimal",
+        "name": "feature/circle_ci"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181364997,
+        "sha": "72b93af2a63c29fa33130ffaa4d91c34956c61f1",
+        "ref": "refs/heads/feature/circle_ci",
+        "message": "Disable azure pipelines",
+        "compare_url": "https://github.com/nbedos/citop/commit/72b93af2a63c",
+        "committed_at": "2019-10-15T12:38:16Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/598127206",
+          "@representation": "minimal",
+          "id": 598127206
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-15T12:41:07.712Z"
+    },
+    {
+      "@type": "build",
+      "@href": "/build/597720236",
+      "@representation": "standard",
+      "@permissions": {
+        "read": true,
+        "cancel": true,
+        "restart": true
+      },
+      "id": 597720236,
+      "number": "48",
+      "state": "passed",
+      "duration": 92,
+      "event_type": "push",
+      "previous_state": "passed",
+      "pull_request_title": null,
+      "pull_request_number": null,
+      "started_at": "2019-10-14T16:20:35Z",
+      "finished_at": "2019-10-14T16:22:07Z",
+      "private": false,
+      "repository": {
+        "@type": "repository",
+        "@href": "/repo/25564643",
+        "@representation": "minimal",
+        "id": 25564643,
+        "name": "citop",
+        "slug": "nbedos/citop"
+      },
+      "branch": {
+        "@type": "branch",
+        "@href": "/repo/25564643/branch/master",
+        "@representation": "minimal",
+        "name": "master"
+      },
+      "tag": null,
+      "commit": {
+        "@type": "commit",
+        "@representation": "minimal",
+        "id": 181233185,
+        "sha": "8ff2b5235cd0841a9ae1f161f2b8e6ee090b6e2f",
+        "ref": "refs/heads/master",
+        "message": "Merge branch 'master' into azure-pipelines",
+        "compare_url": "https://github.com/nbedos/citop/compare/179395b0bcfd...8ff2b5235cd0",
+        "committed_at": "2019-10-14T16:12:14Z"
+      },
+      "jobs": [
+        {
+          "@type": "job",
+          "@href": "/job/597720237",
+          "@representation": "minimal",
+          "id": 597720237
+        }
+      ],
+      "stages": [
+
+      ],
+      "created_by": {
+        "@type": "user",
+        "@href": "/user/1072861",
+        "@representation": "minimal",
+        "id": 1072861,
+        "login": "nbedos"
+      },
+      "updated_at": "2019-10-14T16:22:07.702Z"
+    }
+  ]
+}
