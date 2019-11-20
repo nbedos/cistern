@@ -17,6 +17,7 @@ var ErrRepositoryNotFound = errors.New("repository not found")
 type Provider interface {
 	AccountID() string
 	// Builds should return err == ErrRepositoryNotFound when appropriate
+	// Builds must close buildc before returning
 	Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- Build) error
 	Log(ctx context.Context, repository Repository, jobID int) (string, bool, error)
 }
@@ -261,7 +262,6 @@ func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, l
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				defer close(buildc)
 				errc <- p.Builds(subCtx, repositoryURL, limit, buildc)
 			}()
 

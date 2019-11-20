@@ -57,6 +57,9 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		text.StatusRunning: func(s tcell.Style) tcell.Style {
 			return s.Foreground(tcell.ColorOlive)
 		},
+		text.StatusSkipped: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorGray).Bold(false)
+		},
 	}
 	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  b:Browser  ?:Help  q:Quit"
 
@@ -80,7 +83,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 	errCache := make(chan error)
 	updates := make(chan time.Time)
 	go func() {
-		errCache <- cacheDB.UpdateFromProviders(ctx, repositoryURL, 30, updates)
+		errCache <- cacheDB.UpdateFromProviders(ctx, repositoryURL, 20, updates)
 	}()
 
 	errController := make(chan error)

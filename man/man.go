@@ -13,38 +13,40 @@ DESCRIPTION
        citop lists the most recent CI pipelines associated to the current Git repository.
 
 INTERACTIVE COMMANDS
-   Up, j
-       Select the previous row of the list
+   Up, j (resp. Down, k)
+       Move cursor up (resp.  down) by one line
 
-   Down, k
-       Select the next row of the list
+   Page Up (resp. Page Down)
+       Move cursor up (resp.  down) by one screen
 
    o, + (resp. O)
-       Open (resp.  Open recursively) the currently selected fold
+       Open (resp.  open recursively) the fold at the cursor
 
    c, - (resp. C)
-       Close (resp.  Close recursively) the currently select fold
+       Close (resp.  close recursively) the fold at the cursor
 
    /
-       Open search prompt.  The prompt may be closed with Enter or Escape.
+       Show search prompt.  The prompt may be closed with Enter or Escape.
 
    Enter, n (resp. N)
        Move to the next (resp.  previous) match
 
    v
-       Open the log of the job at the cursor in less
+       View the log of the job at the cursor in PAGER.  The log may be incomplete if the job is still running.
 
    b
-       Open selected row in $BROWSER
+       View selected line in $BROWSER
 
    q
        Quit
 
    ?
-       Open manual page
+       View manual page
 
 ENVIRONMENT
-       citop relies on the BROWSER environment variable to show web pages.
+       citop uses the following environment variables:
+
+       • BROWSER is called to open web pages
 
 EXAMPLES
        Check pipeline status after pushing a commit:

@@ -39,6 +39,7 @@ func (c GitLabClient) AccountID() string {
 
 // TODO Implement live updates once https://github.com/xanzy/go-gitlab/pull/731 is merged
 func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
+	defer close(buildc)
 	repository, err := c.Repository(ctx, repositoryURL)
 	if err != nil {
 		return err
@@ -77,15 +78,6 @@ func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, limit in
 	}
 
 	return nil
-}
-
-func (c *GitLabClient) GetJob(ctx context.Context, repositoryID int, jobID int) (*gitlab.Job, *gitlab.Response, error) {
-	select {
-	case <-c.rateLimiter:
-	case <-ctx.Done():
-		return nil, nil, ctx.Err()
-	}
-	return c.remote.Jobs.GetJob(repositoryID, jobID, gitlab.WithContext(ctx))
 }
 
 func (c *GitLabClient) GetTraceFile(ctx context.Context, repositoryID int, jobID int) (bytes.Buffer, error) {
@@ -139,7 +131,7 @@ func (c GitLabClient) Repository(ctx context.Context, repositoryURL string) (cac
 
 func FromGitLabState(s string) cache.State {
 	switch strings.ToLower(s) {
-	case "pending":
+	case "created", "pending":
 		return cache.Pending
 	case "running":
 		return cache.Running
@@ -159,28 +151,26 @@ func FromGitLabState(s string) cache.State {
 }
 
 func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repository, limit int, buildc chan<- cache.Build) (bool, error) {
-	defaultPageSize := 20
+	pageSize := 20
 	opt := gitlab.ListProjectPipelinesOptions{
 		ListOptions: gitlab.ListOptions{
 			Page: 0,
 		},
 	}
 	active := false
+	errc := make(chan error)
+	wg := sync.WaitGroup{}
 
-	for opt.ListOptions.Page = 0; opt.ListOptions.Page*defaultPageSize < limit; opt.ListOptions.Page++ {
-		opt.ListOptions.PerPage = utils.MinInt(defaultPageSize, limit-opt.ListOptions.Page*defaultPageSize)
+	for {
+		opt.ListOptions.PerPage = utils.MinInt(pageSize, limit-opt.ListOptions.Page*pageSize)
 		select {
 		case <-c.rateLimiter:
 		case <-ctx.Done():
 			return active, ctx.Err()
 		}
-		pipelines, _, err := c.remote.Pipelines.ListProjectPipelines(repository.ID, &opt,
-			gitlab.WithContext(ctx))
+		pipelines, resp, err := c.remote.Pipelines.ListProjectPipelines(repository.ID, &opt, gitlab.WithContext(ctx))
 		if err != nil {
 			return active, err
-		}
-		if len(pipelines) == 0 {
-			break
 		}
 
 		for _, minimalPipeline := range pipelines {
@@ -189,20 +179,52 @@ func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repositor
 			lastUpdate := c.updateTimePerBuildID[strconv.Itoa(minimalPipeline.ID)]
 			c.mux.Unlock()
 			if minimalPipeline.UpdatedAt != nil && minimalPipeline.UpdatedAt.After(lastUpdate) {
-				build, err := c.fetchBuild(ctx, &repository, minimalPipeline.ID)
-				if err != nil {
-					return active, err
-				}
-				select {
-				case buildc <- build:
-				case <-ctx.Done():
-					return active, ctx.Err()
-				}
+				wg.Add(1)
+				go func(id int) {
+					defer wg.Done()
+					build, err := c.fetchBuild(ctx, &repository, id)
+					if err != nil {
+						errc <- err
+						return
+					}
+					select {
+					case buildc <- build:
+					case <-ctx.Done():
+						errc <- err
+						return
+					}
+				}(minimalPipeline.ID)
 			}
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+
+	go func() {
+		wg.Wait()
+		close(errc)
+	}()
+
+	var err error
+	for e := range errc {
+		if err == nil && e != nil {
+			err = e
 		}
 	}
 
-	return active, nil
+	return active, err
+}
+
+func (c GitLabClient) GetJob(ctx context.Context, repositoryID int, jobID int) (*gitlab.Job, *gitlab.Response, error) {
+	select {
+	case <-c.rateLimiter:
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	}
+	return c.remote.Jobs.GetJob(repositoryID, jobID, gitlab.WithContext(ctx))
 }
 
 func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
@@ -211,12 +233,7 @@ func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobI
 		return "", false, err
 	}
 
-	select {
-	case <-c.rateLimiter:
-	case <-ctx.Done():
-		return "", false, nil
-	}
-	gitlabJob, _, err := c.remote.Jobs.GetJob(repository.ID, jobID, gitlab.WithContext(ctx))
+	gitlabJob, _, err := c.GetJob(ctx, repository.ID, jobID)
 	if err != nil {
 		return "", false, nil
 	}

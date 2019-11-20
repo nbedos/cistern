@@ -79,8 +79,10 @@ func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
 		state.Add(text.StatusFailed)
 	case Passed:
 		state.Add(text.StatusPassed)
-	case Pending, Running:
+	case Running:
 		state.Add(text.StatusRunning)
+	case Pending, Skipped, Manual:
+		state.Add(text.StatusSkipped)
 	}
 
 	name := text.NewStyledString(b.prefix)

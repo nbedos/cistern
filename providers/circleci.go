@@ -165,6 +165,7 @@ func (c CircleCIClient) AccountID() string {
 }
 
 func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
+	defer close(buildc)
 	repository, err := c.Repository(ctx, repositoryURL)
 	if err != nil {
 		return err

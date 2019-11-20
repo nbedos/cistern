@@ -304,6 +304,7 @@ type mockProvider struct {
 
 func (p mockProvider) AccountID() string { return p.id }
 func (p mockProvider) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- Build) error {
+	defer close(buildc)
 	for _, build := range p.builds {
 		select {
 		case <-ctx.Done():
@@ -330,6 +331,7 @@ type errProvider struct {
 
 func (p errProvider) AccountID() string { return p.id }
 func (p errProvider) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- Build) error {
+	defer close(buildc)
 	return p.err
 }
 func (p errProvider) Log(ctx context.Context, repository Repository, jobID int) (string, bool, error) {

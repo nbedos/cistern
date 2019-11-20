@@ -137,6 +137,7 @@ type mockProvider struct {
 
 func (p mockProvider) AccountID() string { return p.id }
 func (p mockProvider) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
+	defer close(buildc)
 	return nil
 }
 func (p mockProvider) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {

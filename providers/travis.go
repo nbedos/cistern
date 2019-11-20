@@ -308,6 +308,7 @@ func (c TravisClient) AccountID() string {
 }
 
 func (c TravisClient) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
+	defer close(buildc)
 	repository, err := c.repository(ctx, repositoryURL)
 	if err != nil {
 		return err

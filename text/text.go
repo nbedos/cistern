@@ -18,6 +18,7 @@ const (
 	StatusPassed
 	StatusRunning
 	StatusFailed
+	StatusSkipped
 	GitRef
 	Provider
 )
