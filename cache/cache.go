@@ -18,7 +18,7 @@ type Provider interface {
 	AccountID() string
 	// Builds should return err == ErrRepositoryNotFound when appropriate
 	Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- Build) error
-	Log(ctx context.Context, repository Repository, jobID int) (string, error)
+	Log(ctx context.Context, repository Repository, jobID int) (string, bool, error)
 }
 
 type State string
@@ -341,23 +341,22 @@ func (c *Cache) WriteLog(ctx context.Context, accountID string, buildID string, 
 	if !exists {
 		return fmt.Errorf("no matching job for %v %v %v %v", accountID, buildID, stageID, jobID)
 	}
-	if job.State.IsActive() {
-		return ErrIncompleteLog
-	}
 
 	if !job.Log.Valid {
 		provider, exists := c.providers[accountID]
 		if !exists {
 			return fmt.Errorf("no matching provider found in cache for account ID %q", accountID)
 		}
-		log, err := provider.Log(ctx, *build.Repository, job.ID)
+		log, complete, err := provider.Log(ctx, *build.Repository, job.ID)
 		if err != nil {
 			return err
 		}
 
-		job.Log = utils.NullString{String: log, Valid: true}
-		if err = c.SaveJob(accountID, buildID, stageID, job); err != nil {
-			return err
+		if complete {
+			job.Log = utils.NullString{String: log, Valid: true}
+			if err = c.SaveJob(accountID, buildID, stageID, job); err != nil {
+				return err
+			}
 		}
 	}
 

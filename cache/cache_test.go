@@ -314,9 +314,10 @@ func (p mockProvider) Builds(ctx context.Context, repositoryURL string, limit in
 	}
 	return nil
 }
-func (p mockProvider) Log(ctx context.Context, repository Repository, jobID int) (string, error) {
-	return p.id + "\n", nil
+func (p mockProvider) Log(ctx context.Context, repository Repository, jobID int) (string, bool, error) {
+	return p.id + "\n", true, nil
 }
+
 func (p mockProvider) StreamLog(ctx context.Context, repositoryID int, jobID int, writer io.Writer) error {
 	_, err := writer.Write([]byte(p.id + "\n"))
 	return err
@@ -331,8 +332,8 @@ func (p errProvider) AccountID() string { return p.id }
 func (p errProvider) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- Build) error {
 	return p.err
 }
-func (p errProvider) Log(ctx context.Context, repository Repository, jobID int) (string, error) {
-	return "", nil
+func (p errProvider) Log(ctx context.Context, repository Repository, jobID int) (string, bool, error) {
+	return "", true, nil
 }
 func (p errProvider) StreamLog(ctx context.Context, repositoryID int, jobID int, writer io.Writer) error {
 	return nil

@@ -139,8 +139,8 @@ func (p mockProvider) AccountID() string { return p.id }
 func (p mockProvider) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
 	return nil
 }
-func (p mockProvider) Log(ctx context.Context, repository cache.Repository, jobID int) (string, error) {
-	return "", nil
+func (p mockProvider) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
+	return "", false, nil
 }
 func (p mockProvider) StreamLog(ctx context.Context, repositoryID int, jobID int, writer io.Writer) error {
 	return nil

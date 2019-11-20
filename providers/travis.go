@@ -348,11 +348,6 @@ func (c TravisClient) Builds(ctx context.Context, repositoryURL string, limit in
 	return nil
 }
 
-func (c TravisClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, error) {
-	log, err := c.fetchJobLog(ctx, jobID)
-	return log, err
-}
-
 func (c TravisClient) repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
 	slug, err := utils.RepositorySlugFromURL(repositoryURL)
 	if err != nil {
@@ -364,7 +359,7 @@ func (c TravisClient) repository(ctx context.Context, repositoryURL string) (cac
 	reqURL.Path += fmt.Sprintf(buildPathFormat, slug)
 	reqURL.RawPath += fmt.Sprintf(buildPathFormat, url.PathEscape(slug))
 
-	body, _, err := c.get(ctx, "GET", reqURL, nil)
+	body, _, err := c.get(ctx, "GET", reqURL)
 	if err != nil {
 		if err, ok := err.(HTTPError); ok && err.Status == 404 {
 			return cache.Repository{}, cache.ErrRepositoryNotFound
@@ -390,16 +385,13 @@ func (c TravisClient) webURL(repository cache.Repository) (url.URL, error) {
 }
 
 // Rate-limited HTTP GET request with custom headers
-func (c TravisClient) get(ctx context.Context, method string, resourceURL url.URL, headers map[string]string) (*bytes.Buffer, *http.Response, error) {
+func (c TravisClient) get(ctx context.Context, method string, resourceURL url.URL) (*bytes.Buffer, *http.Response, error) {
 	req, err := http.NewRequest(method, resourceURL.String(), nil)
 	if err != nil {
 		return nil, nil, err
 	}
 	req.Header.Add("Travis-API-Version", "3")
 	req.Header.Add("Authorization", fmt.Sprintf("token %s", c.token))
-	for header, value := range headers {
-		req.Header.Add(header, value)
-	}
 	req = req.WithContext(ctx)
 
 	select {
@@ -449,7 +441,7 @@ func (c TravisClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 	parameters.Add("include", "build.jobs,build.commit,job.config")
 	buildURL.RawQuery = parameters.Encode()
 
-	body, _, err := c.get(ctx, "GET", buildURL, nil)
+	body, _, err := c.get(ctx, "GET", buildURL)
 	if err != nil {
 		return cache.Build{}, err
 	}
@@ -484,7 +476,7 @@ func (c TravisClient) fetchBuilds(ctx context.Context, repository *cache.Reposit
 	parameters.Add("offset", strconv.Itoa(offset))
 	buildsURL.RawQuery = parameters.Encode()
 
-	body, _, err := c.get(ctx, "GET", buildsURL, nil)
+	body, _, err := c.get(ctx, "GET", buildsURL)
 	if err != nil {
 		return nil, err
 	}
@@ -571,14 +563,26 @@ func (c TravisClient) repositoryBuilds(ctx context.Context, repository *cache.Re
 	return err
 }
 
-func (c TravisClient) fetchJobLog(ctx context.Context, jobID int) (string, error) {
+func (c TravisClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
 	var reqURL = c.baseURL
 	reqURL.Path += fmt.Sprintf("/job/%d/log", jobID)
 
-	body, _, err := c.get(ctx, "GET", reqURL, map[string]string{"Accept": "text/plain"})
+	body, _, err := c.get(ctx, "GET", reqURL)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
-	return body.String(), nil
+	var log struct {
+		Content  string
+		LogParts []struct {
+			final bool
+		}
+	}
+
+	if err := json.Unmarshal(body.Bytes(), &log); err != nil {
+		return "", false, err
+	}
+
+	complete := len(log.LogParts) > 0 && log.LogParts[len(log.LogParts)-1].final
+	return log.Content, complete, nil
 }

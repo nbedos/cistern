@@ -204,16 +204,17 @@ func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, limit 
 	return nil
 }
 
-func (c CircleCIClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, error) {
+func (c CircleCIClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
 	endPoint := c.projectEndpoint(repository.Owner, repository.Name)
 	job, _, err := c.fetchJob(ctx, endPoint, jobID, true)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	if !job.Log.Valid {
-		return "", nil
+		return "", false, nil
 	}
-	return job.Log.String, nil
+
+	return job.Log.String, !job.State.IsActive(), nil
 }
 
 func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {

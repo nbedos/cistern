@@ -87,24 +87,20 @@ func (c *GitLabClient) GetJob(ctx context.Context, repositoryID int, jobID int) 
 	return c.remote.Jobs.GetJob(repositoryID, jobID, gitlab.WithContext(ctx))
 }
 
-func (c *GitLabClient) GetTraceFile(ctx context.Context, repositoryID int, jobID int) (bytes.Buffer, int, *gitlab.Response, error) {
+func (c *GitLabClient) GetTraceFile(ctx context.Context, repositoryID int, jobID int) (bytes.Buffer, error) {
 	buf := bytes.Buffer{}
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
-		return buf, 0, nil, ctx.Err()
+		return buf, ctx.Err()
 	}
-	trace, resp, err := c.remote.Jobs.GetTraceFile(repositoryID, jobID, nil, gitlab.WithContext(ctx))
+	trace, _, err := c.remote.Jobs.GetTraceFile(repositoryID, jobID, nil, gitlab.WithContext(ctx))
 	if err != nil {
-		return buf, 0, nil, err
-	}
-	n, err := strconv.Atoi(resp.Header.Get("Content-Length"))
-	if err != nil {
-		return buf, 0, nil, err
+		return buf, err
 	}
 
 	_, err = buf.ReadFrom(trace)
-	return buf, n, resp, err
+	return buf, err
 }
 
 func (c GitLabClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
@@ -208,13 +204,24 @@ func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repositor
 	return active, nil
 }
 
-func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, error) {
-	buf, _, _, err := c.GetTraceFile(ctx, repository.ID, jobID)
+func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
+	buf, err := c.GetTraceFile(ctx, repository.ID, jobID)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
-	return buf.String(), nil
+	select {
+	case <-c.rateLimiter:
+	case <-ctx.Done():
+		return "", false, nil
+	}
+	gitlabJob, _, err := c.remote.Jobs.GetJob(repository.ID, jobID, gitlab.WithContext(ctx))
+	if err != nil {
+		return "", false, nil
+	}
+	complete := !FromGitLabState(gitlabJob.Status).IsActive()
+
+	return buf.String(), complete, nil
 }
 
 func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Repository, pipelineID int) (build cache.Build, err error) {
