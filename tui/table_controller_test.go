@@ -2,6 +2,7 @@ package tui
 
 import (
 	"testing"
+	"time"
 
 	"github.com/gdamore/tcell"
 	"github.com/nbedos/citop/cache"
@@ -21,7 +22,7 @@ func TestTableController_resize(t *testing.T) {
 			tui.Finish()
 		}()
 		c := cache.NewCache(nil)
-		controller, err := NewTableController(&tui, (&c).BuildsByCommit(), "", "")
+		controller, err := NewTableController(&tui, (&c).BuildsByCommit(), time.UTC, "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -44,7 +45,7 @@ func TestTableController_resize(t *testing.T) {
 			tui.Finish()
 		}()
 		c := cache.NewCache(nil)
-		controller, err := NewTableController(&tui, (&c).BuildsByCommit(), "", "")
+		controller, err := NewTableController(&tui, (&c).BuildsByCommit(), time.UTC, "", "")
 		if err != nil {
 			t.Fatal(err)
 		}

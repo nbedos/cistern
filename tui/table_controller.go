@@ -28,10 +28,10 @@ type TableController struct {
 
 var ErrExit = errors.New("exit")
 
-func NewTableController(tui *TUI, source cache.HierarchicalTabularDataSource, tempDir string, defaultStatus string) (TableController, error) {
+func NewTableController(tui *TUI, source cache.HierarchicalTabularDataSource, loc *time.Location, tempDir string, defaultStatus string) (TableController, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := 10, 10
-	table, err := widgets.NewTable(source, width, height)
+	table, err := widgets.NewTable(source, width, height, loc)
 	if err != nil {
 		return TableController{}, err
 	}

@@ -306,7 +306,7 @@ func Test_commitRowFromBuilds(t *testing.T) {
 
 func TestBuildRow_Tabular(t *testing.T) {
 	t.Run("null dates should be replaced by placeholder", func(t *testing.T) {
-		text := buildRow{}.Tabular()
+		text := buildRow{}.Tabular(time.UTC)
 		for _, column := range []string{"CREATED", "STARTED", "FINISHED", "UPDATED"} {
 			if text[column].String() != "-" {
 				t.Fatalf("expected %q but got %q", "-", text[column])
@@ -317,17 +317,17 @@ func TestBuildRow_Tabular(t *testing.T) {
 	t.Run("tabular version of cache.Build", func(t *testing.T) {
 		expected := map[string]string{
 			"COMMIT":   "c2bb562",
-			"CREATED":  "Nov 13 14:12",
+			"CREATED":  "Nov 13 13:12",
 			"DURATION": "3s",
-			"FINISHED": "Nov 13 14:12",
+			"FINISHED": "Nov 13 13:12",
 			"NAME":     "provider (#42)",
 			"REF":      "master",
-			"STARTED":  "Nov 13 14:12",
+			"STARTED":  "Nov 13 13:12",
 			"STATE":    "passed",
 			"TYPE":     "P",
-			"UPDATED":  "Nov 13 14:12",
+			"UPDATED":  "Nov 13 13:12",
 		}
-		for column, text := range buildAsRow.Tabular() {
+		for column, text := range buildAsRow.Tabular(time.UTC) {
 			if s := text.String(); s != expected[column] {
 				t.Fatalf("expected %q but got %q", expected[column], s)
 			}

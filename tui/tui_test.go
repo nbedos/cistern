@@ -149,7 +149,7 @@ func (p mockProvider) StreamLog(ctx context.Context, repositoryID int, jobID int
 func TestRunApplication(t *testing.T) {
 	t.Run("no provider should cause the function to return with an error", func(t *testing.T) {
 		ctx := context.Background()
-		err := RunApplication(ctx, newScreen, "https://example.com/owner/project", nil)
+		err := RunApplication(ctx, newScreen, "https://example.com/owner/project", nil, time.UTC)
 		if err != ErrNoProvider {
 			t.Fatalf("expected %v but got %v", ErrNoProvider, err)
 		}
@@ -171,7 +171,7 @@ func TestRunApplication(t *testing.T) {
 		start := time.Now()
 		var elapsed time.Duration // Only use this after reading error on errc
 		go func() {
-			e := RunApplication(ctx, newScreen, "https://example.com/owner/project", ps)
+			e := RunApplication(ctx, newScreen, "https://example.com/owner/project", ps, time.UTC)
 			elapsed = time.Since(start)
 			errc <- e
 		}()

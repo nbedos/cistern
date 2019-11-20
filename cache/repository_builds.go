@@ -62,14 +62,13 @@ func (b buildRow) Children() []utils.TreeNode {
 	return children
 }
 
-func (b buildRow) Tabular() map[string]text.StyledString {
+func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
 	const nullPlaceholder = "-"
 
 	nullTimeToString := func(t utils.NullTime) text.StyledString {
 		s := nullPlaceholder
 		if t.Valid {
-			t := t.Time.Local().Truncate(time.Second)
-			s = t.Format("Jan _2 15:04")
+			s = t.Time.In(loc).Truncate(time.Second).Format("Jan _2 15:04")
 		}
 		return text.NewStyledString(s)
 	}

@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/text"
@@ -10,7 +11,7 @@ import (
 )
 
 type HierarchicalTabularSourceRow interface {
-	Tabular() map[string]text.StyledString
+	Tabular(*time.Location) map[string]text.StyledString
 	Key() interface{}
 	URL() string
 	SetPrefix(s string)

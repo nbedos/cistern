@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path"
+	"time"
 
 	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/cache"
@@ -22,9 +23,10 @@ type Table struct {
 	width      int
 	sep        string
 	maxWidths  map[string]int
+	location   *time.Location
 }
 
-func NewTable(source cache.HierarchicalTabularDataSource, width int, height int) (Table, error) {
+func NewTable(source cache.HierarchicalTabularDataSource, width int, height int, loc *time.Location) (Table, error) {
 	if width < 0 || height < 0 {
 		return Table{}, errors.New("table width and height must be >= 0")
 	}
@@ -35,6 +37,7 @@ func NewTable(source cache.HierarchicalTabularDataSource, width int, height int)
 		width:     width,
 		maxWidths: make(map[string]int),
 		sep:       "  ", // FIXME Move this out of here
+		location:  loc,
 	}
 
 	table.Refresh()
@@ -51,7 +54,7 @@ func (t *Table) computeMaxWidths() {
 		t.maxWidths[header] = utils.MaxInt(t.maxWidths[header], runewidth.StringWidth(header))
 	}
 	for _, row := range t.rows {
-		for header, value := range row.Tabular() {
+		for header, value := range row.Tabular(t.location) {
 			t.maxWidths[header] = utils.MaxInt(t.maxWidths[header], value.Length())
 		}
 	}
@@ -158,7 +161,7 @@ func (t *Table) NextMatch(s string, ascending bool) bool {
 	}
 	for i := start; i != t.activeLine; i = next(i) {
 		row := t.rows[i]
-		for _, styledString := range row.Tabular() {
+		for _, styledString := range row.Tabular(t.location) {
 			if styledString.Contains(s) {
 				t.Scroll(i - t.activeLine)
 				return true
@@ -225,7 +228,7 @@ func (t *Table) Text() []text.LocalizedStyledString {
 		s := text.LocalizedStyledString{
 			X: 0,
 			Y: i + 1,
-			S: t.stringFromColumns(row.Tabular(), false),
+			S: t.stringFromColumns(row.Tabular(t.location), false),
 		}
 
 		if t.topLine+i == t.activeLine {

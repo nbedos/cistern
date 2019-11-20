@@ -352,8 +352,8 @@ func (c *Cache) WriteLog(ctx context.Context, accountID string, buildID string, 
 			return err
 		}
 
+		job.Log = utils.NullString{String: log, Valid: true}
 		if complete {
-			job.Log = utils.NullString{String: log, Valid: true}
 			if err = c.SaveJob(accountID, buildID, stageID, job); err != nil {
 				return err
 			}

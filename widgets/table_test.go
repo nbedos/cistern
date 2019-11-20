@@ -3,6 +3,7 @@ package widgets
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/citop/cache"
@@ -46,7 +47,7 @@ func (r *testRow) SetPrefix(s string) {
 	r.prefix = s
 }
 
-func (r *testRow) Tabular() map[string]text.StyledString {
+func (r *testRow) Tabular(loc *time.Location) map[string]text.StyledString {
 	return map[string]text.StyledString{
 		"VALUE": text.NewStyledString(r.value),
 	}
@@ -117,14 +118,14 @@ var longSource = testSource{
 
 func TestNewTable(t *testing.T) {
 	t.Run("nodes in table must match source depth-first rows", func(t *testing.T) {
-		_, err := NewTable(emptySource, 10, 10)
+		_, err := NewTable(emptySource, 10, 10, time.UTC)
 		if err != nil {
 			t.Fatal(err)
 		}
 	})
 
 	t.Run("nodes in table must match source depth-first rows", func(t *testing.T) {
-		table, err := NewTable(source, 10, 10)
+		table, err := NewTable(source, 10, 10, time.UTC)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +150,7 @@ func TestNewTable(t *testing.T) {
 
 func TestTable_Refresh(t *testing.T) {
 	t.Run("empty table before refresh, non-empty after", func(t *testing.T) {
-		table, err := NewTable(emptySource, 10, 10)
+		table, err := NewTable(emptySource, 10, 10, time.UTC)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +177,7 @@ func TestTable_Refresh(t *testing.T) {
 	})
 
 	t.Run("non-empty table before refresh, empty after", func(t *testing.T) {
-		table, err := NewTable(source, 10, 10)
+		table, err := NewTable(source, 10, 10, time.UTC)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -197,7 +198,7 @@ func TestTable_Refresh(t *testing.T) {
 	})
 
 	t.Run("if possible, the same row should remain active across calls to refresh", func(t *testing.T) {
-		table, err := NewTable(source, 10, 10)
+		table, err := NewTable(source, 10, 10, time.UTC)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -217,7 +218,7 @@ func TestTable_Refresh(t *testing.T) {
 
 func TestTable_SetTraversable(t *testing.T) {
 	t.Run("unfolding row 'c' must bring the total number of nodes to 5", func(t *testing.T) {
-		table, err := NewTable(source, 10, 10)
+		table, err := NewTable(source, 10, 10, time.UTC)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -292,7 +293,7 @@ func TestTable_Scroll(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run("", func(t *testing.T) {
-			table, err := NewTable(longSource, 10, 4)
+			table, err := NewTable(longSource, 10, 4, time.UTC)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -315,7 +316,7 @@ func TestTable_Scroll(t *testing.T) {
 
 func TestTable_Resize(t *testing.T) {
 	t.Run("zeroed height and width must not cause any error", func(t *testing.T) {
-		table, err := NewTable(longSource, 10, 4)
+		table, err := NewTable(longSource, 10, 4, time.UTC)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -334,7 +335,7 @@ func TestTable_Resize(t *testing.T) {
 
 func TestTable_Text(t *testing.T) {
 	t.Run("zeroed height and width must not cause any error", func(t *testing.T) {
-		table, err := NewTable(source, 10, 10)
+		table, err := NewTable(source, 10, 10, time.UTC)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -393,7 +394,7 @@ func TestTable_NextMatch(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			table, err := NewTable(source, 10, 10)
+			table, err := NewTable(source, 10, 10, time.UTC)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -412,7 +413,7 @@ func TestTable_NextMatch(t *testing.T) {
 	}
 
 	t.Run("NextMatch on an empty table must return false", func(t *testing.T) {
-		table, err := NewTable(emptySource, 10, 10)
+		table, err := NewTable(emptySource, 10, 10, time.UTC)
 		if err != nil {
 			t.Fatal(err)
 		}

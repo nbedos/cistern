@@ -77,7 +77,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	if err := tui.RunApplication(ctx, tcell.NewScreen, repository, CIProviders); err != nil {
+	if err := tui.RunApplication(ctx, tcell.NewScreen, repository, CIProviders, time.Local); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
