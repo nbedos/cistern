@@ -19,6 +19,7 @@ usage:
 	echo "Usage:"
 	echo "    make all         # Build executable and manual pages (requires pandoc)"
 	echo "    make clean       # Remove build directory"
+	echo "    make image       # Build Docker image"
 	echo "    make man.go      # Build manual page in go format (requires pandoc)"
 	echo "    make tests       # Run unit tests"
 
@@ -73,3 +74,6 @@ $(BUILD)/LICENSE : go.mod go.sum $(BUILD)
 
 tests:
 	go test -v ./...
+
+image:
+	docker build -t citop:latest .
