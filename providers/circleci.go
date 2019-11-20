@@ -321,21 +321,41 @@ func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository ca
 		}
 	}
 
+	errc := make(chan error)
+	wg := sync.WaitGroup{}
 	for ID, buildIDs := range workflows {
-		build, err := c.fetchWorkflow(ctx, projectEndpoint, ID, buildIDs, &repository, false)
-		if err != nil {
-			return active, err
-		}
+		wg.Add(1)
+		go func(ID string, buildIDs []int) {
+			defer wg.Done()
+			build, err := c.fetchWorkflow(ctx, projectEndpoint, ID, buildIDs, &repository, false)
+			if err != nil {
+				errc <- err
+				return
+			}
 
-		select {
-		case buildc <- build:
-		case <-ctx.Done():
-			return active, ctx.Err()
-		}
+			select {
+			case buildc <- build:
+			case <-ctx.Done():
+				errc <- ctx.Err()
+				return
+			}
+		}(ID, buildIDs)
 
 	}
 
-	return active, nil
+	go func() {
+		wg.Wait()
+		close(errc)
+	}()
+
+	var err error
+	for e := range errc {
+		if err == nil {
+			err = e
+		}
+	}
+
+	return active, err
 }
 
 type circleRef struct {

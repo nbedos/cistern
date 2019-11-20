@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,6 +43,7 @@ func TestTravisClientfetchBuild(t *testing.T) {
 		token:                "token",
 		accountID:            "travis",
 		buildsPageSize:       10,
+		mux:                  &sync.Mutex{},
 		updateTimePerBuildID: make(map[string]time.Time),
 	}
 
@@ -235,6 +237,7 @@ func TestTravisClientRepository(t *testing.T) {
 		token:                "token",
 		accountID:            "travis",
 		buildsPageSize:       10,
+		mux:                  &sync.Mutex{},
 		updateTimePerBuildID: make(map[string]time.Time),
 	}
 
@@ -297,6 +300,7 @@ func TestTravisClientFetchBuilds(t *testing.T) {
 		token:                "token",
 		accountID:            "travis",
 		buildsPageSize:       10,
+		mux:                  &sync.Mutex{},
 		updateTimePerBuildID: make(map[string]time.Time),
 	}
 
@@ -377,6 +381,7 @@ func TestTravisClientRepositoryBuilds(t *testing.T) {
 		token:                "token",
 		accountID:            "travis",
 		buildsPageSize:       10,
+		mux:                  &sync.Mutex{},
 		updateTimePerBuildID: make(map[string]time.Time),
 	}
 
