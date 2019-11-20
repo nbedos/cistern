@@ -48,6 +48,15 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		text.Provider: func(s tcell.Style) tcell.Style {
 			return s.Bold(true)
 		},
+		text.StatusFailed: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorMaroon)
+		},
+		text.StatusPassed: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorGreen)
+		},
+		text.StatusRunning: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorOlive)
+		},
 	}
 	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  b:Browser  ?:Help  q:Quit"
 

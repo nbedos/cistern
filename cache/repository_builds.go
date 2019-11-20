@@ -20,6 +20,7 @@ import (
 var shaLength = 7
 
 type buildRowKey struct {
+	ref       string
 	sha       string
 	accountID string
 	buildID   string
@@ -31,7 +32,6 @@ type buildRow struct {
 	key         buildRowKey
 	type_       string
 	state       State
-	ref         string
 	name        string
 	provider    string
 	prefix      string
@@ -93,7 +93,7 @@ func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
 
 	return map[string]text.StyledString{
 		"COMMIT":   text.NewStyledString(string([]rune(b.key.sha)[:shaLength]), text.CommitSha),
-		"REF":      text.NewStyledString(b.ref, text.GitRef),
+		"REF":      text.NewStyledString(b.key.ref, text.GitRef),
 		"TYPE":     text.NewStyledString(b.type_),
 		"STATE":    state,
 		"NAME":     name,
@@ -137,13 +137,13 @@ func buildRowFromBuild(b Build) buildRow {
 	ref := ref(b.Ref, b.IsTag)
 	row := buildRow{
 		key: buildRowKey{
+			ref:       ref,
 			sha:       b.Commit.Sha,
 			accountID: b.Repository.AccountID,
 			buildID:   b.ID,
 		},
 		type_:      "P",
 		state:      b.State,
-		ref:        ref,
 		createdAt:  b.CreatedAt,
 		startedAt:  b.StartedAt,
 		finishedAt: b.FinishedAt,
@@ -186,6 +186,7 @@ func buildRowFromBuild(b Build) buildRow {
 func buildRowFromStage(accountID string, sha string, ref string, buildID string, webURL string, s Stage) buildRow {
 	row := buildRow{
 		key: buildRowKey{
+			ref:       ref,
 			sha:       sha,
 			accountID: accountID,
 			buildID:   buildID,
@@ -193,7 +194,6 @@ func buildRowFromStage(accountID string, sha string, ref string, buildID string,
 		},
 		type_:    "S",
 		state:    s.State,
-		ref:      ref,
 		name:     s.Name,
 		url:      webURL,
 		provider: accountID,
@@ -237,6 +237,7 @@ func buildRowFromStage(accountID string, sha string, ref string, buildID string,
 func buildRowFromJob(accountID string, sha string, ref string, buildID string, stageID int, j Job) buildRow {
 	return buildRow{
 		key: buildRowKey{
+			ref:       ref,
 			sha:       sha,
 			accountID: accountID,
 			buildID:   buildID,
@@ -246,7 +247,6 @@ func buildRowFromJob(accountID string, sha string, ref string, buildID string, s
 		type_:      "J",
 		state:      j.State,
 		name:       fmt.Sprintf("%s (#%d)", j.Name, j.ID),
-		ref:        ref,
 		createdAt:  j.CreatedAt,
 		startedAt:  j.StartedAt,
 		finishedAt: j.FinishedAt,
@@ -265,10 +265,10 @@ func commitRowFromBuilds(builds []Build) buildRow {
 	messageLines := strings.SplitN(builds[0].Commit.Message, "\n", 2)
 	row := buildRow{
 		key: buildRowKey{
+			ref: ref(builds[0].Ref, builds[0].IsTag),
 			sha: builds[0].Commit.Sha,
 		},
 		type_:       "C",
-		ref:         ref(builds[0].Ref, builds[0].IsTag),
 		name:        messageLines[0],
 		children:    make([]*buildRow, 0, len(builds)),
 		traversable: false,

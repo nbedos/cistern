@@ -321,6 +321,7 @@ func (c TravisClient) Builds(ctx context.Context, repositoryURL string, limit in
 		MaxElapsedTime:      0,
 		Clock:               backoff.SystemClock,
 	}
+	b.Reset()
 
 	// Fetch build history and active builds list
 	var active bool
@@ -519,13 +520,14 @@ func (c TravisClient) repositoryBuilds(ctx context.Context, repository *cache.Re
 				c.mux.Lock()
 				lastUpdate := c.updateTimePerBuildID[buildID]
 				c.mux.Unlock()
-				active = active || fromTravisState(build.State).IsActive()
+				buildIsActive := fromTravisState(build.State).IsActive()
+				active = active || buildIsActive
 				updatedAt, err := utils.NullTimeFromString(build.UpdatedAt)
 				if err != nil {
 					errc <- err
 					return
 				}
-				if updatedAt.Valid && updatedAt.Time.After(lastUpdate) {
+				if buildIsActive || updatedAt.Valid && updatedAt.Time.After(lastUpdate) {
 					wg.Add(1)
 					go func(buildID string) {
 						defer wg.Done()
@@ -573,16 +575,16 @@ func (c TravisClient) Log(ctx context.Context, repository cache.Repository, jobI
 	}
 
 	var log struct {
-		Content  string
+		Content  string `json:"content"`
 		LogParts []struct {
-			final bool
-		}
+			Final bool `json:"final"`
+		} `json:"log_parts"`
 	}
 
 	if err := json.Unmarshal(body.Bytes(), &log); err != nil {
 		return "", false, err
 	}
 
-	complete := len(log.LogParts) > 0 && log.LogParts[len(log.LogParts)-1].final
+	complete := len(log.LogParts) > 0 && log.LogParts[len(log.LogParts)-1].Final
 	return log.Content, complete, nil
 }

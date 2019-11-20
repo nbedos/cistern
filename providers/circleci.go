@@ -178,6 +178,7 @@ func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, limit 
 		MaxElapsedTime:      0,
 		Clock:               backoff.SystemClock,
 	}
+	b.Reset()
 
 	for {
 		active, err := c.fetchRepositoryBuilds(ctx, repository, limit, buildc)
@@ -217,7 +218,7 @@ func (c CircleCIClient) Log(ctx context.Context, repository cache.Repository, jo
 	return job.Log.String, !job.State.IsActive(), nil
 }
 
-func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
+func (c *CircleCIClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
 	slug, err := utils.RepositorySlugFromURL(repositoryURL)
 	if err != nil {
 		return cache.Repository{}, err
@@ -238,6 +239,8 @@ func (c CircleCIClient) Repository(ctx context.Context, repositoryURL string) (c
 		}
 		return cache.Repository{}, err
 	}
+	// meh.
+	c.updateTimePerPipelineID = make(map[string]time.Time)
 
 	// FIXME What about repository.ID?
 	return cache.Repository{
@@ -305,7 +308,7 @@ func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository ca
 	// This is all far from optimal. CircleCI REST API does not return workflows so we have to query
 	// for jobs and then rebuild the corresponding workflows
 	workflows := make(map[string][]int)
-	for offset := 0; offset*pageSize < limit; offset += pageSize {
+	for offset := 0; offset < limit; offset += pageSize {
 		pageLimit := utils.MinInt(pageSize, limit-offset)
 		pageWorkflows, pageActive, err := c.listRecentWorkflows(ctx, projectEndpoint, offset, pageLimit)
 		if err != nil {

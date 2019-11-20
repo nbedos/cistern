@@ -58,13 +58,13 @@ var build = Build{
 
 var buildAsRow = buildRow{
 	key: buildRowKey{
+		ref:       "master",
 		sha:       "c2bb562365d40caec0b37138f73a87b6339a8b7a",
 		accountID: "provider",
 		buildID:   "42",
 	},
 	type_:    "P",
 	state:    "passed",
-	ref:      "master",
 	name:     "#42",
 	provider: "provider",
 	prefix:   "",
@@ -105,6 +105,7 @@ var stage = Stage{
 
 var stageAsRow = buildRow{
 	key: buildRowKey{
+		ref:       "master",
 		sha:       "c2bb562365d40caec0b37138f73a87b6339a8b7a",
 		accountID: "provider",
 		buildID:   "42",
@@ -112,7 +113,6 @@ var stageAsRow = buildRow{
 	},
 	type_:    "S",
 	state:    "passed",
-	ref:      "master",
 	name:     "test",
 	provider: "provider",
 	createdAt: utils.NullTime{
@@ -168,6 +168,7 @@ var job = Job{
 
 var jobAsRow = buildRow{
 	key: buildRowKey{
+		ref:       "master",
 		sha:       "c2bb562365d40caec0b37138f73a87b6339a8b7a",
 		accountID: "provider",
 		buildID:   "42",
@@ -176,7 +177,6 @@ var jobAsRow = buildRow{
 	},
 	type_:    "J",
 	state:    "passed",
-	ref:      "master",
 	name:     "golang 1.12 (#54)",
 	provider: "provider",
 	createdAt: utils.NullTime{
@@ -277,11 +277,11 @@ func Test_commitRowFromBuilds(t *testing.T) {
 
 	commitAsRow := buildRow{
 		key: buildRowKey{
+			ref: build.Ref,
 			sha: build.Commit.Sha,
 		},
 		type_:       "C",
 		state:       "passed",
-		ref:         build.Ref,
 		name:        "commit title",
 		createdAt:   build.CreatedAt,
 		startedAt:   build.StartedAt,

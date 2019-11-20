@@ -52,6 +52,7 @@ func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, limit in
 		MaxElapsedTime:      0,
 		Clock:               backoff.SystemClock,
 	}
+	b.Reset()
 
 	var active bool
 	for {
