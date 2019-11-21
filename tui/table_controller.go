@@ -14,13 +14,12 @@ import (
 	"github.com/nbedos/citop/man"
 	"github.com/nbedos/citop/text"
 	"github.com/nbedos/citop/utils"
-	"github.com/nbedos/citop/widgets"
 )
 
 type TableController struct {
 	tui           *TUI
-	table         *widgets.Table
-	status        *widgets.StatusBar
+	table         *Table
+	status        *StatusBar
 	tempDir       string
 	inputMode     bool
 	defaultStatus string
@@ -31,12 +30,12 @@ var ErrExit = errors.New("exit")
 func NewTableController(tui *TUI, source cache.HierarchicalTabularDataSource, loc *time.Location, tempDir string, defaultStatus string) (TableController, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := 10, 10
-	table, err := widgets.NewTable(source, width, height, loc)
+	table, err := NewTable(source, width, height, loc)
 	if err != nil {
 		return TableController{}, err
 	}
 
-	status, err := widgets.NewStatusBar(width, height)
+	status, err := NewStatusBar(width, height)
 	if err != nil {
 		return TableController{}, err
 	}
@@ -87,7 +86,7 @@ func (c TableController) text() []text.LocalizedStyledString {
 	texts := make([]text.LocalizedStyledString, 0)
 	yOffset := 0
 
-	for _, child := range []widgets.Widget{c.table, c.status} {
+	for _, child := range []Widget{c.table, c.status} {
 		for _, line := range child.Text() {
 			line.Y += yOffset
 			texts = append(texts, line)

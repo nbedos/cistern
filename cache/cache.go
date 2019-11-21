@@ -13,13 +13,17 @@ import (
 )
 
 var ErrRepositoryNotFound = errors.New("repository not found")
+var ErrUnknownURL = errors.New("URL not recognized")
 
-type Provider interface {
+type CIProvider interface {
 	AccountID() string
-	// Builds should return err == ErrRepositoryNotFound when appropriate
-	// Builds must close buildc before returning
-	Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- Build) error
 	Log(ctx context.Context, repository Repository, jobID int) (string, bool, error)
+	BuildFromURL(ctx context.Context, u string) (Build, error)
+}
+
+type SourceProvider interface {
+	// BuildURLs must close 'urls' channel
+	BuildURLs(ctx context.Context, owner string, repo string, sha string, urls chan<- string) error
 }
 
 type State string
@@ -166,21 +170,23 @@ type buildKey struct {
 }
 
 type Cache struct {
-	builds    map[buildKey]*Build
-	mutex     *sync.Mutex
-	providers map[string]Provider
+	builds          map[buildKey]*Build
+	mutex           *sync.Mutex
+	ciProvidersById map[string]CIProvider
+	sourceProviders []SourceProvider
 }
 
-func NewCache(providers []Provider) Cache {
-	providersByAccountID := make(map[string]Provider, len(providers))
-	for _, provider := range providers {
+func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache {
+	providersByAccountID := make(map[string]CIProvider, len(CIProviders))
+	for _, provider := range CIProviders {
 		providersByAccountID[provider.AccountID()] = provider
 	}
 
 	return Cache{
-		builds:    make(map[buildKey]*Build),
-		mutex:     &sync.Mutex{},
-		providers: providersByAccountID,
+		builds:          make(map[buildKey]*Build),
+		mutex:           &sync.Mutex{},
+		ciProvidersById: providersByAccountID,
+		sourceProviders: sourceProviders,
 	}
 }
 
@@ -247,37 +253,56 @@ func (c Cache) Builds() []Build {
 	return builds
 }
 
-func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, limit int, updates chan time.Time) error {
-	subCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	wg := sync.WaitGroup{}
+func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, sha string, updates chan time.Time) error {
+	var err error
+	slug, err := utils.RepositorySlugFromURL(repositoryURL)
+	if err != nil {
+		return err
+	}
+	cs := strings.Split(slug, "/")
+	if len(cs) != 2 {
+		return errors.New("invalid repository slug")
+	}
+	owner, repo := cs[0], cs[1]
+
 	errc := make(chan error)
+	ctx, cancel := context.WithCancel(ctx)
+	wg := sync.WaitGroup{}
+	for _, p := range c.sourceProviders {
+		urls := make(chan string)
 
-	for _, provider := range c.providers {
 		wg.Add(1)
-		go func(p Provider) {
+		go func(p SourceProvider) {
 			defer wg.Done()
-			buildc := make(chan Build)
+			errc <- p.BuildURLs(ctx, owner, repo, sha, urls)
+		}(p)
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				errc <- p.Builds(subCtx, repositoryURL, limit, buildc)
-			}()
-
-			for build := range buildc {
-				if err := c.Save(build); err != nil {
-					errc <- err
-					return
-				}
-				go func() {
-					select {
-					case updates <- time.Now():
-					case <-subCtx.Done():
+		wg.Add(1)
+		go func(urls <-chan string) {
+			defer wg.Done()
+			for u := range urls {
+				for _, p := range c.ciProvidersById {
+					build, err := p.BuildFromURL(ctx, u)
+					if err == ErrUnknownURL {
+						continue
+					} else if err != nil {
+						errc <- err
+						return
 					}
-				}()
+
+					if err := c.Save(build); err != nil {
+						errc <- err
+						return
+					}
+					go func() {
+						select {
+						case updates <- time.Now():
+						case <-ctx.Done():
+						}
+					}()
+				}
 			}
-		}(provider)
+		}(urls)
 	}
 
 	go func() {
@@ -285,21 +310,10 @@ func (c *Cache) UpdateFromProviders(ctx context.Context, repositoryURL string, l
 		close(errc)
 	}()
 
-	var err error
-	notFound := 0
 	for e := range errc {
-		switch e {
-		case nil:
-			// Do nothing
-		case ErrRepositoryNotFound:
-			if notFound++; notFound == len(c.providers) {
-				err = ErrRepositoryNotFound
-			}
-		default:
+		if err == nil && e != nil {
 			cancel()
-			if err == nil {
-				err = e
-			}
+			err = e
 		}
 	}
 
@@ -343,7 +357,7 @@ func (c *Cache) WriteLog(ctx context.Context, accountID string, buildID string, 
 	}
 
 	if !job.Log.Valid {
-		provider, exists := c.providers[accountID]
+		provider, exists := c.ciProvidersById[accountID]
 		if !exists {
 			return fmt.Errorf("no matching provider found in cache for account ID %q", accountID)
 		}

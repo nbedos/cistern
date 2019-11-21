@@ -13,19 +13,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
 )
 
 type CircleCIClient struct {
-	baseURL                 url.URL
-	httpClient              *http.Client
-	rateLimiter             <-chan time.Time
-	token                   string
-	accountID               string
-	updateTimePerPipelineID map[string]time.Time
-	mux                     *sync.Mutex
+	baseURL     url.URL
+	httpClient  *http.Client
+	rateLimiter <-chan time.Time
+	token       string
+	accountID   string
+	mux         *sync.Mutex
 }
 
 var CircleCIURL = url.URL{
@@ -37,13 +35,12 @@ var CircleCIURL = url.URL{
 
 func NewCircleCIClient(URL url.URL, accountID string, token string, rateLimit time.Duration) CircleCIClient {
 	return CircleCIClient{
-		baseURL:                 URL,
-		httpClient:              &http.Client{Timeout: 10 * time.Second},
-		rateLimiter:             time.Tick(rateLimit),
-		token:                   token,
-		accountID:               accountID,
-		updateTimePerPipelineID: make(map[string]time.Time),
-		mux:                     &sync.Mutex{},
+		baseURL:     URL,
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		rateLimiter: time.Tick(rateLimit),
+		token:       token,
+		accountID:   accountID,
+		mux:         &sync.Mutex{},
 	}
 }
 
@@ -164,46 +161,40 @@ func (c CircleCIClient) AccountID() string {
 	return c.accountID
 }
 
-func (c CircleCIClient) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
-	defer close(buildc)
-	repository, err := c.Repository(ctx, repositoryURL)
+func (c CircleCIClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
+	// TODO
+	/*owner, repo, id, err := parseCircleCIWebURL(&c.baseURL, u)
 	if err != nil {
-		return err
+		return cache.Build{}, err
 	}
 
-	b := backoff.ExponentialBackOff{
-		InitialInterval:     5 * time.Second,
-		RandomizationFactor: backoff.DefaultRandomizationFactor,
-		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         time.Minute,
-		MaxElapsedTime:      0,
-		Clock:               backoff.SystemClock,
-	}
-	b.Reset()
+	repository, err := c.Repository(ctx, fmt.Sprintf("%s/%s", owner, repo))
+	if err != nil {
+		return cache.Build{}, err
+	}*/
 
-	for {
-		active, err := c.fetchRepositoryBuilds(ctx, repository, limit, buildc)
-		if err != nil {
-			return err
-		}
-		if active {
-			b.Reset()
-		}
+	return cache.Build{}, nil
+}
 
-		waitTime := b.NextBackOff()
-		if waitTime == backoff.Stop {
-			break
-		}
-
-		select {
-		case <-time.After(waitTime):
-			// Do nothing
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+// Extract owner, repository and build ID from web URL of build
+func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, string, error) {
+	v, err := url.Parse(u)
+	if err != nil {
+		return "", "", "", err
 	}
 
-	return nil
+	if v.Hostname() != strings.TrimPrefix(baseURL.Hostname(), "api.") {
+		return "", "", "", cache.ErrUnknownURL
+	}
+
+	// URL format: https://circleci.com/gh/nbedos/citop/36
+	cs := strings.Split(v.EscapedPath(), "/")
+	if len(cs) < 5 {
+		return "", "", "", cache.ErrUnknownURL
+	}
+
+	owner, repo, id := cs[2], cs[3], cs[4]
+	return owner, repo, id, nil
 }
 
 func (c CircleCIClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
@@ -233,15 +224,19 @@ func (c *CircleCIClient) Repository(ctx context.Context, repositoryURL string) (
 	owner, name := components[0], components[1]
 
 	// Validate repository existence on CircleCI
+
 	endPoint := c.projectEndpoint(owner, name)
-	if _, _, err = c.listRecentWorkflows(ctx, endPoint, 0, 1); err != nil {
+	parameters := endPoint.Query()
+	parameters.Add("offset", strconv.Itoa(0))
+	parameters.Add("limit", strconv.Itoa(1))
+	parameters.Add("shallow", "true")
+	endPoint.RawQuery = parameters.Encode()
+	if _, err = c.get(ctx, endPoint); err != nil {
 		if err, ok := err.(HTTPError); ok && err.Status == 404 {
 			return cache.Repository{}, cache.ErrRepositoryNotFound
 		}
 		return cache.Repository{}, err
 	}
-	// meh.
-	c.updateTimePerPipelineID = make(map[string]time.Time)
 
 	// FIXME What about repository.ID?
 	return cache.Repository{
@@ -250,117 +245,6 @@ func (c *CircleCIClient) Repository(ctx context.Context, repositoryURL string) (
 		Owner:     owner,
 		Name:      name,
 	}, nil
-}
-
-func (c CircleCIClient) listRecentWorkflows(ctx context.Context, projectEndpoint url.URL, offset int, limit int) (map[string][]int, bool, error) {
-	active := false
-	parameters := projectEndpoint.Query()
-	parameters.Add("offset", strconv.Itoa(offset))
-	parameters.Add("limit", strconv.Itoa(limit))
-	parameters.Add("shallow", "true")
-	projectEndpoint.RawQuery = parameters.Encode()
-
-	body, err := c.get(ctx, projectEndpoint)
-	if err != nil {
-		return nil, active, err
-	}
-
-	var builds []circleCIBuild
-	if err := json.Unmarshal(body.Bytes(), &builds); err != nil {
-		return nil, active, err
-	}
-
-	buildIDsByWorkflow := make(map[string][]int)
-	for _, build := range builds {
-		active = active || fromCircleCIStatus(build.Lifecycle, build.Outcome).IsActive()
-
-		createdAt, err := utils.NullTimeFromString(build.CreatedAt)
-		if err != nil {
-			return nil, active, err
-		}
-		startedAt, err := utils.NullTimeFromString(build.StartedAt)
-		if err != nil {
-			return nil, active, err
-		}
-		finishedAt, err := utils.NullTimeFromString(build.FinishedAt)
-		if err != nil {
-			return nil, active, err
-		}
-
-		updatedAt := utils.MaxNullTime(createdAt, startedAt, finishedAt)
-		c.mux.Lock()
-		// FIXME This is broken. Gather all builds of workflow before discarding the worklow.
-		lastUpdate, exists := c.updateTimePerPipelineID[build.Workflows.ID]
-		if !exists || (updatedAt.Valid && updatedAt.Time.After(lastUpdate)) {
-			c.updateTimePerPipelineID[build.Workflows.ID] = updatedAt.Time
-			buildIDsByWorkflow[build.Workflows.ID] = append(buildIDsByWorkflow[build.Workflows.ID], build.ID)
-		}
-		c.mux.Unlock()
-	}
-
-	return buildIDsByWorkflow, active, nil
-}
-
-func (c CircleCIClient) fetchRepositoryBuilds(ctx context.Context, repository cache.Repository, limit int, buildc chan<- cache.Build) (bool, error) {
-	projectEndpoint := c.projectEndpoint(repository.Owner, repository.Name)
-	pageSize := 20
-	active := false
-
-	// This is all far from optimal. CircleCI REST API does not return workflows so we have to query
-	// for jobs and then rebuild the corresponding workflows
-	workflows := make(map[string][]int)
-	for offset := 0; offset < limit; offset += pageSize {
-		pageLimit := utils.MinInt(pageSize, limit-offset)
-		pageWorkflows, pageActive, err := c.listRecentWorkflows(ctx, projectEndpoint, offset, pageLimit)
-		if err != nil {
-			return active, err
-		}
-		active = active || pageActive
-
-		if len(pageWorkflows) == 0 {
-			break
-		}
-
-		for workflowID, jobIDs := range pageWorkflows {
-			workflows[workflowID] = append(workflows[workflowID], jobIDs...)
-		}
-	}
-
-	errc := make(chan error)
-	wg := sync.WaitGroup{}
-	for ID, buildIDs := range workflows {
-		wg.Add(1)
-		go func(ID string, buildIDs []int) {
-			defer wg.Done()
-			build, err := c.fetchWorkflow(ctx, projectEndpoint, ID, buildIDs, &repository, false)
-			if err != nil {
-				errc <- err
-				return
-			}
-
-			select {
-			case buildc <- build:
-			case <-ctx.Done():
-				errc <- ctx.Err()
-				return
-			}
-		}(ID, buildIDs)
-
-	}
-
-	go func() {
-		wg.Wait()
-		close(errc)
-	}()
-
-	var err error
-	for e := range errc {
-		if err == nil {
-			err = e
-		}
-	}
-
-	return active, err
 }
 
 type circleRef struct {
@@ -425,10 +309,6 @@ func (c CircleCIClient) fetchWorkflow(ctx context.Context, projectEndpoint url.U
 	}
 
 	build.State = cache.AggregateStatuses(jobs)
-
-	c.mux.Lock()
-	c.updateTimePerPipelineID[build.ID] = updatedAt.Time
-	c.mux.Unlock()
 
 	return build, nil
 }

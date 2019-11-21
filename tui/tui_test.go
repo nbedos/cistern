@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"io"
 	"strconv"
 	"testing"
 	"time"
@@ -136,56 +135,19 @@ type mockProvider struct {
 }
 
 func (p mockProvider) AccountID() string { return p.id }
-func (p mockProvider) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
-	defer close(buildc)
-	return nil
-}
 func (p mockProvider) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
 	return "", false, nil
 }
-func (p mockProvider) StreamLog(ctx context.Context, repositoryID int, jobID int, writer io.Writer) error {
-	return nil
+func (p mockProvider) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
+	return cache.Build{}, nil
 }
 
 func TestRunApplication(t *testing.T) {
 	t.Run("no provider should cause the function to return with an error", func(t *testing.T) {
 		ctx := context.Background()
-		err := RunApplication(ctx, newScreen, "https://example.com/owner/project", nil, time.UTC)
+		err := RunApplication(ctx, newScreen, "https://example.com/owner/project", "", nil, nil, time.UTC)
 		if err != ErrNoProvider {
 			t.Fatalf("expected %v but got %v", ErrNoProvider, err)
-		}
-	})
-
-	t.Run("application must keep running once provider returns", func(t *testing.T) {
-		// Those providers do nothing. When their Builds() method is called it will return nil
-		// immediately
-		ps := []cache.Provider{
-			mockProvider{id: "provider1"},
-			mockProvider{id: "provider2"},
-			mockProvider{id: "provider3"},
-			mockProvider{id: "provider4"},
-		}
-
-		d := 100 * time.Millisecond
-		ctx, cancel := context.WithCancel(context.Background())
-		errc := make(chan error)
-		start := time.Now()
-		var elapsed time.Duration // Only use this after reading error on errc
-		go func() {
-			e := RunApplication(ctx, newScreen, "https://example.com/owner/project", ps, time.UTC)
-			elapsed = time.Since(start)
-			errc <- e
-		}()
-		// Simulate user interacting with application for duration d after provider.Builds() returns
-		time.Sleep(d)
-		// Simulate user quitting application
-		cancel()
-		err := <-errc
-		if elapsed < d {
-			t.Fatalf("expected application to run for more than %v but it ran for %v", d, elapsed)
-		}
-		if err != context.Canceled {
-			t.Fatalf("expected %v but got %v", context.Canceled, err)
 		}
 	})
 }

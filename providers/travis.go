@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
 )
@@ -307,55 +306,42 @@ func (c TravisClient) AccountID() string {
 	return c.accountID
 }
 
-func (c TravisClient) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
-	defer close(buildc)
-	repository, err := c.repository(ctx, repositoryURL)
+func (c TravisClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
+	owner, repo, id, err := parseTravisWebURL(&c.baseURL, u)
 	if err != nil {
-		return err
+		return cache.Build{}, err
 	}
 
-	b := backoff.ExponentialBackOff{
-		InitialInterval:     5 * time.Second,
-		RandomizationFactor: backoff.DefaultRandomizationFactor,
-		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         time.Minute,
-		MaxElapsedTime:      0,
-		Clock:               backoff.SystemClock,
-	}
-	b.Reset()
-
-	// Fetch build history and active builds list
-	var active bool
-	for {
-		if err := c.repositoryBuilds(ctx, &repository, limit, buildc); err != nil {
-			return err
-		}
-		if active {
-			b.Reset()
-		}
-
-		waitTime := b.NextBackOff()
-		if waitTime == backoff.Stop {
-			break
-		}
-
-		select {
-		case <-time.After(waitTime):
-			// Do nothing
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+	repository, err := c.repository(ctx, fmt.Sprintf("%s/%s", owner, repo))
+	if err != nil {
+		return cache.Build{}, err
 	}
 
-	return nil
+	return c.fetchBuild(ctx, &repository, id)
 }
 
-func (c TravisClient) repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
-	slug, err := utils.RepositorySlugFromURL(repositoryURL)
+// Extract owner, repository and build ID from web URL of build
+func parseTravisWebURL(baseURL *url.URL, u string) (string, string, string, error) {
+	v, err := url.Parse(u)
 	if err != nil {
-		return cache.Repository{}, err
+		return "", "", "", err
 	}
 
+	if v.Hostname() != strings.TrimPrefix(baseURL.Hostname(), "api.") {
+		return "", "", "", cache.ErrUnknownURL
+	}
+
+	// URL format: https://travis-ci.org/nbedos/termtosvg/builds/612815758
+	cs := strings.Split(v.EscapedPath(), "/")
+	if len(cs) < 5 || cs[3] != "builds" {
+		return "", "", "", cache.ErrUnknownURL
+	}
+
+	owner, repo, id := cs[1], cs[2], cs[4]
+	return owner, repo, id, nil
+}
+
+func (c TravisClient) repository(ctx context.Context, slug string) (cache.Repository, error) {
 	var reqURL = c.baseURL
 	buildPathFormat := "/repo/%s"
 	reqURL.Path += fmt.Sprintf(buildPathFormat, slug)
@@ -465,105 +451,6 @@ func (c TravisClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 	c.mux.Unlock()
 
 	return cacheBuild, nil
-}
-
-func (c TravisClient) fetchBuilds(ctx context.Context, repository *cache.Repository, offset int, limit int) ([]travisBuild, error) {
-	var buildsURL = c.baseURL
-	buildPathFormat := "/repo/%v/builds"
-	buildsURL.Path += fmt.Sprintf(buildPathFormat, repository.Slug())
-	buildsURL.RawPath += fmt.Sprintf(buildPathFormat, url.PathEscape(repository.Slug()))
-
-	parameters := buildsURL.Query()
-	parameters.Add("limit", strconv.Itoa(limit))
-	parameters.Add("offset", strconv.Itoa(offset))
-	buildsURL.RawQuery = parameters.Encode()
-
-	body, _, err := c.get(ctx, "GET", buildsURL)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		Builds []travisBuild
-	}
-
-	if err = json.Unmarshal(body.Bytes(), &response); err != nil {
-		return nil, err
-	}
-
-	return response.Builds, err
-}
-
-func (c TravisClient) repositoryBuilds(ctx context.Context, repository *cache.Repository, limit int, buildc chan<- cache.Build) error {
-	wg := sync.WaitGroup{}
-	errc := make(chan error)
-	subCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	wg.Add(1)
-	active := false
-	go func() {
-		defer wg.Done()
-
-		for offset := 0; offset < limit; offset += c.buildsPageSize {
-			pageSize := utils.MinInt(c.buildsPageSize, limit-offset)
-			builds, err := c.fetchBuilds(subCtx, repository, offset, pageSize)
-			if err != nil {
-				errc <- err
-				return
-			}
-			if len(builds) == 0 {
-				break
-			}
-
-			for _, build := range builds {
-				buildID := strconv.Itoa(build.ID)
-				c.mux.Lock()
-				lastUpdate := c.updateTimePerBuildID[buildID]
-				c.mux.Unlock()
-				buildIsActive := fromTravisState(build.State).IsActive()
-				active = active || buildIsActive
-				updatedAt, err := utils.NullTimeFromString(build.UpdatedAt)
-				if err != nil {
-					errc <- err
-					return
-				}
-				if buildIsActive || updatedAt.Valid && updatedAt.Time.After(lastUpdate) {
-					wg.Add(1)
-					go func(buildID string) {
-						defer wg.Done()
-
-						build, err := c.fetchBuild(subCtx, repository, buildID)
-						if err != nil {
-							errc <- err
-							return
-						}
-						select {
-						case buildc <- build:
-						case <-subCtx.Done():
-							errc <- subCtx.Err()
-						}
-					}(buildID)
-				}
-			}
-		}
-	}()
-
-	go func() {
-		wg.Wait()
-		close(errc)
-	}()
-
-	// FIXME Improve error reporting
-	var err error
-	for e := range errc {
-		if e != nil && err == nil {
-			cancel()
-			err = e
-		}
-	}
-
-	return err
 }
 
 func (c TravisClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {

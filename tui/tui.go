@@ -22,8 +22,8 @@ type ExecCmd struct {
 
 var ErrNoProvider = errors.New("list of providers must not be empty")
 
-func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repositoryURL string, providers []cache.Provider, loc *time.Location) (err error) {
-	if len(providers) == 0 {
+func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repositoryURL string, sha string, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location) (err error) {
+	if len(CIProviders) == 0 || len(SourceProviders) == 0 {
 		return ErrNoProvider
 	}
 	// FIXME Discard log until the status bar is implemented in order to hide the "Unsolicited response received on
@@ -64,7 +64,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  b:Browser  ?:Help  q:Quit"
 
 	ctx, cancel := context.WithCancel(ctx)
-	cacheDB := cache.NewCache(providers)
+	cacheDB := cache.NewCache(CIProviders, SourceProviders)
 	source := cacheDB.BuildsByCommit()
 
 	ui, err := NewTUI(newScreen, defaultStyle, styleSheet)
@@ -83,7 +83,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 	errCache := make(chan error)
 	updates := make(chan time.Time)
 	go func() {
-		errCache <- cacheDB.UpdateFromProviders(ctx, repositoryURL, 20, updates)
+		errCache <- cacheDB.GetPipelines(ctx, repositoryURL, sha, updates)
 	}()
 
 	errController := make(chan error)

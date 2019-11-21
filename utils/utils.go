@@ -208,22 +208,27 @@ func (a ANSIStripper) Close() error {
 	return a.writer.Close()
 }
 
-func GitOriginURL(path string) (string, error) {
+func GitOriginURL(path string) (string, string, error) {
 	r, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	remote, err := r.Remote("origin")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if len(remote.Config().URLs) == 0 {
-		return "", fmt.Errorf("GIT repository %q: remote 'origin' has no associated URL", path)
+		return "", "", fmt.Errorf("GIT repository %q: remote 'origin' has no associated URL", path)
 	}
 
-	return remote.Config().URLs[0], nil
+	ref, err := r.Head()
+	if err != nil {
+		return "", "", err
+	}
+
+	return remote.Config().URLs[0], ref.Name().Short(), nil
 }
 
 type NullDuration struct {

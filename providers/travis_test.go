@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -242,7 +241,7 @@ func TestTravisClientRepository(t *testing.T) {
 	}
 
 	t.Run("Get nbedos/citop", func(t *testing.T) {
-		repository, err := client.repository(context.Background(), "github.com/nbedos/citop")
+		repository, err := client.repository(context.Background(), "nbedos/citop")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -262,154 +261,22 @@ func TestTravisClientRepository(t *testing.T) {
 	})
 
 	t.Run("ErrRepositoryNotFound", func(t *testing.T) {
-		_, err := client.repository(context.Background(), "github.com/nbedos/does_not_exist")
+		_, err := client.repository(context.Background(), "nbedos/does_not_exist")
 		if err != cache.ErrRepositoryNotFound {
 			t.Fatalf("expected %v but got %v", cache.ErrRepositoryNotFound, err)
 		}
 	})
 }
 
-func TestTravisClientFetchBuilds(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		q := r.URL.Query()
-		if r.Method == "GET" && r.URL.Path == "/repo/nbedos/citop/builds" {
-			filenameFmt := "data/repo_25564643_builds?offset=%s&limit=%s.json"
-			filename := fmt.Sprintf(filenameFmt, q.Get("offset"), q.Get("limit"))
-			bs, err := ioutil.ReadFile(filename)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := fmt.Fprint(w, string(bs)); err != nil {
-				t.Fatal(err)
-			}
-			return
-		}
-		w.WriteHeader(404)
-	}))
-	defer ts.Close()
+func TestParseTravisWebURL(t *testing.T) {
+	u := "https://travis-ci.org/nbedos/termtosvg/builds/612815758"
 
-	URL, err := url.Parse(ts.URL)
+	owner, repo, id, err := parseTravisWebURL(&TravisOrgURL, u)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client := TravisClient{
-		baseURL:              *URL,
-		httpClient:           ts.Client(),
-		rateLimiter:          time.Tick(time.Millisecond),
-		token:                "token",
-		accountID:            "travis",
-		buildsPageSize:       10,
-		mux:                  &sync.Mutex{},
-		updateTimePerBuildID: make(map[string]time.Time),
-	}
-
-	repository := cache.Repository{
-		AccountID: "account",
-		ID:        42,
-		URL:       "github.com/nbedos/citop",
-		Owner:     "nbedos",
-		Name:      "citop",
-	}
-
-	builds, err := client.fetchBuilds(context.Background(), &repository, 10, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ids := make(map[int]struct{}, len(builds))
-	for _, build := range builds {
-		ids[build.ID] = struct{}{}
-	}
-
-	expectedIDs := map[int]struct{}{
-		607359944: {},
-		607356631: {},
-		607060646: {},
-		607059776: {},
-		606103420: {},
-		605628645: {},
-		599340942: {},
-		599339545: {},
-		598815592: {},
-		598749982: {},
-	}
-
-	if diff := cmp.Diff(expectedIDs, ids); diff != "" {
-		t.Log(diff)
-		t.Fatal("invalid id")
-	}
-}
-
-func TestTravisClientRepositoryBuilds(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var filename string
-		switch {
-		case r.Method == "GET" && r.URL.Path == "/repo/nbedos/citop/builds":
-			filenameFmt := "data/repo_25564643_builds?offset=%s&limit=%s.json"
-			q := r.URL.Query()
-			filename = fmt.Sprintf(filenameFmt, q.Get("offset"), q.Get("limit"))
-
-		case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/build/"):
-			buildID := strings.TrimPrefix(r.URL.Path, "/build/")
-			filename = fmt.Sprintf("data/build_%s.json", buildID)
-		default:
-			w.WriteHeader(404)
-			return
-		}
-
-		bs, err := ioutil.ReadFile(filename)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := fmt.Fprint(w, string(bs)); err != nil {
-			t.Fatal(err)
-		}
-
-	}))
-	defer ts.Close()
-
-	URL, err := url.Parse(ts.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	client := TravisClient{
-		baseURL:              *URL,
-		httpClient:           ts.Client(),
-		rateLimiter:          time.Tick(time.Millisecond),
-		token:                "token",
-		accountID:            "travis",
-		buildsPageSize:       10,
-		mux:                  &sync.Mutex{},
-		updateTimePerBuildID: make(map[string]time.Time),
-	}
-
-	repository := cache.Repository{
-		AccountID: "account",
-		ID:        42,
-		URL:       "github.com/nbedos/citop",
-		Owner:     "nbedos",
-		Name:      "citop",
-	}
-
-	buildc := make(chan cache.Build)
-	var errRepositoryBuild error = nil
-	nbrBuilds := 25
-	go func() {
-		errRepositoryBuild = client.repositoryBuilds(context.Background(), &repository, nbrBuilds, buildc)
-		close(buildc)
-	}()
-
-	builds := make([]cache.Build, 0)
-	for build := range buildc {
-		builds = append(builds, build)
-	}
-	if len(builds) != nbrBuilds {
-		t.Fatalf("expected %d builds but got %d", nbrBuilds, len(builds))
-	}
-
-	if errRepositoryBuild != nil {
-		t.Fatal(errRepositoryBuild)
+	if owner != "nbedos" || repo != "termtosvg" || id != "612815758" {
+		t.Fail()
 	}
 }

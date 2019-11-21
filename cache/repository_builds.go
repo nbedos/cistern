@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -259,71 +258,6 @@ func buildRowFromJob(accountID string, sha string, ref string, buildID string, s
 	}
 }
 
-func commitRowFromBuilds(builds []Build) buildRow {
-	if len(builds) == 0 {
-		return buildRow{}
-	}
-
-	messageLines := strings.SplitN(builds[0].Commit.Message, "\n", 2)
-	row := buildRow{
-		key: buildRowKey{
-			ref: ref(builds[0].Ref, builds[0].IsTag),
-			sha: builds[0].Commit.Sha,
-		},
-		type_:       "C",
-		name:        messageLines[0],
-		children:    make([]*buildRow, 0, len(builds)),
-		traversable: false,
-		provider:    "",
-	}
-
-	latestBuildByProvider := make(map[string]Build)
-	for _, build := range builds {
-		child := buildRowFromBuild(build)
-		row.children = append(row.children, &child)
-
-		latestBuild, exists := latestBuildByProvider[build.Repository.AccountID]
-		if !exists || latestBuild.StartedAt.Valid && build.StartedAt.Valid && latestBuild.StartedAt.Time.Before(build.StartedAt.Time) {
-			latestBuildByProvider[build.Repository.AccountID] = build
-		}
-	}
-
-	latestBuilds := make([]Statuser, 0, len(latestBuildByProvider))
-	for _, build := range latestBuildByProvider {
-		latestBuilds = append(latestBuilds, build)
-		row.createdAt = utils.MinNullTime(row.createdAt, build.CreatedAt)
-		row.startedAt = utils.MinNullTime(row.startedAt, build.StartedAt)
-		row.finishedAt = utils.MaxNullTime(row.finishedAt, build.FinishedAt)
-		if !row.updatedAt.Valid || row.updatedAt.Time.Before(build.UpdatedAt) {
-			row.updatedAt.Time = build.UpdatedAt
-			row.updatedAt.Valid = true
-		}
-		if !row.duration.Valid || (build.Duration.Valid && build.Duration.Duration > row.duration.Duration) {
-			row.duration = build.Duration
-		}
-	}
-
-	row.state = AggregateStatuses(latestBuilds)
-
-	sort.Slice(row.children, func(i, j int) bool {
-		ti := utils.MinNullTime(
-			row.children[i].createdAt,
-			row.children[i].startedAt,
-			row.children[i].updatedAt,
-			row.children[i].finishedAt)
-
-		tj := utils.MinNullTime(
-			row.children[j].createdAt,
-			row.children[j].startedAt,
-			row.children[j].updatedAt,
-			row.children[j].finishedAt)
-
-		return ti.Time.After(tj.Time) || (ti == tj && row.children[i].name > row.children[j].name)
-	})
-
-	return row
-}
-
 type BuildsByCommit struct {
 	cache Cache
 }
@@ -353,24 +287,9 @@ func (s BuildsByCommit) Alignment() map[string]text.Alignment {
 }
 
 func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
-	type Ref struct {
-		sha   string
-		ref   string
-		isTag bool
-	}
-	buildsPerRef := make(map[Ref][]Build)
+	rows := make([]HierarchicalTabularSourceRow, 0)
 	for _, build := range s.cache.Builds() {
-		ref := Ref{
-			sha:   build.Commit.Sha,
-			ref:   build.Ref,
-			isTag: build.IsTag,
-		}
-		buildsPerRef[ref] = append(buildsPerRef[ref], build)
-	}
-
-	rows := make([]HierarchicalTabularSourceRow, 0, len(buildsPerRef))
-	for _, builds := range buildsPerRef {
-		row := commitRowFromBuilds(builds)
+		row := buildRowFromBuild(build)
 		rows = append(rows, &row)
 	}
 

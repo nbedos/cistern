@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/utils"
 	"github.com/xanzy/go-gitlab"
@@ -37,47 +37,43 @@ func (c GitLabClient) AccountID() string {
 	return c.accountID
 }
 
-// TODO Implement live updates once https://github.com/xanzy/go-gitlab/pull/731 is merged
-func (c GitLabClient) Builds(ctx context.Context, repositoryURL string, limit int, buildc chan<- cache.Build) error {
-	defer close(buildc)
-	repository, err := c.Repository(ctx, repositoryURL)
+func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
+	owner, repo, id, err := parseGitlabWebURL(c.remote.BaseURL(), u)
 	if err != nil {
-		return err
+		return cache.Build{}, err
 	}
 
-	b := backoff.ExponentialBackOff{
-		InitialInterval:     5 * time.Second,
-		RandomizationFactor: backoff.DefaultRandomizationFactor,
-		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         time.Minute,
-		MaxElapsedTime:      0,
-		Clock:               backoff.SystemClock,
-	}
-	b.Reset()
-
-	var active bool
-	for {
-		if active, err = c.LastBuilds(ctx, repository, limit, buildc); err != nil {
-			return err
-		}
-		if active {
-			b.Reset()
-		}
-
-		waitTime := b.NextBackOff()
-		if waitTime == backoff.Stop {
-			break
-		}
-
-		select {
-		case <-time.After(waitTime):
-			// Do nothing
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+	repository, err := c.Repository(ctx, fmt.Sprintf("%s/%s", owner, repo))
+	if err != nil {
+		return cache.Build{}, err
 	}
 
-	return nil
+	return c.fetchBuild(ctx, &repository, id)
+}
+
+// Extract owner, repository and build ID from web URL of build
+func parseGitlabWebURL(baseURL *url.URL, u string) (string, string, int, error) {
+	v, err := url.Parse(u)
+	if err != nil {
+		return "", "", 0, err
+	}
+
+	if v.Hostname() != strings.TrimPrefix(baseURL.Hostname(), "api.") {
+		return "", "", 0, cache.ErrUnknownURL
+	}
+
+	// URL format: https://gitlab.com/nbedos/citop/pipelines/97604657
+	cs := strings.Split(v.EscapedPath(), "/")
+	if len(cs) < 5 || cs[3] != "pipelines" {
+		return "", "", 0, cache.ErrUnknownURL
+	}
+
+	owner, repo := cs[1], cs[2]
+	id, err := strconv.Atoi(cs[4])
+	if err != nil {
+		return "", "", 0, err
+	}
+	return owner, repo, id, nil
 }
 
 func (c *GitLabClient) GetTraceFile(ctx context.Context, repositoryID int, jobID int) (bytes.Buffer, error) {
@@ -96,18 +92,13 @@ func (c *GitLabClient) GetTraceFile(ctx context.Context, repositoryID int, jobID
 	return buf, err
 }
 
-func (c GitLabClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
-	repositorySlug, err := utils.RepositorySlugFromURL(repositoryURL)
-	if err != nil {
-		return cache.Repository{}, err
-	}
-
+func (c GitLabClient) Repository(ctx context.Context, slug string) (cache.Repository, error) {
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
 		return cache.Repository{}, ctx.Err()
 	}
-	project, _, err := c.remote.Projects.GetProject(repositorySlug, nil, gitlab.WithContext(ctx))
+	project, _, err := c.remote.Projects.GetProject(slug, nil, gitlab.WithContext(ctx))
 	if err != nil {
 		if err, ok := err.(*gitlab.ErrorResponse); ok && err.Response.StatusCode == 404 {
 			return cache.Repository{}, cache.ErrRepositoryNotFound
@@ -148,74 +139,6 @@ func FromGitLabState(s string) cache.State {
 	default:
 		return cache.Unknown
 	}
-}
-
-func (c GitLabClient) LastBuilds(ctx context.Context, repository cache.Repository, limit int, buildc chan<- cache.Build) (bool, error) {
-	pageSize := 20
-	opt := gitlab.ListProjectPipelinesOptions{
-		ListOptions: gitlab.ListOptions{
-			Page: 0,
-		},
-	}
-	active := false
-	errc := make(chan error)
-	wg := sync.WaitGroup{}
-
-	for {
-		opt.ListOptions.PerPage = utils.MinInt(pageSize, limit-opt.ListOptions.Page*pageSize)
-		select {
-		case <-c.rateLimiter:
-		case <-ctx.Done():
-			return active, ctx.Err()
-		}
-		pipelines, resp, err := c.remote.Pipelines.ListProjectPipelines(repository.ID, &opt, gitlab.WithContext(ctx))
-		if err != nil {
-			return active, err
-		}
-
-		for _, minimalPipeline := range pipelines {
-			active = active || FromGitLabState(minimalPipeline.Status).IsActive()
-			c.mux.Lock()
-			lastUpdate := c.updateTimePerBuildID[strconv.Itoa(minimalPipeline.ID)]
-			c.mux.Unlock()
-			if minimalPipeline.UpdatedAt != nil && minimalPipeline.UpdatedAt.After(lastUpdate) {
-				wg.Add(1)
-				go func(id int) {
-					defer wg.Done()
-					build, err := c.fetchBuild(ctx, &repository, id)
-					if err != nil {
-						errc <- err
-						return
-					}
-					select {
-					case buildc <- build:
-					case <-ctx.Done():
-						errc <- err
-						return
-					}
-				}(minimalPipeline.ID)
-			}
-		}
-
-		if resp.NextPage == 0 {
-			break
-		}
-		opt.Page = resp.NextPage
-	}
-
-	go func() {
-		wg.Wait()
-		close(errc)
-	}()
-
-	var err error
-	for e := range errc {
-		if err == nil && e != nil {
-			err = e
-		}
-	}
-
-	return active, err
 }
 
 func (c GitLabClient) GetJob(ctx context.Context, repositoryID int, jobID int) (*gitlab.Job, *gitlab.Response, error) {

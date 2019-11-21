@@ -21,7 +21,7 @@ func TestTableController_resize(t *testing.T) {
 		defer func() {
 			tui.Finish()
 		}()
-		c := cache.NewCache(nil)
+		c := cache.NewCache(nil, nil)
 		controller, err := NewTableController(&tui, (&c).BuildsByCommit(), time.UTC, "", "")
 		if err != nil {
 			t.Fatal(err)
@@ -44,7 +44,7 @@ func TestTableController_resize(t *testing.T) {
 		defer func() {
 			tui.Finish()
 		}()
-		c := cache.NewCache(nil)
+		c := cache.NewCache(nil, nil)
 		controller, err := NewTableController(&tui, (&c).BuildsByCommit(), time.UTC, "", "")
 		if err != nil {
 			t.Fatal(err)

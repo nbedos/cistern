@@ -267,43 +267,6 @@ func Delay(b Build, d time.Duration) Build {
 	return b
 }
 
-func Test_commitRowFromBuilds(t *testing.T) {
-	builds := []Build{
-		build,
-		Delay(build, time.Hour),
-		Delay(build, 3*time.Hour),
-		Delay(build, 48*time.Hour),
-	}
-
-	commitAsRow := buildRow{
-		key: buildRowKey{
-			ref: build.Ref,
-			sha: build.Commit.Sha,
-		},
-		type_:       "C",
-		state:       "passed",
-		name:        "commit title",
-		createdAt:   build.CreatedAt,
-		startedAt:   build.StartedAt,
-		finishedAt:  builds[3].FinishedAt,
-		updatedAt:   builds[3].FinishedAt,
-		duration:    build.Duration,
-		traversable: false,
-	}
-
-	row := commitRowFromBuilds(builds)
-	if len(row.children) != len(builds) {
-		t.Fatalf("expected %d children but got %d", len(builds), len(row.children))
-	}
-
-	row.children = nil
-	commitAsRow.children = row.children
-	if diff := row.Diff(commitAsRow); diff != "" {
-		t.Log(diff)
-		t.Fail()
-	}
-}
-
 func TestBuildRow_Tabular(t *testing.T) {
 	t.Run("null dates should be replaced by placeholder", func(t *testing.T) {
 		text := buildRow{}.Tabular(time.UTC)
@@ -336,7 +299,7 @@ func TestBuildRow_Tabular(t *testing.T) {
 }
 
 func TestBuildsByCommit_Rows(t *testing.T) {
-	c := NewCache(nil)
+	c := NewCache(nil, nil)
 	shas := []string{"aaaaaa", "bbbbbb", "cccccc"}
 	ids := []int{1, 2, 4, 8, 16, 32}
 	for i, sha := range shas {
@@ -351,19 +314,19 @@ func TestBuildsByCommit_Rows(t *testing.T) {
 	}
 
 	rows := c.BuildsByCommit().Rows()
-	if len(rows) != len(shas) {
+	if len(rows) != len(shas)*len(ids) {
 		t.Fatalf("expected %d row but got %d", len(shas), len(rows))
 	}
 }
 
 func TestBuildsByCommit_WriteToDisk(t *testing.T) {
 	builds := []Build{build}
-	c := NewCache([]Provider{
+	c := NewCache([]CIProvider{
 		mockProvider{
 			id:     "provider",
 			builds: builds,
 		},
-	})
+	}, nil)
 	for _, build := range builds {
 		if err := c.Save(build); err != nil {
 			t.Fatal(err)

@@ -103,7 +103,7 @@ func TestDepthFirstTraversal(t *testing.T) {
 }
 
 func TestGitOriginURL(t *testing.T) {
-	u, err := GitOriginURL(".")
+	u, _, err := GitOriginURL(".")
 	if err != nil {
 		t.Fatal(err)
 	}
