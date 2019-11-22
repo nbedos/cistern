@@ -17,7 +17,7 @@ func TestParseCircleCIWebURL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if owner != "nbedos" || repo != "citop" || id != "36" {
+	if owner != "nbedos" || repo != "citop" || id != 36 {
 		t.Fail()
 	}
 }

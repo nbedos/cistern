@@ -71,18 +71,18 @@ func main() {
 			gitlabToken,
 			100*time.Millisecond),
 
-		/*providers.NewCircleCIClient(
-		providers.CircleCIURL,
-		"circleci",
-		circleCIToken,
-		100*time.Millisecond),*/
+		providers.NewCircleCIClient(
+			providers.CircleCIURL,
+			"circleci",
+			circleCIToken,
+			100*time.Millisecond),
 	}
 
 	SourceProviders := []cache.SourceProvider{
 		providers.NewGitHubClient(context.Background(), &githubToken),
 	}
 
-	ref = "master"
+	//ref = "master"
 	ctx := context.Background()
 	if err := tui.RunApplication(ctx, tcell.NewScreen, repository, ref, CIProviders, SourceProviders, time.Local); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())

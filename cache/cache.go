@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff/v3"
 	"github.com/nbedos/citop/utils"
 )
 
@@ -23,7 +24,7 @@ type CIProvider interface {
 
 type SourceProvider interface {
 	// BuildURLs must close 'urls' channel
-	BuildURLs(ctx context.Context, owner string, repo string, sha string, urls chan<- string) error
+	BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error)
 }
 
 type State string
@@ -192,7 +193,7 @@ func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache 
 
 func (c *Cache) Save(build Build) error {
 	if build.Repository == nil {
-		return errors.New("build.Repository must not be nil")
+		return errors.New("build.repository must not be nil")
 	}
 
 	if build.Jobs == nil {
@@ -253,6 +254,44 @@ func (c Cache) Builds() []Build {
 	return builds
 }
 
+func (c *Cache) MonitorPipeline(ctx context.Context, p CIProvider, u string, updates chan time.Time) error {
+	b := backoff.ExponentialBackOff{
+		InitialInterval:     5 * time.Second,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         5 * time.Minute,
+		MaxElapsedTime:      15 * time.Minute,
+		Clock:               backoff.SystemClock,
+	}
+	b.Reset()
+
+	for waitTime := time.Duration(0); waitTime != backoff.Stop; waitTime = b.NextBackOff() {
+		select {
+		case <-time.After(waitTime):
+			// Do nothing
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+
+		build, err := p.BuildFromURL(ctx, u)
+		if err != nil {
+			return err
+		}
+
+		if err := c.Save(build); err != nil {
+			return err
+		}
+		go func() {
+			select {
+			case updates <- time.Now():
+			case <-ctx.Done():
+			}
+		}()
+	}
+
+	return nil
+}
+
 func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, sha string, updates chan time.Time) error {
 	var err error
 	slug, err := utils.RepositorySlugFromURL(repositoryURL)
@@ -269,40 +308,50 @@ func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, sha stri
 	ctx, cancel := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
 	for _, p := range c.sourceProviders {
-		urls := make(chan string)
-
 		wg.Add(1)
 		go func(p SourceProvider) {
 			defer wg.Done()
-			errc <- p.BuildURLs(ctx, owner, repo, sha, urls)
-		}(p)
 
-		wg.Add(1)
-		go func(urls <-chan string) {
-			defer wg.Done()
-			for u := range urls {
-				for _, p := range c.ciProvidersById {
-					build, err := p.BuildFromURL(ctx, u)
-					if err == ErrUnknownURL {
-						continue
-					} else if err != nil {
-						errc <- err
-						return
-					}
+			b := backoff.ExponentialBackOff{
+				InitialInterval:     5 * time.Second,
+				RandomizationFactor: backoff.DefaultRandomizationFactor,
+				Multiplier:          backoff.DefaultMultiplier,
+				MaxInterval:         5 * time.Minute,
+				MaxElapsedTime:      15 * time.Minute,
+				Clock:               backoff.SystemClock,
+			}
+			b.Reset()
 
-					if err := c.Save(build); err != nil {
-						errc <- err
-						return
+			for waitTime := time.Duration(0); waitTime != backoff.Stop; waitTime = b.NextBackOff() {
+				select {
+				case <-time.After(waitTime):
+					// Do nothing
+				case <-ctx.Done():
+					errc <- ctx.Err()
+					return
+				}
+
+				us, err := p.BuildURLs(ctx, owner, repo, sha)
+				if err != nil {
+					errc <- err
+					return
+				}
+				for _, u := range us {
+					// All providers but 1 should return ErrRepositoryNotFound
+					for _, p := range c.ciProvidersById {
+						wg.Add(1)
+						go func(u string) {
+							defer wg.Done()
+							err := c.MonitorPipeline(ctx, p, u, updates)
+							if err != nil && err != ErrRepositoryNotFound {
+								errc <- err
+								return
+							}
+						}(u)
 					}
-					go func() {
-						select {
-						case updates <- time.Now():
-						case <-ctx.Done():
-						}
-					}()
 				}
 			}
-		}(urls)
+		}(p)
 	}
 
 	go func() {

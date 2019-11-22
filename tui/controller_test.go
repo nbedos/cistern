@@ -9,7 +9,7 @@ import (
 	"github.com/nbedos/citop/text"
 )
 
-func TestTableController_resize(t *testing.T) {
+func TestController_resize(t *testing.T) {
 	t.Run("resize to (0, 0) should not cause any error", func(t *testing.T) {
 		newScreen := func() (tcell.Screen, error) {
 			return tcell.NewSimulationScreen(""), nil
@@ -22,7 +22,7 @@ func TestTableController_resize(t *testing.T) {
 			tui.Finish()
 		}()
 		c := cache.NewCache(nil, nil)
-		controller, err := NewTableController(&tui, (&c).BuildsByCommit(), time.UTC, "", "")
+		controller, err := NewController(&tui, (&c).BuildsByCommit(), time.UTC, "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -45,7 +45,7 @@ func TestTableController_resize(t *testing.T) {
 			tui.Finish()
 		}()
 		c := cache.NewCache(nil, nil)
-		controller, err := NewTableController(&tui, (&c).BuildsByCommit(), time.UTC, "", "")
+		controller, err := NewController(&tui, (&c).BuildsByCommit(), time.UTC, "", "")
 		if err != nil {
 			t.Fatal(err)
 		}

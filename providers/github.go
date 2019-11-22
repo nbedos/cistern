@@ -28,30 +28,33 @@ func NewGitHubClient(ctx context.Context, token *string) GitHubClient {
 	}
 }
 
-func (c GitHubClient) BuildURLs(ctx context.Context, owner string, repo string, sha string, urls chan<- string) error {
-	defer close(urls)
+func (c GitHubClient) BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error) {
+	previousURLs := make(map[string]struct{})
 	statuses, _, err := c.client.Repositories.ListStatuses(ctx, owner, repo, sha, nil)
 	if err != nil {
-		if err, ok := err.(*github.ErrorResponse); ok && err.Response.StatusCode == 404 {
-			return cache.ErrRepositoryNotFound
+		switch err := err.(type) {
+		case *github.ErrorResponse:
+			if err.Response.StatusCode == 404 {
+				return nil, cache.ErrRepositoryNotFound
+			}
+		default:
+			return nil, err
 		}
-		return err
 	}
 
-	found := make(map[string]struct{})
 	for _, status := range statuses {
 		if status.TargetURL == nil {
 			continue
 		}
-		if _, exists := found[*status.TargetURL]; !exists {
-			select {
-			case urls <- *status.TargetURL:
-				found[*status.TargetURL] = struct{}{}
-			case <-ctx.Done():
-				return ctx.Err()
-			}
+		if _, exists := previousURLs[*status.TargetURL]; exists {
+			continue
 		}
 	}
 
-	return nil
+	urls := make([]string, 0, len(previousURLs))
+	for u := range previousURLs {
+		urls = append(urls, u)
+	}
+
+	return urls, nil
 }

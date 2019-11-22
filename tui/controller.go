@@ -16,7 +16,7 @@ import (
 	"github.com/nbedos/citop/utils"
 )
 
-type TableController struct {
+type Controller struct {
 	tui           *TUI
 	table         *Table
 	status        *StatusBar
@@ -27,21 +27,21 @@ type TableController struct {
 
 var ErrExit = errors.New("exit")
 
-func NewTableController(tui *TUI, source cache.HierarchicalTabularDataSource, loc *time.Location, tempDir string, defaultStatus string) (TableController, error) {
+func NewController(tui *TUI, source cache.HierarchicalTabularDataSource, loc *time.Location, tempDir string, defaultStatus string) (Controller, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := 10, 10
 	table, err := NewTable(source, width, height, loc)
 	if err != nil {
-		return TableController{}, err
+		return Controller{}, err
 	}
 
 	status, err := NewStatusBar(width, height)
 	if err != nil {
-		return TableController{}, err
+		return Controller{}, err
 	}
 	status.Write(defaultStatus)
 
-	return TableController{
+	return Controller{
 		tui:           tui,
 		table:         &table,
 		status:        &status,
@@ -50,7 +50,7 @@ func NewTableController(tui *TUI, source cache.HierarchicalTabularDataSource, lo
 	}, nil
 }
 
-func (c *TableController) Run(ctx context.Context, updates <-chan time.Time) error {
+func (c *Controller) Run(ctx context.Context, updates <-chan time.Time) error {
 	var err error
 	for err == nil {
 		select {
@@ -70,19 +70,19 @@ func (c *TableController) Run(ctx context.Context, updates <-chan time.Time) err
 	return err
 }
 
-func (c *TableController) setStatus(s string) {
+func (c *Controller) setStatus(s string) {
 	c.status.Write(s)
 }
 
-func (c *TableController) clearStatus() {
+func (c *Controller) clearStatus() {
 	c.setStatus(c.defaultStatus)
 }
 
-func (c *TableController) refresh() {
+func (c *Controller) refresh() {
 	c.table.Refresh()
 }
 
-func (c TableController) text() []text.LocalizedStyledString {
+func (c Controller) text() []text.LocalizedStyledString {
 	texts := make([]text.LocalizedStyledString, 0)
 	yOffset := 0
 
@@ -98,7 +98,7 @@ func (c TableController) text() []text.LocalizedStyledString {
 	return texts
 }
 
-func (c *TableController) resize(width int, height int) {
+func (c *Controller) resize(width int, height int) {
 	width = utils.MaxInt(width, 0)
 	height = utils.MaxInt(height, 0)
 
@@ -109,11 +109,11 @@ func (c *TableController) resize(width int, height int) {
 	c.status.Resize(width, statusHeight)
 }
 
-func (c *TableController) draw() {
+func (c *Controller) draw() {
 	c.tui.Draw(c.text()...)
 }
 
-func (c *TableController) process(ctx context.Context, event tcell.Event) error {
+func (c *Controller) process(ctx context.Context, event tcell.Event) error {
 	c.clearStatus()
 	switch ev := event.(type) {
 	case *tcell.EventResize:

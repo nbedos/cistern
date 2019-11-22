@@ -162,76 +162,66 @@ func (c CircleCIClient) AccountID() string {
 }
 
 func (c CircleCIClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
-	// TODO
-	/*owner, repo, id, err := parseCircleCIWebURL(&c.baseURL, u)
+	owner, repo, id, err := parseCircleCIWebURL(&c.baseURL, u)
 	if err != nil {
 		return cache.Build{}, err
 	}
 
-	repository, err := c.Repository(ctx, fmt.Sprintf("%s/%s", owner, repo))
+	repository, err := c.repository(ctx, owner, repo)
 	if err != nil {
 		return cache.Build{}, err
-	}*/
+	}
 
-	return cache.Build{}, nil
+	endPoint := c.projectEndpoint(repository.Owner, repository.Name)
+	return c.fetchBuild(ctx, endPoint, &repository, id, false)
 }
 
 // Extract owner, repository and build ID from web URL of build
-func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, string, error) {
+func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, int, error) {
 	v, err := url.Parse(u)
 	if err != nil {
-		return "", "", "", err
+		return "", "", 0, err
 	}
 
 	if v.Hostname() != strings.TrimPrefix(baseURL.Hostname(), "api.") {
-		return "", "", "", cache.ErrUnknownURL
+		return "", "", 0, cache.ErrUnknownURL
 	}
 
 	// URL format: https://circleci.com/gh/nbedos/citop/36
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 5 {
-		return "", "", "", cache.ErrUnknownURL
+		return "", "", 0, cache.ErrUnknownURL
 	}
 
-	owner, repo, id := cs[2], cs[3], cs[4]
+	owner, repo := cs[2], cs[3]
+	id, err := strconv.Atoi(cs[4])
+	if err != nil {
+		return "", "", 0, err
+	}
+
 	return owner, repo, id, nil
 }
 
 func (c CircleCIClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
 	endPoint := c.projectEndpoint(repository.Owner, repository.Name)
-	job, _, err := c.fetchJob(ctx, endPoint, jobID, true)
+	build, err := c.fetchBuild(ctx, endPoint, &repository, jobID, true)
 	if err != nil {
 		return "", false, err
 	}
-	if !job.Log.Valid {
-		return "", false, nil
-	}
 
-	return job.Log.String, !job.State.IsActive(), nil
+	return "", !build.State.IsActive(), nil
 }
 
-func (c *CircleCIClient) Repository(ctx context.Context, repositoryURL string) (cache.Repository, error) {
-	slug, err := utils.RepositorySlugFromURL(repositoryURL)
-	if err != nil {
-		return cache.Repository{}, err
-	}
-
-	components := strings.Split(slug, "/")
-	if len(components) != 2 {
-		return cache.Repository{}, fmt.Errorf("invalid repository slug "+
-			"(expected two path components): '%s' ", slug)
-	}
-	owner, name := components[0], components[1]
-
+func (c *CircleCIClient) repository(ctx context.Context, owner string, repo string) (cache.Repository, error) {
 	// Validate repository existence on CircleCI
 
-	endPoint := c.projectEndpoint(owner, name)
+	endPoint := c.projectEndpoint(owner, repo)
 	parameters := endPoint.Query()
 	parameters.Add("offset", strconv.Itoa(0))
 	parameters.Add("limit", strconv.Itoa(1))
 	parameters.Add("shallow", "true")
 	endPoint.RawQuery = parameters.Encode()
-	if _, err = c.get(ctx, endPoint); err != nil {
+	if _, err := c.get(ctx, endPoint); err != nil {
 		if err, ok := err.(HTTPError); ok && err.Status == 404 {
 			return cache.Repository{}, cache.ErrRepositoryNotFound
 		}
@@ -241,112 +231,33 @@ func (c *CircleCIClient) Repository(ctx context.Context, repositoryURL string) (
 	// FIXME What about repository.ID?
 	return cache.Repository{
 		AccountID: c.accountID,
-		URL:       repositoryURL,
+		URL:       fmt.Sprintf("https://github.com/%s/%s", owner, repo),
 		Owner:     owner,
-		Name:      name,
+		Name:      repo,
 	}, nil
 }
 
-type circleRef struct {
-	commit cache.Commit
-	ref    string
-	isTag  bool
-}
-
-func (c CircleCIClient) fetchWorkflow(ctx context.Context, projectEndpoint url.URL, id string, buildIDs []int, repository *cache.Repository, log bool) (build cache.Build, err error) {
-	if len(buildIDs) == 0 {
-		return cache.Build{}, nil
-	}
-
-	webURL := projectEndpoint
-	webURL.Path = fmt.Sprintf(fmt.Sprintf("/workflow-run/%s", id))
-
-	build = cache.Build{
-		Repository:      repository,
-		ID:              id,
-		Commit:          cache.Commit{},
-		Ref:             "",
-		IsTag:           false,
-		RepoBuildNumber: "",
-		State:           "",
-		CreatedAt:       utils.NullTime{},
-		StartedAt:       utils.NullTime{},
-		FinishedAt:      utils.NullTime{},
-		UpdatedAt:       time.Time{},
-		Duration:        utils.NullDuration{},
-		WebURL:          webURL.String(),
-		Stages:          nil,
-		Jobs:            make(map[int]*cache.Job, len(buildIDs)),
-	}
-
-	jobs := make([]cache.Statuser, 0, len(buildIDs))
-	for i, id := range buildIDs {
-		job, ref, err := c.fetchJob(ctx, projectEndpoint, id, log)
-		if err != nil {
-			return build, err
-		}
-		if i == 0 {
-			build.Commit = ref.commit
-			build.Ref = ref.ref
-			build.IsTag = ref.isTag
-		}
-		build.Jobs[job.ID] = &job
-
-		build.CreatedAt = utils.MinNullTime(build.CreatedAt, job.CreatedAt)
-		build.StartedAt = utils.MinNullTime(build.StartedAt, job.StartedAt)
-		build.FinishedAt = utils.MaxNullTime(build.StartedAt, job.FinishedAt)
-
-		if !build.Duration.Valid || job.Duration.Duration > build.Duration.Duration {
-			build.Duration = job.Duration
-		}
-
-		jobs = append(jobs, job)
-	}
-
-	updatedAt := utils.MaxNullTime(build.CreatedAt, build.StartedAt, build.FinishedAt)
-	if updatedAt.Valid {
-		build.UpdatedAt = updatedAt.Time
-	}
-
-	build.State = cache.AggregateStatuses(jobs)
-
-	return build, nil
-}
-
-func (c CircleCIClient) fetchJob(ctx context.Context, projectEndpoint url.URL, jobID int, log bool) (cache.Job, circleRef, error) {
+func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL, repo *cache.Repository, buildID int, log bool) (cache.Build, error) {
 	var err error
-	var ref circleRef
-	var job cache.Job
+	var build cache.Build
 
-	projectEndpoint.Path += fmt.Sprintf("/%d", jobID)
+	projectEndpoint.Path += fmt.Sprintf("/%d", buildID)
 	body, err := c.get(ctx, projectEndpoint)
 	if err != nil {
-		return job, ref, err
+		return build, err
 	}
 
 	var circleCIBuild circleCIBuild
 	if err := json.Unmarshal(body.Bytes(), &circleCIBuild); err != nil {
-		return job, ref, err
+		return build, err
 	}
 
-	job, err = circleCIBuild.ToCacheJob()
+	build, err = circleCIBuild.ToCacheBuild(c.accountID, repo)
 	if err != nil {
-		return job, ref, err
+		return build, err
 	}
 
-	ref.ref = circleCIBuild.Branch
-	if circleCIBuild.Tag != "" {
-		ref.isTag = true
-		ref.ref = circleCIBuild.Tag
-	}
-	ref.commit = cache.Commit{
-		Sha:     circleCIBuild.Sha,
-		Message: circleCIBuild.Message,
-	}
-	if ref.commit.Date, err = utils.NullTimeFromString(circleCIBuild.CommittedAt); err != nil {
-		return job, ref, err
-	}
-
+	/*s := utils.NullString{}
 	if log {
 		// FIXME Prefix each line by the name of the step in a way compatible with carriage returns
 		fullLog := strings.Builder{}
@@ -362,17 +273,17 @@ func (c CircleCIClient) fetchJob(ctx context.Context, projectEndpoint url.URL, j
 				if action.LogURL != "" {
 					log, err := c.fetchLog(ctx, action.LogURL)
 					if err != nil {
-						return job, ref, err
+						return build, err
 					}
 
 					fullLog.WriteString(utils.Prefix(log, prefix))
 				}
 			}
 		}
-		job.Log = utils.NullString{String: fullLog.String(), Valid: true}
-	}
+		s = utils.NullString{String: fullLog.String(), Valid: true}
+	}*/
 
-	return job, ref, nil
+	return build, nil
 }
 
 type circleCIBuild struct {
@@ -410,6 +321,7 @@ func (b circleCIBuild) ToCacheBuild(accountID string, repository *cache.Reposito
 			Sha:     b.Sha,
 			Message: b.Message,
 		},
+		ID:              strconv.Itoa(b.ID),
 		RepoBuildNumber: strconv.Itoa(b.ID),
 		State:           fromCircleCIStatus(b.Lifecycle, b.Outcome),
 		WebURL:          b.WebURL,
@@ -451,37 +363,6 @@ func (b circleCIBuild) ToCacheBuild(accountID string, repository *cache.Reposito
 	}
 
 	return build, nil
-}
-
-func (b circleCIBuild) ToCacheJob() (cache.Job, error) {
-	job := cache.Job{
-		ID:           b.ID,
-		State:        fromCircleCIStatus(b.Lifecycle, b.Outcome),
-		Name:         b.Workflows.JobName,
-		Log:          utils.NullString{},
-		WebURL:       b.WebURL,
-		AllowFailure: false,
-	}
-
-	if b.DurationMilliseconds > 0 {
-		job.Duration = utils.NullDuration{
-			Duration: time.Duration(b.DurationMilliseconds) * time.Millisecond,
-			Valid:    true,
-		}
-	}
-
-	var err error
-	if job.CreatedAt, err = utils.NullTimeFromString(b.CreatedAt); err != nil {
-		return job, err
-	}
-	if job.StartedAt, err = utils.NullTimeFromString(b.StartedAt); err != nil {
-		return job, err
-	}
-	if job.FinishedAt, err = utils.NullTimeFromString(b.FinishedAt); err != nil {
-		return job, err
-	}
-
-	return job, nil
 }
 
 func fromCircleCIStatus(lifecycle string, outcome string) cache.State {

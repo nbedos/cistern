@@ -15,20 +15,13 @@ func TestClient(t *testing.T) {
 	owner := "nbedos"
 	repo := "termtosvg"
 	sha := "d58600a58bf1738c6529ce3489a546bfa2178e07"
-	ctx := context.Background()
 
-	urls := make(chan string)
-	errc := make(chan error)
-	go func() {
-		errc <- client.BuildURLs(ctx, owner, repo, sha, urls)
-		close(errc)
-	}()
-
-	for url := range urls {
-		t.Log(url)
+	urls, err := client.BuildURLs(context.Background(), owner, repo, sha)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	if err := <-errc; err != nil {
-		t.Fatal(err)
+	for _, u := range urls {
+		t.Log(u)
 	}
 }

@@ -75,7 +75,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		ui.Finish()
 	}()
 
-	controller, err := NewTableController(&ui, &source, loc, tmpDir, defaultStatus)
+	controller, err := NewController(&ui, &source, loc, tmpDir, defaultStatus)
 	if err != nil {
 		return err
 	}
