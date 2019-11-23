@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/nbedos/citop/cache"
@@ -274,31 +273,27 @@ func (s travisStage) toCacheStage(build *cache.Build) cache.Stage {
 }
 
 type TravisClient struct {
-	baseURL              url.URL
-	httpClient           *http.Client
-	rateLimiter          <-chan time.Time
-	logBackoffInterval   time.Duration
-	buildsPageSize       int
-	token                string
-	accountID            string
-	updateTimePerBuildID map[string]time.Time
-	mux                  *sync.Mutex
+	baseURL            url.URL
+	httpClient         *http.Client
+	rateLimiter        <-chan time.Time
+	logBackoffInterval time.Duration
+	buildsPageSize     int
+	token              string
+	accountID          string
 }
 
 var TravisOrgURL = url.URL{Scheme: "https", Host: "api.travis-ci.org"}
 var TravisComURL = url.URL{Scheme: "https", Host: "api.travis-ci.com"}
 
-func NewTravisClient(URL url.URL, token string, accountID string, rateLimit time.Duration) TravisClient {
+func NewTravisClient(accountID string, token string, URL url.URL, rateLimit time.Duration) TravisClient {
 	return TravisClient{
-		baseURL:              URL,
-		httpClient:           &http.Client{Timeout: 10 * time.Second},
-		rateLimiter:          time.Tick(rateLimit),
-		logBackoffInterval:   10 * time.Second,
-		token:                token,
-		accountID:            accountID,
-		buildsPageSize:       10,
-		mux:                  &sync.Mutex{},
-		updateTimePerBuildID: make(map[string]time.Time),
+		baseURL:            URL,
+		httpClient:         &http.Client{Timeout: 10 * time.Second},
+		rateLimiter:        time.Tick(rateLimit),
+		logBackoffInterval: 10 * time.Second,
+		token:              token,
+		accountID:          accountID,
+		buildsPageSize:     10,
 	}
 }
 
@@ -347,7 +342,7 @@ func (c TravisClient) repository(ctx context.Context, slug string) (cache.Reposi
 	reqURL.Path += fmt.Sprintf(buildPathFormat, slug)
 	reqURL.RawPath += fmt.Sprintf(buildPathFormat, url.PathEscape(slug))
 
-	body, _, err := c.get(ctx, "GET", reqURL)
+	body, err := c.get(ctx, "GET", reqURL)
 	if err != nil {
 		if err, ok := err.(HTTPError); ok && err.Status == 404 {
 			return cache.Repository{}, cache.ErrRepositoryNotFound
@@ -373,10 +368,10 @@ func (c TravisClient) webURL(repository cache.Repository) (url.URL, error) {
 }
 
 // Rate-limited HTTP GET request with custom headers
-func (c TravisClient) get(ctx context.Context, method string, resourceURL url.URL) (*bytes.Buffer, *http.Response, error) {
+func (c TravisClient) get(ctx context.Context, method string, resourceURL url.URL) (*bytes.Buffer, error) {
 	req, err := http.NewRequest(method, resourceURL.String(), nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	req.Header.Add("Travis-API-Version", "3")
 	req.Header.Add("Authorization", fmt.Sprintf("token %s", c.token))
@@ -385,17 +380,17 @@ func (c TravisClient) get(ctx context.Context, method string, resourceURL url.UR
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
-		return nil, nil, ctx.Err()
+		return nil, ctx.Err()
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	defer resp.Body.Close() // FIXME return error
 
 	body := new(bytes.Buffer)
 	if _, err := body.ReadFrom(resp.Body); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -407,7 +402,7 @@ func (c TravisClient) get(ctx context.Context, method string, resourceURL url.UR
 		}
 	}
 
-	return body, resp, err
+	return body, err
 }
 
 type HTTPError struct {
@@ -429,7 +424,7 @@ func (c TravisClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 	parameters.Add("include", "build.jobs,build.commit,job.config")
 	buildURL.RawQuery = parameters.Encode()
 
-	body, _, err := c.get(ctx, "GET", buildURL)
+	body, err := c.get(ctx, "GET", buildURL)
 	if err != nil {
 		return cache.Build{}, err
 	}
@@ -446,10 +441,6 @@ func (c TravisClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 		return cache.Build{}, err
 	}
 
-	c.mux.Lock()
-	c.updateTimePerBuildID[cacheBuild.ID] = cacheBuild.UpdatedAt
-	c.mux.Unlock()
-
 	return cacheBuild, nil
 }
 
@@ -457,7 +448,7 @@ func (c TravisClient) Log(ctx context.Context, repository cache.Repository, jobI
 	var reqURL = c.baseURL
 	reqURL.Path += fmt.Sprintf("/job/%d/log", jobID)
 
-	body, _, err := c.get(ctx, "GET", reqURL)
+	body, err := c.get(ctx, "GET", reqURL)
 	if err != nil {
 		return "", false, err
 	}

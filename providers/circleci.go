@@ -33,7 +33,7 @@ var CircleCIURL = url.URL{
 	RawPath: "api/v1.1",
 }
 
-func NewCircleCIClient(URL url.URL, accountID string, token string, rateLimit time.Duration) CircleCIClient {
+func NewCircleCIClient(accountID string, token string, URL url.URL, rateLimit time.Duration) CircleCIClient {
 	return CircleCIClient{
 		baseURL:     URL,
 		httpClient:  &http.Client{Timeout: 10 * time.Second},

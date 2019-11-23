@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"sync"
 	"testing"
 	"time"
 
@@ -36,14 +35,12 @@ func TestTravisClientfetchBuild(t *testing.T) {
 	}
 
 	client := TravisClient{
-		baseURL:              *URL,
-		httpClient:           ts.Client(),
-		rateLimiter:          time.Tick(time.Millisecond),
-		token:                "token",
-		accountID:            "travis",
-		buildsPageSize:       10,
-		mux:                  &sync.Mutex{},
-		updateTimePerBuildID: make(map[string]time.Time),
+		baseURL:        *URL,
+		httpClient:     ts.Client(),
+		rateLimiter:    time.Tick(time.Millisecond),
+		token:          "token",
+		accountID:      "travis",
+		buildsPageSize: 10,
 	}
 
 	repository := cache.Repository{
@@ -230,14 +227,12 @@ func TestTravisClientRepository(t *testing.T) {
 	}
 
 	client := TravisClient{
-		baseURL:              *URL,
-		httpClient:           ts.Client(),
-		rateLimiter:          time.Tick(time.Millisecond),
-		token:                "token",
-		accountID:            "travis",
-		buildsPageSize:       10,
-		mux:                  &sync.Mutex{},
-		updateTimePerBuildID: make(map[string]time.Time),
+		baseURL:        *URL,
+		httpClient:     ts.Client(),
+		rateLimiter:    time.Tick(time.Millisecond),
+		token:          "token",
+		accountID:      "travis",
+		buildsPageSize: 10,
 	}
 
 	t.Run("Get nbedos/citop", func(t *testing.T) {

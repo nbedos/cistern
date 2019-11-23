@@ -44,12 +44,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	var travisToken, gitlabToken, circleCIToken, githubToken string
+	var travisToken, gitlabToken, circleCIToken, githubToken, appVeyorToken string
 	tokens := map[string]*string{
 		"TRAVIS_API_TOKEN":   &travisToken,
 		"GITLAB_API_TOKEN":   &gitlabToken,
 		"CIRCLECI_API_TOKEN": &circleCIToken,
 		"GITHUB_API_TOKEN":   &githubToken,
+		"APPVEYOR_API_TOKEN": &appVeyorToken,
 	}
 	for envVar, token := range tokens {
 		if *token = os.Getenv(envVar); *token == "" {
@@ -60,22 +61,10 @@ func main() {
 	}
 
 	CIProviders := []cache.CIProvider{
-		providers.NewTravisClient(
-			providers.TravisOrgURL,
-			travisToken,
-			"travis",
-			50*time.Millisecond),
-
-		providers.NewGitLabClient(
-			"gitlab",
-			gitlabToken,
-			100*time.Millisecond),
-
-		providers.NewCircleCIClient(
-			providers.CircleCIURL,
-			"circleci",
-			circleCIToken,
-			100*time.Millisecond),
+		providers.NewTravisClient("travis", travisToken, providers.TravisOrgURL, time.Second/20),
+		providers.NewGitLabClient("gitlab", gitlabToken, time.Second/10),
+		providers.NewCircleCIClient("circleci", circleCIToken, providers.CircleCIURL, time.Second/10),
+		providers.NewAppVeyorClient("appveyor", appVeyorToken, time.Second/10),
 	}
 
 	SourceProviders := []cache.SourceProvider{
