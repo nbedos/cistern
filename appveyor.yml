@@ -2,7 +2,7 @@ image:
     - Ubuntu
 
 environment:
-    GOPATH: $HOME/go
+    GO111MODULE=on
     matrix:
         - stack: go 1.13
         - stack: go 1.12
