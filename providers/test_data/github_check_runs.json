@@ -1,0 +1,83 @@
+{
+  "total_count": 1,
+  "check_runs": [
+    {
+      "id": 654987321,
+      "node_id": "MDg6Q2hlY2tSdW4zMTQ1MDQ1NTg=",
+      "head_sha": "e79b1139070d70268eed760ec53cf046bd7d2898",
+      "external_id": "123654789",
+      "url": "https://api.github.com/repos/owner/repository/check-runs/654987321",
+      "html_url": "https://github.com/owner/repository/runs/654987321",
+      "details_url": "https://travis-ci.com/owner/repository/builds/123654789",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2019-11-21T18:01:50Z",
+      "completed_at": "2019-11-21T18:07:50Z",
+      "output": {
+        "title": "Build Passed",
+        "summary": "<a href='https://travis-ci.com/owner/repository/builds/123654789'><img src='https://travis-ci.com/images/stroke-icons/icon-passed.png' height='11'> The build</a> **passed**, just like the previous build.",
+        "text": "This is a normal build for the master branch. You should be able to reproduce it by checking out the branch locally.\n\n## Jobs and Stages\nThis build only has a single job.\nYou can use jobs to [test against multiple versions](https://docs.travis-ci.com/user/customizing-the-build/#Build-Matrix) of your runtime or dependencies, or to [speed up your build](https://docs.travis-ci.com/user/speeding-up-the-build/).\n\n## Build Configuration\n\nBuild Option     | Setting\n-----------------|--------------\nLanguage         | Node.js\nOperating System | Linux (Xenial)\nNode.js Version  | 12\n\n<details>\n<summary>Build Configuration</summary>\n<pre lang='yaml'>\n{\n  \"os\": \"linux\",\n  \"env\": [\n    \"DEPLOY_ENV=POSTWOMAN_IO\"\n  ],\n  \"dist\": \"xenial\",\n  \"cache\": {\n    \"npm\": true,\n    \"directories\": [\n      \"node_modules\",\n      \"~/.cache\"\n    ]\n  },\n  \"group\": \"stable\",\n  \"addons\": {\n    \"apt\": {\n      \"packages\": [\n        \"libgconf-2-4\"\n      ]\n    }\n  },\n  \"script\": [\n    \"cd functions\",\n    \"npm install\",\n    \"cd ..\",\n    \"npm run generate\"\n  ],\n  \".result\": \"configured\",\n  \"install\": [\n    \"npm install firebase-tools\",\n    \"npm install\"\n  ],\n  \"node_js\": [\n    \"12\"\n  ],\n  \"branches\": {\n    \"only\": [\n      \"master\"\n    ]\n  },\n  \"language\": \"node_js\",\n  \"after_success\": [\n    \"firebase deploy --token $FIREBASE_TOKEN\"\n  ],\n  \"before_script\": [\n    \"npm run test\"\n  ],\n  \"notifications\": {\n    \"webhooks\": \"https://www.travisbuddy.com\"\n  }\n}\n</pre>\n</details>",
+        "annotations_count": 0,
+        "annotations_url": "https://api.github.com/repos/owner/repository/check-runs/654987321/annotations"
+      },
+      "name": "Travis CI - Branch",
+      "check_suite": {
+        "id": 111222333
+      },
+      "app": {
+        "id": 67,
+        "slug": "travis-ci",
+        "node_id": "MDM6QXBwNjc=",
+        "owner": {
+          "login": "travis-ci",
+          "id": 639823,
+          "node_id": "MDEyOk9yZ2FuaXphdGlvbjYzOTgyMw==",
+          "avatar_url": "https://avatars2.githubusercontent.com/u/639823?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/travis-ci",
+          "html_url": "https://github.com/travis-ci",
+          "followers_url": "https://api.github.com/users/travis-ci/followers",
+          "following_url": "https://api.github.com/users/travis-ci/following{/other_user}",
+          "gists_url": "https://api.github.com/users/travis-ci/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/travis-ci/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/travis-ci/subscriptions",
+          "organizations_url": "https://api.github.com/users/travis-ci/orgs",
+          "repos_url": "https://api.github.com/users/travis-ci/repos",
+          "events_url": "https://api.github.com/users/travis-ci/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/travis-ci/received_events",
+          "type": "Organization",
+          "site_admin": false
+        },
+        "name": "Travis CI",
+        "description": "Test and deploy with confidence. Trusted by over 800,000 users, Travis CI is the leading hosted continuous integration system.\r\n\r\nSupporting over 30 different languages, including Ruby, Mac/iOS, and Docker, Travis CI is built for everyone.\r\n\r\nFree for open source, and with a 100 build trial for private projects, getting setup takes just 2 minutes.",
+        "external_url": "https://travis-ci.com",
+        "html_url": "https://github.com/apps/travis-ci",
+        "created_at": "2016-06-21T16:22:21Z",
+        "updated_at": "2018-09-14T20:36:16Z",
+        "permissions": {
+          "checks": "write",
+          "contents": "read",
+          "deployments": "write",
+          "members": "read",
+          "metadata": "read",
+          "pull_requests": "read",
+          "repository_hooks": "write",
+          "statuses": "write"
+        },
+        "events": [
+          "check_run",
+          "check_suite",
+          "create",
+          "delete",
+          "member",
+          "pull_request",
+          "push",
+          "repository"
+        ]
+      },
+      "pull_requests": [
+
+      ]
+    }
+  ]
+}
