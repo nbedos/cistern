@@ -197,6 +197,7 @@ func fromAppVeyorState(s string) cache.State {
 	case "failed":
 		return cache.Failed
 	default:
+		panic(fmt.Errorf("unknown state: %q", s))
 		return cache.Unknown
 	}
 }
