@@ -22,6 +22,7 @@ func TestParseAppVeyorURL(t *testing.T) {
 
 func TestAppVeyorJob_ToCacheJob(t *testing.T) {
 	j := appVeyorJob{
+		ID:           "id",
 		Name:         "name",
 		AllowFailure: true,
 		Status:       "success",
@@ -51,9 +52,10 @@ func TestAppVeyorJob_ToCacheJob(t *testing.T) {
 			Duration: 2750098900 * time.Nanosecond,
 		},
 		AllowFailure: true,
+		WebURL:       "buildURL/job/id",
 	}
 
-	job, err := j.toCacheJob(expectedJob.ID)
+	job, err := j.toCacheJob(expectedJob.ID, "buildURL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,6 +124,8 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 			Duration: 2750098900 * time.Nanosecond,
 		},
 		WebURL: "https://ci.appveyor.com/project/owner/repo/builds/42",
+		Stages: make(map[int]*cache.Stage),
+		Jobs:   make(map[int]*cache.Job),
 	}
 
 	build, err := b.toCacheBuild("account", &repo)

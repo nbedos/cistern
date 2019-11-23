@@ -2,7 +2,7 @@ image:
     - Ubuntu
 
 environment:
-    GO111MODULE=on
+    GO111MODULE: on
     matrix:
         - stack: go 1.13
         - stack: go 1.12

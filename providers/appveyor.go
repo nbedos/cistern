@@ -266,7 +266,7 @@ func (b appVeyorBuild) toCacheBuild(accountID string, repo *cache.Repository) (c
 		url.PathEscape(repo.Owner), url.PathEscape(repo.Name), b.ID)
 
 	for i, job := range b.Jobs {
-		j, err := job.toCacheJob(i + 1)
+		j, err := job.toCacheJob(i+1, build.WebURL)
 		if err != nil {
 			return build, err
 		}
@@ -277,6 +277,7 @@ func (b appVeyorBuild) toCacheBuild(accountID string, repo *cache.Repository) (c
 }
 
 type appVeyorJob struct {
+	ID           string `json:"jobId"`
 	Name         string `json:"name"`
 	AllowFailure bool   `json:"allowFailure"`
 	Status       string `json:"status"`
@@ -285,7 +286,7 @@ type appVeyorJob struct {
 	FinishedAt   string `json:"finished"`
 }
 
-func (j appVeyorJob) toCacheJob(id int) (cache.Job, error) {
+func (j appVeyorJob) toCacheJob(id int, buildURL string) (cache.Job, error) {
 	if id <= 0 {
 		return cache.Job{}, errors.New("job id must be > 0")
 	}
@@ -293,7 +294,7 @@ func (j appVeyorJob) toCacheJob(id int) (cache.Job, error) {
 		ID:           id,
 		State:        fromAppVeyorState(j.Status),
 		Name:         j.Name,
-		WebURL:       "",
+		WebURL:       fmt.Sprintf("%s/job/%s", buildURL, url.PathEscape(j.ID)),
 		AllowFailure: j.AllowFailure,
 	}
 
