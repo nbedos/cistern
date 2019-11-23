@@ -117,7 +117,7 @@ func (c AppVeyorClient) fetchBuild(ctx context.Context, owner string, repoName s
 	history.RawPath += fmt.Sprintf(historyFormat, url.PathEscape(owner), url.PathEscape(repoName))
 	params := history.Query()
 	params.Add("recordsNumber", "1")
-	params.Add("startBuildId", strconv.Itoa(id))
+	params.Add("startBuildId", strconv.Itoa(id+1))
 	history.RawQuery = params.Encode()
 
 	var b struct {
@@ -132,8 +132,11 @@ func (c AppVeyorClient) fetchBuild(ctx context.Context, owner string, repoName s
 		return cache.Build{}, err
 	}
 
-	if len(b.Builds) == 0 {
+	if len(b.Builds) != 1 {
 		return cache.Build{}, fmt.Errorf("found no build with id %d", id)
+	}
+	if b.Builds[0].ID != id {
+		return cache.Build{}, fmt.Errorf("expected build #%d but got %d", id, b.Builds[0].ID)
 	}
 	version := b.Builds[0].Version
 

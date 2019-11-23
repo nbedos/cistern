@@ -1,13 +1,11 @@
-# appveyor.yml
 image:
     - Ubuntu
 
 environment:
+    GOPATH: /usr/go/
     matrix:
-        - GOPATH: /usr/go/
-          stack: go 1.13
-        - GOPATH: /usr/go/
-          stack: go 1.12
+        - stack: go 1.13
+        - stack: go 1.12
 
 test_script:
   - go test ./...
