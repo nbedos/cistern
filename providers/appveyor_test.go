@@ -1,6 +1,12 @@
 package providers
 
 import (
+	"context"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -138,12 +144,50 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 	}
 }
 
-/*func TestCircleCIClient_BuildFromURL(t *testing.T) {
-	c := NewAppVeyorClient("appveyor", os.Getenv("APPVEYOR_API_TOKEN"), time.Second/10)
-	u := "https://ci.appveyor.com/project/nbedos/citop/builds/29024796"
-	build, err := c.BuildFromURL(context.Background(), u)
+func TestCircleCIClient_BuildFromURL(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		filename := ""
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/api/projects/nbedos/citop/history":
+			filename = "appveyor_history_29070120.json"
+		case r.Method == "GET" && r.URL.Path == "/api/projects/nbedos/citop/build/1.0.22":
+			filename = "appveyor_build_1_0_22.json"
+		default:
+			w.WriteHeader(404)
+			return
+		}
+
+		bs, err := ioutil.ReadFile(fmt.Sprintf("test_data/%s", filename))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fmt.Fprint(w, string(bs)); err != nil {
+			t.Fatal(err)
+		}
+	}))
+	defer ts.Close()
+
+	tsu, err := url.Parse(ts.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(build)
-}*/
+	tsu.Path += "/api"
+	tsu.RawPath += "/api"
+
+	client := AppVeyorClient{
+		url:         *tsu,
+		client:      &http.Client{Timeout: 10 * time.Second},
+		rateLimiter: time.Tick(time.Millisecond),
+		token:       "token",
+		accountID:   "account",
+	}
+
+	buildURL := "https://ci.appveyor.com/project/nbedos/citop/builds/29070120"
+	build, err := client.BuildFromURL(context.Background(), buildURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if build.ID != "29070120" {
+		t.Fatal()
+	}
+}

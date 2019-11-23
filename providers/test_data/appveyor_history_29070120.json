@@ -1,0 +1,116 @@
+{
+  "project": {
+    "projectId": 626103,
+    "accountId": 132781,
+    "accountName": "nbedos",
+    "builds": [],
+    "name": "citop",
+    "slug": "citop",
+    "repositoryType": "gitHub",
+    "repositoryScm": "git",
+    "repositoryName": "nbedos/citop",
+    "isPrivate": false,
+    "isGitHubApp": false,
+    "skipBranchesWithoutAppveyorYml": false,
+    "enableSecureVariablesInPullRequests": false,
+    "enableSecureVariablesInPullRequestsFromSameRepo": false,
+    "enableDeploymentInPullRequests": false,
+    "saveBuildCacheInPullRequests": false,
+    "rollingBuilds": false,
+    "rollingBuildsDoNotCancelRunningBuilds": false,
+    "rollingBuildsOnlyForPullRequests": false,
+    "alwaysBuildClosedPullRequests": false,
+    "tags": "",
+    "securityDescriptor": {
+      "accessRightDefinitions": [
+        {
+          "name": "View",
+          "description": "View"
+        },
+        {
+          "name": "RunBuild",
+          "description": "Run build"
+        },
+        {
+          "name": "Update",
+          "description": "Update settings"
+        },
+        {
+          "name": "Delete",
+          "description": "Delete project"
+        }
+      ],
+      "roleAces": [
+        {
+          "roleId": 255280,
+          "name": "Administrator",
+          "isAdmin": true,
+          "accessRights": [
+            {
+              "name": "View",
+              "allowed": true
+            },
+            {
+              "name": "RunBuild",
+              "allowed": true
+            },
+            {
+              "name": "Update",
+              "allowed": true
+            },
+            {
+              "name": "Delete",
+              "allowed": true
+            }
+          ]
+        },
+        {
+          "roleId": 255281,
+          "name": "User",
+          "isAdmin": false,
+          "accessRights": [
+            {
+              "name": "View"
+            },
+            {
+              "name": "RunBuild"
+            },
+            {
+              "name": "Update"
+            },
+            {
+              "name": "Delete"
+            }
+          ]
+        }
+      ]
+    },
+    "disablePushWebhooks": false,
+    "disablePullRequestWebhooks": false,
+    "created": "2019-11-04T21:38:41.6251676+00:00"
+  },
+  "builds": [
+    {
+      "buildId": 29070120,
+      "projectId": 0,
+      "jobs": [],
+      "buildNumber": 22,
+      "version": "1.0.22",
+      "message": "Add configuration",
+      "branch": "feature/appveyor",
+      "isTag": false,
+      "commitId": "fd4c4ae5a4005e38c66566e2480087072620e9de",
+      "authorName": "nbedos",
+      "authorUsername": "nbedos",
+      "committerName": "nbedos",
+      "committerUsername": "nbedos",
+      "committed": "2019-11-23T12:50:29+00:00",
+      "messages": [],
+      "status": "success",
+      "started": "2019-11-23T12:51:13.8681659+00:00",
+      "finished": "2019-11-23T12:51:50.2327515+00:00",
+      "created": "2019-11-23T12:51:05.4688869+00:00",
+      "updated": "2019-11-23T12:51:50.2327515+00:00"
+    }
+  ]
+}

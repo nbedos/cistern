@@ -18,7 +18,7 @@ import (
 func TestTravisClientfetchBuild(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && r.URL.Path == "/build/609256446" {
-			bs, err := ioutil.ReadFile("test_data/build_609256446.json")
+			bs, err := ioutil.ReadFile("test_data/travis_build_609256446.json")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -208,7 +208,7 @@ func TestTravisClientfetchBuild(t *testing.T) {
 func TestTravisClientRepository(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && r.URL.Path == "/repo/nbedos/citop" {
-			bs, err := ioutil.ReadFile("test_data/repo_25564643.json")
+			bs, err := ioutil.ReadFile("test_data/travis_repo_25564643.json")
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -17,13 +17,14 @@ import (
 )
 
 type AppVeyorClient struct {
+	url         url.URL
 	client      *http.Client
 	rateLimiter <-chan time.Time
 	token       string
 	accountID   string
 }
 
-var AppVeyorURL = url.URL{
+var appVeyorURL = url.URL{
 	Scheme:  "https",
 	Host:    "ci.appveyor.com",
 	Path:    "/api",
@@ -32,6 +33,7 @@ var AppVeyorURL = url.URL{
 
 func NewAppVeyorClient(accountID string, token string, rateLimit time.Duration) AppVeyorClient {
 	return AppVeyorClient{
+		url:         appVeyorURL,
 		client:      &http.Client{Timeout: 10 * time.Second},
 		rateLimiter: time.Tick(rateLimit),
 		token:       token,
@@ -111,7 +113,7 @@ func (c AppVeyorClient) fetchBuild(ctx context.Context, owner string, repoName s
 	//      an empty job list but with a version number
 	//      2. /projects/owner/repoName/build/<version> using the version number from the last call
 	//      gives us a build with a complete job list
-	history := AppVeyorURL
+	history := c.url
 	historyFormat := "/projects/%s/%s/history"
 	history.Path += fmt.Sprintf(historyFormat, owner, repoName)
 	history.RawPath += fmt.Sprintf(historyFormat, url.PathEscape(owner), url.PathEscape(repoName))
@@ -148,7 +150,7 @@ func (c AppVeyorClient) fetchBuild(ctx context.Context, owner string, repoName s
 		Name:      b.Project.Name,
 	}
 
-	endpoint := AppVeyorURL
+	endpoint := c.url
 	pathFormat := "/projects/%s/%s/build/%s"
 	endpoint.Path += fmt.Sprintf(pathFormat, owner, repoName, version)
 	endpoint.RawPath += fmt.Sprintf(pathFormat, url.PathEscape(owner),
@@ -192,6 +194,8 @@ func fromAppVeyorState(s string) cache.State {
 	switch strings.ToLower(s) {
 	case "queued", "received":
 		return cache.Pending
+	case "running":
+		return cache.Running
 	case "success":
 		return cache.Passed
 	case "failed":
