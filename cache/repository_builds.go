@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -92,9 +93,14 @@ func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
 		name.Append(b.name)
 	}
 
+	refClass := text.GitBranch
+	if strings.HasPrefix(b.key.ref, "tag:") {
+		refClass = text.GitTag
+	}
+
 	return map[string]text.StyledString{
-		"COMMIT":   text.NewStyledString(string([]rune(b.key.sha)[:shaLength]), text.CommitSha),
-		"REF":      text.NewStyledString(b.key.ref, text.GitRef),
+		"COMMIT":   text.NewStyledString(string([]rune(b.key.sha)[:shaLength]), text.GitSha),
+		"REF":      text.NewStyledString(b.key.ref, refClass),
 		"TYPE":     text.NewStyledString(b.type_),
 		"STATE":    state,
 		"NAME":     name,
@@ -269,7 +275,7 @@ func (c *Cache) BuildsByCommit() BuildsByCommit {
 }
 
 func (s BuildsByCommit) Headers() []string {
-	return []string{"REF", "COMMIT", "TYPE", "STATE", "CREATED", "DURATION", "NAME"}
+	return []string{"REF", "TYPE", "STATE", "CREATED", "DURATION", "NAME"}
 }
 
 func (s BuildsByCommit) Alignment() map[string]text.Alignment {

@@ -183,7 +183,7 @@ func (t Table) stringFromColumns(values map[string]text.StyledString, header boo
 		paddedColumns[j].Align(alignment, t.maxWidths[name])
 	}
 
-	line := text.Join(paddedColumns, t.sep)
+	line := text.Join(paddedColumns, text.NewStyledString(t.sep))
 	line.Align(text.Left, t.width)
 
 	return line

@@ -292,7 +292,7 @@ func (c *Cache) MonitorPipeline(ctx context.Context, p CIProvider, u string, upd
 	return nil
 }
 
-func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, sha string, updates chan time.Time) error {
+func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, commit utils.Commit, updates chan time.Time) error {
 	var err error
 	slug, err := utils.RepositorySlugFromURL(repositoryURL)
 	if err != nil {
@@ -331,7 +331,7 @@ func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, sha stri
 					return
 				}
 
-				us, err := p.BuildURLs(ctx, owner, repo, sha)
+				us, err := p.BuildURLs(ctx, owner, repo, commit.Sha)
 				if err != nil {
 					errc <- err
 					return
@@ -340,14 +340,14 @@ func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, sha stri
 					// All providers but 1 should return ErrRepositoryNotFound
 					for _, p := range c.ciProvidersById {
 						wg.Add(1)
-						go func(u string) {
+						go func(p CIProvider, u string) {
 							defer wg.Done()
 							err := c.MonitorPipeline(ctx, p, u, updates)
-							if err != nil && err != ErrRepositoryNotFound {
+							if err != nil && err != ErrUnknownURL {
 								errc <- err
 								return
 							}
-						}(u)
+						}(p, u)
 					}
 				}
 			}

@@ -14,12 +14,15 @@ const (
 	DefaultClass Class = iota
 	TableHeader
 	ActiveRow
-	CommitSha
+	GitSha
+	GitRef
+	GitTag
+	GitBranch
+	GitHead
 	StatusPassed
 	StatusRunning
 	StatusFailed
 	StatusSkipped
-	GitRef
 	Provider
 )
 
@@ -61,7 +64,7 @@ func (s StyledString) Length() int {
 	return l
 }
 
-func Join(ss []StyledString, sep string) StyledString {
+func Join(ss []StyledString, sep StyledString) StyledString {
 	joined := StyledString{
 		components: make([]elementaryString, 0),
 	}
@@ -71,9 +74,9 @@ func Join(ss []StyledString, sep string) StyledString {
 		}
 
 		if i < len(ss)-1 {
-			joined.components = append(joined.components, elementaryString{
-				Content: sep,
-			})
+			for _, c := range sep.components {
+				joined.components = append(joined.components, c)
+			}
 		}
 	}
 

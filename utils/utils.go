@@ -9,7 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nbedos/citop/text"
 	"gopkg.in/src-d/go-git.v4"
+	"gopkg.in/src-d/go-git.v4/plumbing"
 )
 
 func Modulo(a, b int) int {
@@ -208,27 +210,122 @@ func (a ANSIStripper) Close() error {
 	return a.writer.Close()
 }
 
-func GitOriginURL(path string) (string, string, error) {
+type Commit struct {
+	Sha      string
+	Author   string
+	Date     time.Time
+	Message  string
+	Branches []string
+	Tags     []string
+	Head     string
+}
+
+func (c Commit) Strings() []text.StyledString {
+	var title text.StyledString
+	commit := text.NewStyledString(fmt.Sprintf("commit %s", c.Sha), text.GitSha)
+	if len(c.Branches) > 0 || len(c.Tags) > 0 {
+		refs := make([]text.StyledString, 0, len(c.Branches)+len(c.Tags))
+		for _, tag := range c.Tags {
+			refs = append(refs, text.NewStyledString(fmt.Sprintf("tag: %s", tag), text.GitTag))
+		}
+		for _, branch := range c.Branches {
+			if branch == c.Head {
+				var s text.StyledString
+				s.Append("HEAD -> ", text.GitHead)
+				s.Append(branch, text.GitBranch)
+				refs = append([]text.StyledString{s}, refs...)
+			} else {
+				refs = append(refs, text.NewStyledString(branch, text.GitBranch))
+			}
+		}
+
+		title = text.Join([]text.StyledString{
+			commit,
+			text.NewStyledString(" (", text.GitSha),
+			text.Join(refs, text.NewStyledString(", ", text.GitSha)),
+			text.NewStyledString(")", text.GitSha),
+		}, text.NewStyledString(""))
+	} else {
+		title = commit
+	}
+
+	texts := []text.StyledString{
+		title,
+		text.NewStyledString(fmt.Sprintf("Author: %s", c.Author)),
+		text.NewStyledString(fmt.Sprintf("Date: %s", c.Date.Truncate(time.Second).String())),
+		text.NewStyledString(""),
+	}
+	for _, line := range strings.Split(c.Message, "\n") {
+		texts = append(texts, text.NewStyledString("    "+line))
+		break
+	}
+
+	return texts
+}
+
+func GitOriginURL(path string) (string, Commit, error) {
 	r, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
-		return "", "", err
+		return "", Commit{}, err
 	}
 
 	remote, err := r.Remote("origin")
 	if err != nil {
-		return "", "", err
+		return "", Commit{}, err
 	}
 
 	if len(remote.Config().URLs) == 0 {
-		return "", "", fmt.Errorf("GIT repository %q: remote 'origin' has no associated URL", path)
+		return "", Commit{}, fmt.Errorf("GIT repository %q: remote 'origin' has no associated URL", path)
 	}
 
-	ref, err := r.Head()
+	head, err := r.Head()
 	if err != nil {
-		return "", "", err
+		return "", Commit{}, err
 	}
 
-	return remote.Config().URLs[0], ref.Name().Short(), nil
+	commit, err := r.CommitObject(head.Hash())
+	if err != nil {
+		return "", Commit{}, err
+	}
+
+	c := Commit{
+		Sha:      head.Hash().String(),
+		Author:   commit.Author.String(),
+		Date:     commit.Author.When,
+		Message:  commit.Message,
+		Branches: nil,
+		Tags:     nil,
+		Head:     head.Name().Short(),
+	}
+
+	refs, err := r.References()
+	if err != nil {
+		return "", Commit{}, err
+	}
+
+	err = refs.ForEach(func(ref *plumbing.Reference) error {
+		if ref.Hash() != commit.Hash {
+			return nil
+		}
+
+		if ref.Name() == head.Name() {
+			c.Head = head.Name().Short()
+		}
+
+		switch {
+		case ref.Name().IsTag():
+			c.Tags = append(c.Tags, ref.Name().Short())
+		case ref.Name().IsBranch():
+			c.Branches = append(c.Branches, ref.Name().Short())
+		}
+
+		return nil
+	})
+	if err != nil {
+		return "", Commit{}, err
+	}
+
+	return remote.Config().URLs[0], c, nil
 }
 
 type NullDuration struct {

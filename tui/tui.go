@@ -13,6 +13,7 @@ import (
 	"github.com/gdamore/tcell/encoding"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/text"
+	"github.com/nbedos/citop/utils"
 )
 
 type ExecCmd struct {
@@ -22,7 +23,7 @@ type ExecCmd struct {
 
 var ErrNoProvider = errors.New("list of providers must not be empty")
 
-func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repositoryURL string, sha string, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location) (err error) {
+func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repositoryURL string, commit utils.Commit, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location) (err error) {
 	if len(CIProviders) == 0 || len(SourceProviders) == 0 {
 		return ErrNoProvider
 	}
@@ -60,8 +61,20 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		text.StatusSkipped: func(s tcell.Style) tcell.Style {
 			return s.Foreground(tcell.ColorGray).Bold(false)
 		},
+		text.GitSha: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorOlive)
+		},
+		text.GitBranch: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorTeal).Bold(false)
+		},
+		text.GitTag: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorYellow).Bold(false)
+		},
+		text.GitHead: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorAqua)
+		},
 	}
-	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  b:Browser  ?:Help  q:Quit"
+	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  v:Logs  b:Browser  ?:Help  q:Quit"
 
 	ctx, cancel := context.WithCancel(ctx)
 	cacheDB := cache.NewCache(CIProviders, SourceProviders)
@@ -79,11 +92,12 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 	if err != nil {
 		return err
 	}
+	controller.SetHeader(commit.Strings())
 
 	errCache := make(chan error)
 	updates := make(chan time.Time)
 	go func() {
-		errCache <- cacheDB.GetPipelines(ctx, repositoryURL, sha, updates)
+		errCache <- cacheDB.GetPipelines(ctx, repositoryURL, commit, updates)
 	}()
 
 	errController := make(chan error)

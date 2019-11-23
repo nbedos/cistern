@@ -24,7 +24,7 @@ func main() {
 	signal.Ignore(syscall.SIGTSTP)
 
 	var repository string
-	var ref string
+	var commit utils.Commit
 	switch len(os.Args) {
 	case 1:
 		cwd, err := os.Getwd()
@@ -32,7 +32,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(1)
 		}
-		repository, ref, err = utils.GitOriginURL(cwd)
+		repository, commit, err = utils.GitOriginURL(cwd)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(1)
@@ -82,9 +82,8 @@ func main() {
 		providers.NewGitHubClient(context.Background(), &githubToken),
 	}
 
-	//ref = "master"
 	ctx := context.Background()
-	if err := tui.RunApplication(ctx, tcell.NewScreen, repository, ref, CIProviders, SourceProviders, time.Local); err != nil {
+	if err := tui.RunApplication(ctx, tcell.NewScreen, repository, commit, CIProviders, SourceProviders, time.Local); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}

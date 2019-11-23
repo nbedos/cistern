@@ -18,6 +18,7 @@ import (
 
 type Controller struct {
 	tui           *TUI
+	header        *TextArea
 	table         *Table
 	status        *StatusBar
 	tempDir       string
@@ -30,6 +31,11 @@ var ErrExit = errors.New("exit")
 func NewController(tui *TUI, source cache.HierarchicalTabularDataSource, loc *time.Location, tempDir string, defaultStatus string) (Controller, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := 10, 10
+	header, err := NewTextArea(width, height)
+	if err != nil {
+		return Controller{}, err
+	}
+
 	table, err := NewTable(source, width, height, loc)
 	if err != nil {
 		return Controller{}, err
@@ -43,6 +49,7 @@ func NewController(tui *TUI, source cache.HierarchicalTabularDataSource, loc *ti
 
 	return Controller{
 		tui:           tui,
+		header:        &header,
 		table:         &table,
 		status:        &status,
 		tempDir:       tempDir,
@@ -70,6 +77,10 @@ func (c *Controller) Run(ctx context.Context, updates <-chan time.Time) error {
 	return err
 }
 
+func (c *Controller) SetHeader(lines []text.StyledString) {
+	c.header.Write(lines...)
+}
+
 func (c *Controller) setStatus(s string) {
 	c.status.Write(s)
 }
@@ -86,7 +97,7 @@ func (c Controller) text() []text.LocalizedStyledString {
 	texts := make([]text.LocalizedStyledString, 0)
 	yOffset := 0
 
-	for _, child := range []Widget{c.table, c.status} {
+	for _, child := range []Widget{c.header, c.table, c.status} {
 		for _, line := range child.Text() {
 			line.Y += yOffset
 			texts = append(texts, line)
@@ -101,10 +112,11 @@ func (c Controller) text() []text.LocalizedStyledString {
 func (c *Controller) resize(width int, height int) {
 	width = utils.MaxInt(width, 0)
 	height = utils.MaxInt(height, 0)
+	headerHeight := utils.MinInt(utils.MinInt(len(c.header.content)+2, 9), height)
+	tableHeight := utils.MaxInt(0, height-headerHeight-1)
+	statusHeight := height - headerHeight - tableHeight
 
-	tableHeight := utils.MaxInt(0, height-1)
-	statusHeight := height - tableHeight
-
+	c.header.Resize(width, headerHeight)
 	c.table.Resize(width, tableHeight)
 	c.status.Resize(width, statusHeight)
 }
