@@ -18,7 +18,7 @@ var ErrUnknownURL = errors.New("URL not recognized")
 
 type CIProvider interface {
 	AccountID() string
-	Log(ctx context.Context, repository Repository, jobID int) (string, bool, error)
+	Log(ctx context.Context, repository Repository, jobID string) (string, error)
 	BuildFromURL(ctx context.Context, u string) (Build, error)
 }
 
@@ -117,14 +117,14 @@ type Build struct {
 	Duration        utils.NullDuration
 	WebURL          string
 	Stages          map[int]*Stage
-	Jobs            map[int]*Job
+	Jobs            []*Job
 }
 
 func (b Build) Status() State        { return b.State }
 func (b Build) AllowedFailure() bool { return false }
 
-func (b Build) Get(stageID int, jobID int) (Job, bool) {
-	var jobs map[int]*Job
+func (b Build) Get(stageID int, jobID string) (Job, bool) {
+	var jobs []*Job
 	if stageID == 0 {
 		jobs = b.Jobs
 	} else {
@@ -135,22 +135,25 @@ func (b Build) Get(stageID int, jobID int) (Job, bool) {
 		jobs = stage.Jobs
 	}
 
-	job, exists := jobs[jobID]
-	if !exists {
-		return Job{}, false
+	// meh.
+	for _, job := range jobs {
+		if job.ID == jobID {
+			return *job, true
+		}
 	}
-	return *job, true
+
+	return Job{}, false
 }
 
 type Stage struct {
 	ID    int
 	Name  string
 	State State
-	Jobs  map[int]*Job
+	Jobs  []*Job
 }
 
 type Job struct {
-	ID           int
+	ID           string
 	State        State
 	Name         string
 	CreatedAt    utils.NullTime
@@ -191,33 +194,39 @@ func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache 
 	}
 }
 
+var ErrOlderBuild = errors.New("build to save is older than current build in cache")
+
 func (c *Cache) Save(build Build) error {
 	if build.Repository == nil {
 		return errors.New("build.repository must not be nil")
 	}
 
+	cacheBuild, exists := c.fetchBuild(build.Repository.AccountID, build.ID)
+	if exists && !cacheBuild.UpdatedAt.Before(build.UpdatedAt) {
+		return ErrOlderBuild
+	}
 	if build.Jobs == nil {
-		build.Jobs = make(map[int]*Job)
+		build.Jobs = make([]*Job, 0)
 	}
 	if build.Stages == nil {
 		build.Stages = make(map[int]*Stage)
 	} else {
 		for _, stage := range build.Stages {
 			if stage.Jobs == nil {
-				stage.Jobs = make(map[int]*Job)
+				stage.Jobs = make([]*Job, 0)
 			}
 		}
 	}
 
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-
 	c.builds[buildKey{
 		AccountID: build.Repository.AccountID,
 		BuildID:   build.ID,
 	}] = &build
 
 	return nil
+
 }
 
 func (c *Cache) SaveJob(accountID string, buildID string, stageID int, job Job) error {
@@ -232,14 +241,27 @@ func (c *Cache) SaveJob(accountID string, buildID string, stageID int, job Job) 
 		return fmt.Errorf("no matching build found in cache for key %v", key)
 	}
 	if stageID == 0 {
-		build.Jobs[job.ID] = &job
+		for i := range build.Jobs {
+			if build.Jobs[i].ID == job.ID {
+				build.Jobs[i] = &job
+				return nil
+			}
+		}
+		build.Jobs = append(build.Jobs, &job)
 	} else {
 		stage, exists := build.Stages[stageID]
 		if !exists {
 			return fmt.Errorf("build has no stage %d", stageID)
 		}
-		stage.Jobs[job.ID] = &job
+		for i := range stage.Jobs {
+			if stage.Jobs[i].ID == job.ID {
+				stage.Jobs[i] = &job
+				return nil
+			}
+		}
+		stage.Jobs = append(stage.Jobs, &job)
 	}
+
 	return nil
 }
 
@@ -278,15 +300,20 @@ func (c *Cache) MonitorPipeline(ctx context.Context, p CIProvider, u string, upd
 			return err
 		}
 
-		if err := c.Save(build); err != nil {
+		switch err := c.Save(build); err {
+		case nil:
+			go func() {
+				select {
+				case updates <- time.Now():
+				case <-ctx.Done():
+				}
+			}()
+		case ErrOlderBuild:
+			// Do nothing. This is useful to avoid deleting logs on an existing build since
+			// p.BuildFromURL() will always return build without logs.
+		default:
 			return err
 		}
-		go func() {
-			select {
-			case updates <- time.Now():
-			case <-ctx.Done():
-			}
-		}()
 	}
 
 	return nil
@@ -384,7 +411,7 @@ func (c *Cache) fetchBuild(accountID string, buildID string) (Build, bool) {
 	return Build{}, false
 }
 
-func (c *Cache) fetchJob(accountID string, buildID string, stageID int, jobID int) (Job, bool) {
+func (c *Cache) fetchJob(accountID string, buildID string, stageID int, jobID string) (Job, bool) {
 	build, exists := c.fetchBuild(accountID, buildID)
 	if !exists {
 		return Job{}, false
@@ -395,7 +422,7 @@ func (c *Cache) fetchJob(accountID string, buildID string, stageID int, jobID in
 
 var ErrIncompleteLog = errors.New("log not complete")
 
-func (c *Cache) WriteLog(ctx context.Context, accountID string, buildID string, stageID int, jobID int, writer io.Writer) error {
+func (c *Cache) WriteLog(ctx context.Context, accountID string, buildID string, stageID int, jobID string, writer io.Writer) error {
 	build, exists := c.fetchBuild(accountID, buildID)
 	if !exists {
 		return fmt.Errorf("no matching build for %v %v", accountID, buildID)
@@ -410,13 +437,13 @@ func (c *Cache) WriteLog(ctx context.Context, accountID string, buildID string, 
 		if !exists {
 			return fmt.Errorf("no matching provider found in cache for account ID %q", accountID)
 		}
-		log, complete, err := provider.Log(ctx, *build.Repository, job.ID)
+		log, err := provider.Log(ctx, *build.Repository, job.ID)
 		if err != nil {
 			return err
 		}
 
 		job.Log = utils.NullString{String: log, Valid: true}
-		if complete {
+		if !job.State.IsActive() {
 			if err = c.SaveJob(accountID, buildID, stageID, job); err != nil {
 				return err
 			}

@@ -98,9 +98,7 @@ var stage = Stage{
 	ID:    1,
 	Name:  "test",
 	State: "passed",
-	Jobs: map[int]*Job{
-		job.ID: &job,
-	},
+	Jobs:  []*Job{&job},
 }
 
 var stageAsRow = buildRow{
@@ -142,7 +140,7 @@ var stageAsRow = buildRow{
 }
 
 var job = Job{
-	ID:    54,
+	ID:    "54",
 	State: "passed",
 	Name:  "golang 1.12",
 	CreatedAt: utils.NullTime{
@@ -173,11 +171,11 @@ var jobAsRow = buildRow{
 		accountID: "provider",
 		buildID:   "42",
 		stageID:   1,
-		jobID:     54,
+		jobID:     "54",
 	},
 	type_:    "J",
 	state:    "passed",
-	name:     "golang 1.12 (#54)",
+	name:     "golang 1.12",
 	provider: "provider",
 	createdAt: utils.NullTime{
 		Valid: true,

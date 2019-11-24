@@ -45,8 +45,17 @@ func (c AppVeyorClient) AccountID() string {
 	return c.accountID
 }
 
-func (c AppVeyorClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
-	return "", true, nil
+func (c AppVeyorClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
+	endpoint := c.url
+	endpoint.Path += fmt.Sprintf("/buildjobs/%s/log", jobID)
+	endpoint.RawPath += fmt.Sprintf("/buildjobs/%s/log", url.PathEscape(jobID))
+
+	body, err := c.get(ctx, endpoint)
+	if err != nil {
+		return "", err
+	}
+
+	return body.String(), nil
 }
 
 func (c AppVeyorClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
@@ -238,7 +247,7 @@ func (b appVeyorBuild) toCacheBuild(accountID string, repo *cache.Repository) (c
 		RepoBuildNumber: strconv.Itoa(b.Number),
 		State:           fromAppVeyorState(b.Status),
 		Stages:          make(map[int]*cache.Stage),
-		Jobs:            make(map[int]*cache.Job),
+		Jobs:            make([]*cache.Job, 0),
 	}
 	var err error
 	build.Commit.Date, err = utils.NullTimeFromString(b.CommittedAt)
@@ -271,12 +280,12 @@ func (b appVeyorBuild) toCacheBuild(accountID string, repo *cache.Repository) (c
 	build.WebURL = fmt.Sprintf("https://ci.appveyor.com/project/%s/%s/builds/%d",
 		url.PathEscape(repo.Owner), url.PathEscape(repo.Name), b.ID)
 
-	for i, job := range b.Jobs {
-		j, err := job.toCacheJob(i+1, build.WebURL)
+	for _, job := range b.Jobs {
+		j, err := job.toCacheJob(job.ID, build.WebURL)
 		if err != nil {
 			return build, err
 		}
-		build.Jobs[j.ID] = &j
+		build.Jobs = append(build.Jobs, &j)
 	}
 
 	return build, nil
@@ -292,9 +301,9 @@ type appVeyorJob struct {
 	FinishedAt   string `json:"finished"`
 }
 
-func (j appVeyorJob) toCacheJob(id int, buildURL string) (cache.Job, error) {
-	if id <= 0 {
-		return cache.Job{}, errors.New("job id must be > 0")
+func (j appVeyorJob) toCacheJob(id string, buildURL string) (cache.Job, error) {
+	if id == "" {
+		return cache.Job{}, errors.New("job id must not be the empty string")
 	}
 	job := cache.Job{
 		ID:           id,

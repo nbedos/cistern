@@ -202,14 +202,8 @@ func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, int, error
 	return owner, repo, id, nil
 }
 
-func (c CircleCIClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
-	endPoint := c.projectEndpoint(repository.Owner, repository.Name)
-	build, err := c.fetchBuild(ctx, endPoint, &repository, jobID, true)
-	if err != nil {
-		return "", false, err
-	}
-
-	return "", !build.State.IsActive(), nil
+func (c CircleCIClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
+	return "", nil
 }
 
 func (c *CircleCIClient) repository(ctx context.Context, owner string, repo string) (cache.Repository, error) {

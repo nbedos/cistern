@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/nbedos/citop/utils"
 )
 
@@ -89,34 +90,34 @@ func TestBuild_Get(t *testing.T) {
 			1: {ID: 1},
 			2: {
 				ID: 2,
-				Jobs: map[int]*Job{
-					3: {ID: 3},
-					4: {ID: 4},
+				Jobs: []*Job{
+					{ID: "3"},
+					{ID: "4"},
 				},
 			},
 		},
-		Jobs: map[int]*Job{
-			5: {ID: 5},
-			6: {ID: 6},
-			7: {ID: 7},
+		Jobs: []*Job{
+			{ID: "5"},
+			{ID: "6"},
+			{ID: "7"},
 		},
 	}
 
 	successTestCases := []struct {
 		stageID int
-		jobID   int
+		jobID   string
 	}{
 		{
 			stageID: 2,
-			jobID:   3,
+			jobID:   "3",
 		},
 		{
 			stageID: 2,
-			jobID:   4,
+			jobID:   "4",
 		},
 		{
 			stageID: 0,
-			jobID:   5,
+			jobID:   "5",
 		},
 	}
 
@@ -127,26 +128,26 @@ func TestBuild_Get(t *testing.T) {
 				t.Fail()
 			}
 			if job.ID != testCase.jobID {
-				t.Fatalf("expected jobID %d but got %d", testCase.jobID, job.ID)
+				t.Fatalf("expected jobID %s but got %s", testCase.jobID, job.ID)
 			}
 		})
 	}
 
 	failureTestCases := []struct {
 		stageID int
-		jobID   int
+		jobID   string
 	}{
 		{
 			stageID: 0,
-			jobID:   0,
+			jobID:   "0",
 		},
 		{
 			stageID: 2,
-			jobID:   0,
+			jobID:   "0",
 		},
 		{
 			stageID: -1,
-			jobID:   -1,
+			jobID:   "-1",
 		},
 	}
 
@@ -180,23 +181,44 @@ func TestCache_Save(t *testing.T) {
 		}
 	})
 
-	t.Run("If a build with the same key is already in the cache it must be overwritten", func(t *testing.T) {
+	buildOld := Build{
+		Repository: &repository,
+		ID:         "42", State: Failed,
+		UpdatedAt: time.Date(2019, 11, 24, 14, 52, 0, 0, time.UTC),
+	}
+	buildNew := Build{
+		Repository: &repository,
+		ID:         "42",
+		State:      Passed,
+		UpdatedAt:  buildOld.UpdatedAt.Add(time.Second),
+	}
+
+	t.Run("existing build must be overwritten if it's older than the current build", func(t *testing.T) {
 		c := NewCache(nil, nil)
 
-		buildFailed := Build{Repository: &repository, ID: "42", State: Failed}
-		if err := c.Save(buildFailed); err != nil {
+		if err := c.Save(buildOld); err != nil {
 			t.Fatal(err)
 		}
-		buildPassed := Build{Repository: &repository, ID: "42", State: Passed}
-		if err := c.Save(buildPassed); err != nil {
+		if err := c.Save(buildNew); err != nil {
 			t.Fatal(err)
 		}
-		savedBuild, exists := c.fetchBuild(buildPassed.Repository.AccountID, buildPassed.ID)
+		savedBuild, exists := c.fetchBuild(buildOld.Repository.AccountID, buildNew.ID)
 		if !exists {
 			t.Fatal("build was not saved")
 		}
-		if savedBuild.State != buildPassed.State {
+		if savedBuild.State != buildNew.State {
 			t.Fatal("build state must be equal")
+		}
+	})
+
+	t.Run("cache.Save must return ErrOlderBuild if the build to save is older than the one in cache", func(t *testing.T) {
+		c := NewCache(nil, nil)
+
+		if err := c.Save(buildNew); err != nil {
+			t.Fatal(err)
+		}
+		if err := c.Save(buildOld); err != ErrOlderBuild {
+			t.Fatalf("expected %v but got %v", ErrOlderBuild, err)
 		}
 	})
 
@@ -231,13 +253,13 @@ func TestCache_SaveJob(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		job := Job{ID: 43}
+		job := Job{ID: "43"}
 		if err := c.SaveJob(repository.AccountID, build.ID, 0, job); err != nil {
 			t.Fatal(err)
 		}
-		savedJob, _ := c.fetchJob(repository.AccountID, build.ID, 0, 43)
-		if !reflect.DeepEqual(savedJob, job) {
-			t.Fatalf("job (%+v) must be equalf to savedJob (%+v)", job, savedJob)
+		savedJob, _ := c.fetchJob(repository.AccountID, build.ID, 0, "43")
+		if diff := cmp.Diff(savedJob, job); len(diff) > 0 {
+			t.Fatal(diff)
 		}
 	})
 
@@ -247,18 +269,16 @@ func TestCache_SaveJob(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		job := Job{ID: 45}
+		job := Job{ID: "45"}
 		if err := c.SaveJob(repository.AccountID, build.ID, 43, job); err != nil {
 			t.Fatal(err)
 		}
-		savedJob, exists := c.fetchJob(repository.AccountID, build.ID, 43, 45)
+		savedJob, exists := c.fetchJob(repository.AccountID, build.ID, 43, "45")
 		if !exists {
 			t.Fatal("job not found")
 		}
-		if !reflect.DeepEqual(savedJob, job) {
-			t.Logf("savedJob: %+v", savedJob)
-			t.Logf("job     : %+v", job)
-			t.Fatal("job must be equal to savedJob")
+		if diff := cmp.Diff(savedJob, job); len(diff) > 0 {
+			t.Fatal(diff)
 		}
 	})
 
@@ -268,7 +288,7 @@ func TestCache_SaveJob(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := c.SaveJob(repository.AccountID, build.ID, 404, Job{ID: 45}); err == nil {
+		if err := c.SaveJob(repository.AccountID, build.ID, 404, Job{ID: "45"}); err == nil {
 			t.Fatal("expected error but got nil")
 		}
 	})
@@ -301,8 +321,8 @@ type mockProvider struct {
 }
 
 func (p mockProvider) AccountID() string { return p.id }
-func (p mockProvider) Log(ctx context.Context, repository Repository, jobID int) (string, bool, error) {
-	return p.id + "\n", true, nil
+func (p mockProvider) Log(ctx context.Context, repository Repository, jobID string) (string, error) {
+	return p.id + "\n", nil
 }
 func (p mockProvider) BuildFromURL(ctx context.Context, u string) (Build, error) {
 	return Build{}, nil
@@ -323,9 +343,9 @@ func TestCache_WriteLog(t *testing.T) {
 			{
 				Repository: &Repository{AccountID: "provider1"},
 				ID:         "1",
-				Jobs: map[int]*Job{
-					1: {
-						ID:    1,
+				Jobs: []*Job{
+					{
+						ID:    "1",
 						State: Passed,
 						Log: utils.NullString{
 							Valid: false,
@@ -345,7 +365,7 @@ func TestCache_WriteLog(t *testing.T) {
 		}
 
 		buf := bytes.Buffer{}
-		if err := c.WriteLog(context.Background(), "provider1", "1", 0, 1, &buf); err != nil {
+		if err := c.WriteLog(context.Background(), "provider1", "1", 0, "1", &buf); err != nil {
 			t.Fatal(err)
 		}
 
@@ -363,9 +383,9 @@ func TestCache_WriteLog(t *testing.T) {
 			{
 				Repository: &Repository{AccountID: "provider1"},
 				ID:         "1",
-				Jobs: map[int]*Job{
-					1: {
-						ID:    1,
+				Jobs: []*Job{
+					{
+						ID:    "1",
 						State: Passed,
 						Log: utils.NullString{
 							Valid:  true,
@@ -386,11 +406,11 @@ func TestCache_WriteLog(t *testing.T) {
 		}
 
 		buf := bytes.Buffer{}
-		if err := c.WriteLog(context.Background(), "provider1", "1", 0, 1, &buf); err != nil {
+		if err := c.WriteLog(context.Background(), "provider1", "1", 0, "1", &buf); err != nil {
 			t.Fatal(err)
 		}
 
-		expected := builds[0].Jobs[1].Log.String
+		expected := builds[0].Jobs[0].Log.String
 		if buf.String() != expected {
 			t.Fatalf("expected %q but got %q", expected, buf.String())
 		}
@@ -402,9 +422,9 @@ func TestCache_WriteLog(t *testing.T) {
 		build := Build{
 			Repository: &Repository{AccountID: "provider1"},
 			ID:         "1",
-			Jobs: map[int]*Job{
-				1: {
-					ID:    1,
+			Jobs: []*Job{
+				{
+					ID:    "1",
 					State: Passed,
 					Log: utils.NullString{
 						Valid:  true,
@@ -422,21 +442,21 @@ func TestCache_WriteLog(t *testing.T) {
 			accountID string
 			buildID   string
 			stageID   int
-			jobID     int
+			jobID     string
 		}{
 			{
 				name:      "unknown provider",
 				buildID:   "1",
 				accountID: "404",
 				stageID:   0,
-				jobID:     1,
+				jobID:     "1",
 			},
 			{
 				name:      "unknown build",
 				accountID: "provider1",
 				buildID:   "2",
 				stageID:   0,
-				jobID:     1,
+				jobID:     "1",
 			},
 			{
 				name:      "unknown stage",
@@ -448,7 +468,7 @@ func TestCache_WriteLog(t *testing.T) {
 				name:      "unknown job",
 				accountID: "provider1",
 				buildID:   "1",
-				jobID:     404,
+				jobID:     "404",
 			},
 		}
 

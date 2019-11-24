@@ -117,7 +117,7 @@ func (b travisBuild) toCacheBuild(accountID string, repository *cache.Repository
 			Valid:    b.Duration > 0,
 		},
 		Stages:          make(map[int]*cache.Stage),
-		Jobs:            make(map[int]*cache.Job),
+		Jobs:            make([]*cache.Job, 0),
 		RepoBuildNumber: b.Number,
 	}
 
@@ -159,9 +159,9 @@ func (b travisBuild) toCacheBuild(accountID string, repository *cache.Repository
 			build.CreatedAt = utils.MinNullTime(build.CreatedAt, job.CreatedAt)
 		}
 		if stage != nil {
-			stage.Jobs[job.ID] = &job
+			stage.Jobs = append(stage.Jobs, &job)
 		} else {
-			build.Jobs[job.ID] = &job
+			build.Jobs = append(build.Jobs, &job)
 		}
 	}
 
@@ -226,7 +226,7 @@ func (j travisJob) toCacheJob(build *cache.Build, stage *cache.Stage, webURL str
 	}
 
 	job := cache.Job{
-		ID:           j.ID,
+		ID:           strconv.Itoa(j.ID),
 		State:        fromTravisState(j.State),
 		Name:         name,
 		Log:          utils.NullString{String: j.Log, Valid: j.Log != ""},
@@ -268,7 +268,7 @@ func (s travisStage) toCacheStage(build *cache.Build) cache.Stage {
 		ID:    s.ID,
 		Name:  s.Name,
 		State: fromTravisState(s.State),
-		Jobs:  make(map[int]*cache.Job),
+		Jobs:  make([]*cache.Job, 0),
 	}
 }
 
@@ -444,26 +444,22 @@ func (c TravisClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 	return cacheBuild, nil
 }
 
-func (c TravisClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
+func (c TravisClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
 	var reqURL = c.baseURL
-	reqURL.Path += fmt.Sprintf("/job/%d/log", jobID)
+	reqURL.Path += fmt.Sprintf("/job/%s/log", jobID)
 
 	body, err := c.get(ctx, "GET", reqURL)
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 
 	var log struct {
-		Content  string `json:"content"`
-		LogParts []struct {
-			Final bool `json:"final"`
-		} `json:"log_parts"`
+		Content string `json:"content"`
 	}
 
 	if err := json.Unmarshal(body.Bytes(), &log); err != nil {
-		return "", false, err
+		return "", err
 	}
 
-	complete := len(log.LogParts) > 0 && log.LogParts[len(log.LogParts)-1].Final
-	return log.Content, complete, nil
+	return log.Content, nil
 }

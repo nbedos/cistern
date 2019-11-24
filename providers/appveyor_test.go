@@ -38,7 +38,7 @@ func TestAppVeyorJob_ToCacheJob(t *testing.T) {
 	}
 
 	expectedJob := cache.Job{
-		ID:    42,
+		ID:    "id",
 		State: "passed",
 		Name:  "name",
 		CreatedAt: utils.NullTime{
@@ -131,7 +131,7 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 		},
 		WebURL: "https://ci.appveyor.com/project/owner/repo/builds/42",
 		Stages: make(map[int]*cache.Stage),
-		Jobs:   make(map[int]*cache.Job),
+		Jobs:   make([]*cache.Job, 0),
 	}
 
 	build, err := b.toCacheBuild("account", &repo)
@@ -189,5 +189,44 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 	}
 	if build.ID != "29070120" {
 		t.Fatal()
+	}
+}
+
+func TestCircleCIClient_Log(t *testing.T) {
+	expectedLog := "log\n"
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/api/buildjobs/jobId/log":
+			if _, err := fmt.Fprint(w, expectedLog); err != nil {
+				t.Fatal(err)
+			}
+		default:
+			w.WriteHeader(404)
+			return
+		}
+	}))
+	defer ts.Close()
+
+	tsu, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tsu.Path += "/api"
+	tsu.RawPath += "/api"
+
+	client := AppVeyorClient{
+		url:         *tsu,
+		client:      &http.Client{Timeout: 10 * time.Second},
+		rateLimiter: time.Tick(time.Millisecond),
+		token:       "token",
+		accountID:   "account",
+	}
+
+	log, err := client.Log(context.Background(), cache.Repository{}, "jobId")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(log, expectedLog); len(diff) > 0 {
+		t.Fatal(diff)
 	}
 }

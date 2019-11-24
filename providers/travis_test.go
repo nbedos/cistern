@@ -89,7 +89,7 @@ func TestTravisClientfetchBuild(t *testing.T) {
 			Duration: 114 * time.Second,
 		},
 		WebURL: fmt.Sprintf("%s/nbedos/citop/builds/609256446", ts.URL),
-		Jobs:   map[int]*cache.Job{},
+		Jobs:   []*cache.Job{},
 	}
 
 	expectedBuild.Stages = map[int]*cache.Stage{
@@ -100,9 +100,9 @@ func TestTravisClientfetchBuild(t *testing.T) {
 			Jobs:  nil,
 		},
 	}
-	expectedBuild.Stages[11290169].Jobs = map[int]*cache.Job{
-		609256447: {
-			ID:    609256447,
+	expectedBuild.Stages[11290169].Jobs = []*cache.Job{
+		{
+			ID:    "609256447",
 			State: cache.Failed,
 			Name:  "GoLang 1.13 on Ubuntu Bionic",
 			CreatedAt: utils.NullTime{
@@ -125,8 +125,8 @@ func TestTravisClientfetchBuild(t *testing.T) {
 			WebURL:       fmt.Sprintf("%s/nbedos/citop/jobs/609256447", ts.URL),
 			AllowFailure: false,
 		},
-		609256448: {
-			ID:    609256448,
+		{
+			ID:    "609256448",
 			State: cache.Failed,
 			Name:  "GoLang 1.12 on Ubuntu Trusty",
 			CreatedAt: utils.NullTime{
@@ -149,8 +149,8 @@ func TestTravisClientfetchBuild(t *testing.T) {
 			WebURL:       fmt.Sprintf("%s/nbedos/citop/jobs/609256448", ts.URL),
 			AllowFailure: false,
 		},
-		609256449: {
-			ID:    609256449,
+		{
+			ID:    "609256449",
 			State: cache.Failed,
 			Name:  "GoLang 1.13 on macOS 10.14",
 			CreatedAt: utils.NullTime{
@@ -173,8 +173,8 @@ func TestTravisClientfetchBuild(t *testing.T) {
 			WebURL:       fmt.Sprintf("%s/nbedos/citop/jobs/609256449", ts.URL),
 			AllowFailure: false,
 		},
-		609256450: {
-			ID:    609256450,
+		{
+			ID:    "609256450",
 			State: cache.Failed,
 			Name:  "GoLang 1.12 on macOS 10.13",
 			CreatedAt: utils.NullTime{

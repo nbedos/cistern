@@ -150,19 +150,17 @@ func (c GitLabClient) GetJob(ctx context.Context, repositoryID int, jobID int) (
 	return c.remote.Jobs.GetJob(repositoryID, jobID, gitlab.WithContext(ctx))
 }
 
-func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
-	buf, err := c.GetTraceFile(ctx, repository.ID, jobID)
+func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
+	id, err := strconv.Atoi(jobID)
 	if err != nil {
-		return "", false, err
+		return "", err
+	}
+	buf, err := c.GetTraceFile(ctx, repository.ID, id)
+	if err != nil {
+		return "", err
 	}
 
-	gitlabJob, _, err := c.GetJob(ctx, repository.ID, jobID)
-	if err != nil {
-		return "", false, nil
-	}
-	complete := !FromGitLabState(gitlabJob.Status).IsActive()
-
-	return buf.String(), complete, nil
+	return buf.String(), nil
 }
 
 func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Repository, pipelineID int) (build cache.Build, err error) {
@@ -213,7 +211,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 		},
 		WebURL: pipeline.WebURL,
 		Stages: make(map[int]*cache.Stage),
-		Jobs:   make(map[int]*cache.Job),
+		Jobs:   make([]*cache.Job, 0),
 	}
 
 	jobs := make([]*gitlab.Job, 0)
@@ -243,7 +241,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 			stage := cache.Stage{
 				ID:   len(stagesByName) + 1,
 				Name: job.Stage,
-				Jobs: make(map[int]*cache.Job),
+				Jobs: make([]*cache.Job, 0),
 			}
 			stagesByName[job.Stage] = &stage
 			build.Stages[stage.ID] = &stage
@@ -252,7 +250,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 
 	for _, gitlabJob := range jobs {
 		job := cache.Job{
-			ID:         gitlabJob.ID,
+			ID:         strconv.Itoa(gitlabJob.ID),
 			State:      FromGitLabState(gitlabJob.Status),
 			Name:       gitlabJob.Name,
 			Log:        utils.NullString{},
@@ -266,7 +264,7 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 			WebURL:       gitlabJob.WebURL,
 			AllowFailure: gitlabJob.AllowFailure,
 		}
-		stagesByName[gitlabJob.Stage].Jobs[job.ID] = &job
+		stagesByName[gitlabJob.Stage].Jobs = append(stagesByName[gitlabJob.Stage].Jobs, &job)
 	}
 
 	// Compute stage state

@@ -25,7 +25,7 @@ type buildRowKey struct {
 	accountID string
 	buildID   string
 	stageID   int
-	jobID     int
+	jobID     string
 }
 
 type buildRow struct {
@@ -167,13 +167,8 @@ func buildRowFromBuild(b Build) buildRow {
 		row.name = b.ID
 	}
 
-	jobIDs := make([]int, 0, len(b.Jobs))
-	for ID := range b.Jobs {
-		jobIDs = append(jobIDs, ID)
-	}
-	sort.Ints(jobIDs)
-	for _, jobID := range jobIDs {
-		child := buildRowFromJob(b.Repository.AccountID, b.Commit.Sha, ref, b.ID, 0, *b.Jobs[jobID])
+	for _, job := range b.Jobs {
+		child := buildRowFromJob(b.Repository.AccountID, b.Commit.Sha, ref, b.ID, 0, *job)
 		row.children = append(row.children, &child)
 	}
 
@@ -206,12 +201,10 @@ func buildRowFromStage(accountID string, sha string, ref string, buildID string,
 		provider: accountID,
 	}
 
-	jobIDs := make([]int, 0, len(s.Jobs))
 	// We aggregate jobs by name and only keep the most recent to weed out previous runs of the job.
 	// This is mainly for GitLab which keeps jobs after they are restarted.
 	jobByName := make(map[string]*Job, len(s.Jobs))
-	for ID, job := range s.Jobs {
-		jobIDs = append(jobIDs, ID)
+	for _, job := range s.Jobs {
 		namedJob, exists := jobByName[job.Name]
 		if !exists || job.CreatedAt.Valid && job.CreatedAt.Time.After(namedJob.CreatedAt.Time) {
 			jobByName[job.Name] = job
@@ -232,9 +225,8 @@ func buildRowFromStage(accountID string, sha string, ref string, buildID string,
 		}
 	}
 
-	sort.Ints(jobIDs)
-	for _, id := range jobIDs {
-		child := buildRowFromJob(accountID, sha, ref, buildID, s.ID, *s.Jobs[id])
+	for _, job := range s.Jobs {
+		child := buildRowFromJob(accountID, sha, ref, buildID, s.ID, *job)
 		row.children = append(row.children, &child)
 	}
 
@@ -242,6 +234,10 @@ func buildRowFromStage(accountID string, sha string, ref string, buildID string,
 }
 
 func buildRowFromJob(accountID string, sha string, ref string, buildID string, stageID int, j Job) buildRow {
+	name := j.Name
+	if name == "" {
+		name = j.ID
+	}
 	return buildRow{
 		key: buildRowKey{
 			ref:       ref,
@@ -253,7 +249,7 @@ func buildRowFromJob(accountID string, sha string, ref string, buildID string, s
 		},
 		type_:      "J",
 		state:      j.State,
-		name:       fmt.Sprintf("%s (#%d)", j.Name, j.ID),
+		name:       name,
 		createdAt:  j.CreatedAt,
 		startedAt:  j.StartedAt,
 		finishedAt: j.FinishedAt,
@@ -328,7 +324,7 @@ func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir st
 		return "", fmt.Errorf("key conversion to buildRowKey failed: '%v'", key)
 	}
 
-	if buildKey.jobID == 0 {
+	if buildKey.jobID == "" {
 		return "", ErrNoLogHere
 	}
 
@@ -337,7 +333,7 @@ func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir st
 	stageID := buildKey.stageID
 	jobID := buildKey.jobID
 
-	pattern := fmt.Sprintf("job_%d_*.log", jobID)
+	pattern := fmt.Sprintf("job_%s_*.log", jobID)
 	file, err := ioutil.TempFile(dir, pattern)
 	w := utils.NewANSIStripper(file)
 	defer w.Close()
