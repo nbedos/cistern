@@ -313,7 +313,7 @@ func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 			rj.updatedAt,
 			rj.finishedAt)
 
-		return ti.Time.After(tj.Time)
+		return ti.Time.Before(tj.Time)
 	})
 
 	return rows

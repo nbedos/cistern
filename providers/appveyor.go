@@ -192,7 +192,7 @@ func parseAppVeyorURL(u string) (string, string, int, error) {
 
 func fromAppVeyorState(s string) cache.State {
 	switch strings.ToLower(s) {
-	case "queued", "received":
+	case "queued", "received", "starting":
 		return cache.Pending
 	case "running":
 		return cache.Running
@@ -200,6 +200,8 @@ func fromAppVeyorState(s string) cache.State {
 		return cache.Passed
 	case "failed":
 		return cache.Failed
+	case "cancelled":
+		return cache.Canceled
 	default:
 		return cache.Unknown
 	}

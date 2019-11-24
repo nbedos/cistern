@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -51,26 +52,22 @@ func TestClient(t *testing.T) {
 	owner := "nbedos"
 	repo := "termtosvg"
 	sha := "d58600a58bf1738c6529ce3489a546bfa2178e07"
-
 	urls, err := client.BuildURLs(context.Background(), owner, repo, sha)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	buildURLs := map[string]struct{}{}
-	for _, u := range urls {
-		buildURLs[u] = struct{}{}
+	expectedURLs := []string{
+		"https://circleci.com/gh/nbedos/citop/36",
+		"https://ci.appveyor.com/project/nbedos/citop/builds/29024796",
+		"https://travis-ci.com/owner/repository/builds/123654789",
+		"https://travis-ci.org/nbedos/citop/builds/615087280",
+		"https://gitlab.com/nbedos/citop/pipelines/97604657",
 	}
 
-	expectedURLs := map[string]struct{}{
-		"https://circleci.com/gh/nbedos/citop/36":                      {},
-		"https://ci.appveyor.com/project/nbedos/citop/builds/29024796": {},
-		"https://travis-ci.com/owner/repository/builds/123654789":      {},
-		"https://travis-ci.org/nbedos/citop/builds/615087280":          {},
-		"https://gitlab.com/nbedos/citop/pipelines/97604657":           {},
-	}
-
-	if diff := cmp.Diff(buildURLs, expectedURLs); len(diff) > 0 {
+	sort.Strings(urls)
+	sort.Strings(expectedURLs)
+	if diff := cmp.Diff(urls, expectedURLs); len(diff) > 0 {
 		t.Fatal(diff)
 	}
 }
