@@ -26,8 +26,7 @@ of a CI provider after running `git push`. I'd much rather have a terminal appli
 to listing the builds associated to git HEAD since it's almost always what I need.
 
 Another use case that I'd like to address is **monitoring pipelines from multiple providers in a
-single location**. Most CI providers have free plans for free software. Relying on multiple providers
-is made easier when all pipelines can be monitored with a single application.      
+single location**. Most CI providers have free plans for free software making it tempting to use several providers for redundancy or for testing on multiple platforms. Relying on multiple providers is made easier when all pipelines can be monitored with a single application.      
 
 # Features
 * Display builds associated to git HEAD
