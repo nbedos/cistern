@@ -50,13 +50,13 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 			return s.Bold(true)
 		},
 		text.StatusFailed: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorMaroon)
+			return s.Foreground(tcell.ColorMaroon).Bold(false)
 		},
 		text.StatusPassed: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorGreen)
+			return s.Foreground(tcell.ColorGreen).Bold(false)
 		},
 		text.StatusRunning: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorOlive)
+			return s.Foreground(tcell.ColorOlive).Bold(false)
 		},
 		text.StatusSkipped: func(s tcell.Style) tcell.Style {
 			return s.Foreground(tcell.ColorGray).Bold(false)
