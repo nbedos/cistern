@@ -202,7 +202,9 @@ func (c *Cache) Save(build Build) error {
 	}
 
 	cacheBuild, exists := c.fetchBuild(build.Repository.AccountID, build.ID)
-	if exists && !cacheBuild.UpdatedAt.Before(build.UpdatedAt) {
+	// UpdatedAt does not reflect an eventual update of a job so default to always updating
+	// an active build
+	if exists && !build.State.IsActive() && !build.UpdatedAt.After(cacheBuild.UpdatedAt) {
 		return ErrOlderBuild
 	}
 	if build.Jobs == nil {
