@@ -88,9 +88,13 @@ func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
 	name := text.NewStyledString(b.prefix)
 	if b.type_ == "P" {
 		name.Append(b.provider, text.Provider)
-		name.Append(fmt.Sprintf(" (%s)", b.name))
 	} else {
 		name.Append(b.name)
+	}
+
+	pipeline := b.key.buildID
+	if _, err := strconv.Atoi(b.key.buildID); err == nil {
+		pipeline = "#" + pipeline
 	}
 
 	refClass := text.GitBranch
@@ -99,8 +103,8 @@ func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
 	}
 
 	return map[string]text.StyledString{
-		"COMMIT":   text.NewStyledString(string([]rune(b.key.sha)[:shaLength]), text.GitSha),
 		"REF":      text.NewStyledString(b.key.ref, refClass),
+		"PIPELINE": text.NewStyledString(pipeline),
 		"TYPE":     text.NewStyledString(b.type_),
 		"STATE":    state,
 		"NAME":     name,
@@ -271,13 +275,13 @@ func (c *Cache) BuildsByCommit() BuildsByCommit {
 }
 
 func (s BuildsByCommit) Headers() []string {
-	return []string{"REF", "TYPE", "STATE", "CREATED", "DURATION", "NAME"}
+	return []string{"REF", "PIPELINE", "TYPE", "STATE", "CREATED", "DURATION", "NAME"}
 }
 
 func (s BuildsByCommit) Alignment() map[string]text.Alignment {
 	return map[string]text.Alignment{
 		"REF":      text.Left,
-		"COMMIT":   text.Left,
+		"PIPELINE": text.Right,
 		"TYPE":     text.Right,
 		"STATE":    text.Left,
 		"CREATED":  text.Left,

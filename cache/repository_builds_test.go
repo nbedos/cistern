@@ -278,10 +278,11 @@ func TestBuildRow_Tabular(t *testing.T) {
 	t.Run("tabular version of cache.Build", func(t *testing.T) {
 		expected := map[string]string{
 			"COMMIT":   "c2bb562",
+			"PIPELINE": "#42",
 			"CREATED":  "Nov 13 13:12",
 			"DURATION": "3s",
 			"FINISHED": "Nov 13 13:12",
-			"NAME":     "provider (#42)",
+			"NAME":     "provider",
 			"REF":      "master",
 			"STARTED":  "Nov 13 13:12",
 			"STATE":    "passed",
