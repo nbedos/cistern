@@ -388,11 +388,22 @@ func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, commit u
 		close(errc)
 	}()
 
+	count := 0
+
+errLoop:
 	for e := range errc {
-		if err == nil && e != nil {
-			cancel()
-			err = e
+		switch e {
+		case nil:
+			continue errLoop
+		case ErrRepositoryNotFound:
+			count++
+			if count < len(c.sourceProviders) {
+				continue errLoop
+			}
 		}
+
+		cancel()
+		err = e
 	}
 
 	return err

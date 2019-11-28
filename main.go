@@ -60,15 +60,17 @@ func main() {
 		}
 	}
 
+	gitlab := providers.NewGitLabClient("gitlab", gitlabToken, time.Second/10)
 	CIProviders := []cache.CIProvider{
 		providers.NewTravisClient("travis", travisToken, providers.TravisOrgURL, time.Second/20),
-		providers.NewGitLabClient("gitlab", gitlabToken, time.Second/10),
+		gitlab,
 		providers.NewCircleCIClient("circleci", circleCIToken, providers.CircleCIURL, time.Second/10),
 		providers.NewAppVeyorClient("appveyor", appVeyorToken, time.Second/10),
 	}
 
 	SourceProviders := []cache.SourceProvider{
 		providers.NewGitHubClient(context.Background(), &githubToken),
+		gitlab,
 	}
 
 	ctx := context.Background()

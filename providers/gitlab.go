@@ -33,6 +33,40 @@ func NewGitLabClient(accountID string, token string, rateLimit time.Duration) Gi
 	}
 }
 
+func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error) {
+	repository, err := c.Repository(ctx, fmt.Sprintf("%s/%s", owner, repo))
+	if err != nil {
+		return nil, err
+	}
+
+	options := gitlab.ListProjectPipelinesOptions{
+		SHA: &sha,
+	}
+	urls := make([]string, 0)
+	for {
+		select {
+		case <-c.rateLimiter:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		pipelines, resp, err := c.remote.Pipelines.ListProjectPipelines(repository.ID, &options)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, pipeline := range pipelines {
+			urls = append(urls, pipeline.WebURL)
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		options.Page = resp.NextPage
+	}
+
+	return urls, nil
+}
+
 func (c GitLabClient) AccountID() string {
 	return c.accountID
 }
