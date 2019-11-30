@@ -9,49 +9,43 @@ citop – Continuous Integration Table Of Pipelines
 **citop**
 
 # DESCRIPTION
-citop lists the most recent CI pipelines associated to the current Git repository.
+citop shows the CI pipelines associated to a git commit
 
 # INTERACTIVE COMMANDS
-## Up, j (resp. Down, k)
-Move cursor up (resp. down) by one line
+| **Key**                    | **Action**                                                 |
+| -------------------------- |:---------------------------------------------------------- |
+| Up, j                      | Move cursor up by one line                                 |
+| Down, k                    | Move cursor down by one line                               | 
+| Page Up                    | Move cursor up by one screen                               |
+| Page Down                  | Move cursor down by one screen                             |
+| o, +                       | Open the fold at the cursor                                |
+| O                          | Open the fold at the cursor and all sub-folds              |
+| c, -                       | Close the fold at the cursor                               |
+| C                          | Close the fold at the cursor and all sub-folds             |
+| /                          | Open search prompt                                         |
+| Escape                     | Close search prompt                                        |
+| Enter, n                   | Move to the next match                                     |
+| N                          | Move to the previous match                                 |
+| v                          | View the log of the job at the cursor<sup>\[a\]</sup>      |
+| b                          | Open with default web browser                              |
+| q                          | Quit                                                       |
+| ?                          | View manual page                                           |
 
-## Page Up (resp. Page Down)
-Move cursor up (resp. down) by one screen
 
-## o, + (resp. O)
-Open (resp. open recursively) the fold at the cursor
+* <sup>\[a\]</sup>  Note that if the job is still running the log may be incomplete. 
 
-## c, - (resp. C)
-Close (resp. close recursively) the fold at the cursor
-
-## /
-Show search prompt. The prompt may be closed with Enter or Escape.
-
-## Enter, n (resp. N)
-Move to the next (resp. previous) match
-
-## v
-View the log of the job at the cursor. The log may be incomplete if
-the job is still running.
-
-## b
-Open web page associated to the current row with the default web browser
-
-## q
-Quit
-
-## ?
-View manual page
 
 # CONFIGURATION FILE
 ## Location
-citop follows the XDG base directory specification and expects to find the configuration file
-at one of the following locations:
+citop follows the XDG base directory specification \[1\] and expects to find the configuration file
+at one of the following locations depending of the value of the two environment variables 
+`XDG_CONFIG_HOME` and `XDG_CONFIG_DIRS`:
 
-1. `$XDG_CONFIG_HOME/citop/citop.toml`
-2. `$HOME/.config/citop/citop.toml` if `XDG_CONFIG_HOME` is not set
-3. `$DIR/citop/citop.toml` for every directory `DIR` in the comma-separated list `XDG_CONFIG_DIRS`
-4. `/etc/xdg/citop/citop.toml` if `XDG_CONFIG_DIRS` is not set
+1. `"$XDG_CONFIG_HOME/citop/citop.toml"` 
+2. `"$DIR/citop/citop.toml"` for every directory `DIR` in the comma-separated list `"$XDG_CONFIG_DIRS"`
+
+If `XDG_CONFIG_HOME` is not set, citop uses the default value `"$HOME/.config"` instead.
+If `XDG_CONFIG_DIRS` is not set, citop uses the default value `"/etc/xdg"` instead. 
 
 ## Format
 citop uses a configuration file in TOML version v0.5.0 format.
@@ -76,12 +70,12 @@ name = "gitlab.com"
 url = "https://gitlab.com"
 # Personal access token for accessing the GitLab API
 # Tokens can be generated at https://gitlab.com/profile/personal_access_tokens
-token = "gitlab_access_token"
+token = "gitlab_api_token"
 
 [[providers.github]]
 # Personal access token for accessing the GitHub API
 # Tokens can be generated at https://github.com/settings/tokens
-token = "github_access_token"
+token = "github_api_token"
 
 [[providers.travis]]
 # Name of the provider to be shown in the TUI (optional, default: "travis")
@@ -91,27 +85,27 @@ name = "travis.org"
 url = "org"
 # Personal access token for accessing the Travis API
 # Token generation procedure: https://developer.travis-ci.org/authentication
-token = "travis_org_access_token"
+token = "travis_org_api_token"
 
 # Another travis instance with a different name, URL and access token
 [[providers.travis]]
 name = "travis.com"
 url = "com"
-token = "travis_com_access_token"
+token = "travis_com_api_token"
 
 [[providers.appveyor]]
 # Name of the provider to be shown in the TUI (optional, default: "appveyor")
 name = "appveyor"
 # API key for accessing the AppVeyor API
-# API key can be generated here: https://ci.appveyor.com/api-keys
-token = "token"
+# Keys can be generated here: https://ci.appveyor.com/api-keys
+token = "appveyor_api_key"
 
 [[providers.circleci]]
 # Name of the provider to be shown in the TUI (optional, default: "circleci")
 name = "circleci"
 # Personal API token to access the CircleCI API
 # Tokens can be managed here: https://circleci.com/account/api
-token = "token"
+token = "circleci_api_token"
 ```
 
 # ENVIRONMENT VARIABLES
@@ -128,4 +122,9 @@ $ git commit -m 'Commit message'
 $ git push
 $ citop
 ```
+
+# NOTES
+1. https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+
+
 
