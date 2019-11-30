@@ -73,11 +73,14 @@ func TestAppVeyorJob_ToCacheJob(t *testing.T) {
 
 func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 	repo := cache.Repository{
-		AccountID: "acount",
-		ID:        42,
-		URL:       "github.com/owner/repo",
-		Owner:     "owner",
-		Name:      "repo",
+		Provider: cache.Provider{
+			ID:   "id",
+			Name: "name",
+		},
+		ID:    42,
+		URL:   "github.com/owner/repo",
+		Owner: "owner",
+		Name:  "repo",
 	}
 	b := appVeyorBuild{
 		ID:          42,
@@ -179,7 +182,10 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 		client:      &http.Client{Timeout: 10 * time.Second},
 		rateLimiter: time.Tick(time.Millisecond),
 		token:       "token",
-		accountID:   "account",
+		provider: cache.Provider{
+			ID:   "id",
+			Name: "name",
+		},
 	}
 
 	buildURL := "https://ci.appveyor.com/project/nbedos/citop/builds/29070120"
@@ -219,7 +225,10 @@ func TestCircleCIClient_Log(t *testing.T) {
 		client:      &http.Client{Timeout: 10 * time.Second},
 		rateLimiter: time.Tick(time.Millisecond),
 		token:       "token",
-		accountID:   "account",
+		provider: cache.Provider{
+			ID:   "id",
+			Name: "name",
+		},
 	}
 
 	log, err := client.Log(context.Background(), cache.Repository{}, "jobId")

@@ -175,6 +175,7 @@ func (c *Controller) process(ctx context.Context, event tcell.Event) error {
 		case tcell.KeyRune:
 			if c.inputMode {
 				c.status.InputBuffer += string(ev.Rune())
+				break
 			}
 			switch keyRune := ev.Rune(); keyRune {
 			case 'b':

@@ -17,7 +17,7 @@ var ErrRepositoryNotFound = errors.New("repository not found")
 var ErrUnknownURL = errors.New("URL not recognized")
 
 type CIProvider interface {
-	AccountID() string
+	ID() string
 	Log(ctx context.Context, repository Repository, jobID string) (string, error)
 	BuildFromURL(ctx context.Context, u string) (Build, error)
 }
@@ -77,19 +77,17 @@ func AggregateStatuses(ss []Statuser) State {
 	return state
 }
 
-type Account struct {
-	ID       string
-	URL      string
-	UserID   string
-	Username string
+type Provider struct {
+	ID   string
+	Name string
 }
 
 type Repository struct {
-	AccountID string
-	ID        int
-	URL       string
-	Owner     string
-	Name      string
+	Provider Provider
+	ID       int
+	URL      string
+	Owner    string
+	Name     string
 }
 
 func (r Repository) Slug() string {
@@ -183,7 +181,7 @@ type Cache struct {
 func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache {
 	providersByAccountID := make(map[string]CIProvider, len(CIProviders))
 	for _, provider := range CIProviders {
-		providersByAccountID[provider.AccountID()] = provider
+		providersByAccountID[provider.ID()] = provider
 	}
 
 	return Cache{
@@ -201,7 +199,7 @@ func (c *Cache) Save(build Build) error {
 		return errors.New("build.repository must not be nil")
 	}
 
-	cacheBuild, exists := c.fetchBuild(build.Repository.AccountID, build.ID)
+	cacheBuild, exists := c.fetchBuild(build.Repository.Provider.ID, build.ID)
 	// UpdatedAt does not reflect an eventual update of a job so default to always updating
 	// an active build
 	if exists && !build.State.IsActive() && !build.UpdatedAt.After(cacheBuild.UpdatedAt) {
@@ -223,7 +221,7 @@ func (c *Cache) Save(build Build) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.builds[buildKey{
-		AccountID: build.Repository.AccountID,
+		AccountID: build.Repository.Provider.ID,
 		BuildID:   build.ID,
 	}] = &build
 

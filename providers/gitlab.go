@@ -16,16 +16,19 @@ import (
 )
 
 type GitLabClient struct {
-	accountID            string
+	provider             cache.Provider
 	remote               *gitlab.Client
 	rateLimiter          <-chan time.Time
 	updateTimePerBuildID map[string]time.Time
 	mux                  *sync.Mutex
 }
 
-func NewGitLabClient(accountID string, token string, rateLimit time.Duration) GitLabClient {
+func NewGitLabClient(id string, name string, token string, rateLimit time.Duration) GitLabClient {
 	return GitLabClient{
-		accountID:            accountID,
+		provider: cache.Provider{
+			ID:   id,
+			Name: name,
+		},
 		remote:               gitlab.NewClient(nil, token),
 		rateLimiter:          time.Tick(rateLimit),
 		updateTimePerBuildID: make(map[string]time.Time),
@@ -67,8 +70,8 @@ func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, 
 	return urls, nil
 }
 
-func (c GitLabClient) AccountID() string {
-	return c.accountID
+func (c GitLabClient) ID() string {
+	return c.provider.ID
 }
 
 func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
@@ -146,11 +149,11 @@ func (c GitLabClient) Repository(ctx context.Context, slug string) (cache.Reposi
 	}
 
 	return cache.Repository{
-		ID:        project.ID,
-		Owner:     splitPath[0],
-		Name:      splitPath[1],
-		URL:       project.WebURL,
-		AccountID: c.accountID,
+		ID:       project.ID,
+		Owner:    splitPath[0],
+		Name:     splitPath[1],
+		URL:      project.WebURL,
+		Provider: c.provider,
 	}, nil
 }
 

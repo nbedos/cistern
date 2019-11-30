@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -345,4 +347,28 @@ func (d NullDuration) String() string {
 		return fmt.Sprintf("%ds", seconds)
 	}
 	return fmt.Sprintf("%dm%02ds", minutes, seconds)
+}
+
+func getEnvWithDefault(key string, d string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		value = d
+	}
+	return value
+}
+
+// Return possible locations of configuration files based on
+// https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+func XDGConfigLocations(filename string) []string {
+	confHome := getEnvWithDefault("XDG_CONFIG_HOME", path.Join(os.Getenv("HOME"), ".config"))
+	locations := []string{
+		path.Join(confHome, filename),
+	}
+
+	dirs := getEnvWithDefault("XDG_CONFIG_DIRS", "/etc/xdg")
+	for _, dir := range strings.Split(dirs, ":") {
+		locations = append(locations, path.Join(dir, filename))
+	}
+
+	return locations
 }
