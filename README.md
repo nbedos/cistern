@@ -56,6 +56,6 @@ GITHUB_API_TOKEN is mandatory and at least another variable must be set.
 # Usage
 Running `citop` in a directory containing a git repository will show pipelines associated to git HEAD
 
-See the [manual page](man/citop_pandoc.md) for additional information.
+See the [manual page](man/citop_gfm.md) for additional information.
  
 

@@ -466,6 +466,38 @@ name = \[dq]circleci\[dq]
 token = \[dq]circleci_api_token\[dq]
 \f[R]
 .fi
+.SS Examples
+.PP
+Here are a few examples of \f[C]citop.toml\f[R] configuration files.
+.PP
+Monitor pipelines on Travis CI, AppVeyor and CircleCI for a repository
+hosted on GitHub:
+.IP
+.nf
+\f[C]
+[[providers.github]]
+token = \[dq]github_api_token\[dq]
+
+[[providers.travis]]
+url = \[dq]org\[dq]
+token = \[dq]travis_org_api_token\[dq]
+
+[[providers.appveyor]]
+token = \[dq]appveyor_api_key\[dq]
+
+[[providers.circleci]]
+token = \[dq]circleci_api_token\[dq]
+\f[R]
+.fi
+.PP
+Monitor pipelines on GitLab CI for a repository hosted on GitLab itself:
+.IP
+.nf
+\f[C]
+[[providers.gitlab]]
+token = \[dq]gitlab_api_token\[dq]
+\f[R]
+.fi
 .SH ENVIRONMENT VARIABLES
 .IP \[bu] 2
 \f[C]BROWSER\f[R] is used to find the path of the default web browser

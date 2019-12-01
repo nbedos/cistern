@@ -256,6 +256,30 @@ name = "circleci"
 token = "circleci_api_token"
 ```
 
+### Examples
+Here are a few examples of `citop.toml` configuration files.
+
+Monitor pipelines on Travis CI, AppVeyor and CircleCI for a repository hosted on GitHub:
+```toml
+[[providers.github]]
+token = "github_api_token"
+
+[[providers.travis]]
+url = "org"
+token = "travis_org_api_token"
+
+[[providers.appveyor]]
+token = "appveyor_api_key"
+
+[[providers.circleci]]
+token = "circleci_api_token"
+```
+
+Monitor pipelines on GitLab CI for a repository hosted on GitLab itself:
+```toml
+[[providers.gitlab]]
+token = "gitlab_api_token"
+```
 
 # ENVIRONMENT VARIABLES
 
