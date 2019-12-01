@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"regexp"
 	"strings"
@@ -265,7 +266,7 @@ func (c Commit) Strings() []text.StyledString {
 	return texts
 }
 
-func GitOriginURL(path string) (string, Commit, error) {
+func GitOriginURL(path string, sha string) (string, Commit, error) {
 	r, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
 		return "", Commit{}, err
@@ -285,13 +286,36 @@ func GitOriginURL(path string) (string, Commit, error) {
 		return "", Commit{}, err
 	}
 
-	commit, err := r.CommitObject(head.Hash())
-	if err != nil {
+	var hash plumbing.Hash
+	if sha == "HEAD" {
+		hash = head.Hash()
+	} else {
+		hash = plumbing.NewHash(sha)
+	}
+	commit, err := r.CommitObject(hash)
+	switch err {
+	case nil:
+		// Do nothing
+	case plumbing.ErrObjectNotFound:
+		// go-git cannot resolve a revision from an abbreviated SHA. This is quite
+		// useful so, for now, circumvent the problem by using the local git binary.
+		cmd := exec.Command("git", "show", sha, "--pretty=format:%H")
+		bs, err := cmd.Output()
+		if err != nil {
+			return "", Commit{}, plumbing.ErrObjectNotFound
+		}
+
+		hash = plumbing.NewHash(strings.SplitN(string(bs), "\n", 2)[0])
+		commit, err = r.CommitObject(hash)
+		if err != nil {
+			return "", Commit{}, err
+		}
+	default:
 		return "", Commit{}, err
 	}
 
 	c := Commit{
-		Sha:      head.Hash().String(),
+		Sha:      commit.Hash.String(),
 		Author:   commit.Author.String(),
 		Date:     commit.Author.When,
 		Message:  commit.Message,

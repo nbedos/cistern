@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -160,29 +161,30 @@ func main() {
 	// FIXME Do not ignore SIGTSTP/SIGCONT
 	signal.Ignore(syscall.SIGTSTP)
 
-	var repository string
-	var commit utils.Commit
-	switch len(os.Args) {
-	case 1:
-		cwd, err := os.Getwd()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
-		repository, commit, err = utils.GitOriginURL(cwd)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
-	case 2:
-		repository = os.Args[1]
-	default:
-		fmt.Fprintln(os.Stderr, usage)
+	defaultCommit := "HEAD"
+	commitFlag := flag.String("commit", defaultCommit, "commit to monitor")
+	commitShortFlag := flag.String("c", defaultCommit, "shorthand for --commit")
+
+	flag.Parse()
+
+	sha := *commitFlag
+	if sha == defaultCommit {
+		sha = *commitShortFlag
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+
+	repository, commit, err := utils.GitOriginURL(cwd, sha)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 
 	paths := utils.XDGConfigLocations(path.Join(ConfDir, ConfFilename))
-
 	config, err := ConfigFromPaths(paths...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -190,13 +192,11 @@ func main() {
 	}
 
 	ctx := context.Background()
-
-	sourceProviders, ciProviders, err := config.Providers.Providers(context.Background())
+	sourceProviders, ciProviders, err := config.Providers.Providers(ctx)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-
 	if err := tui.RunApplication(ctx, tcell.NewScreen, repository, commit, ciProviders, sourceProviders, time.Local); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
