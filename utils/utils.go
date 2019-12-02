@@ -70,7 +70,7 @@ func DepthFirstTraversal(node TreeNode, traverseAll bool) []TreeNode {
 	return explored
 }
 
-func RepositorySlugFromURL(repositoryURL string) (string, error) {
+func RepoOwnerAndName(repositoryURL string) (string, string, error) {
 	// Turn "git@host:path.git" into "host/path" so that it is compatible with url.Parse()
 	if strings.HasPrefix(repositoryURL, "git@") {
 		repositoryURL = strings.TrimPrefix(repositoryURL, "git@")
@@ -80,17 +80,17 @@ func RepositorySlugFromURL(repositoryURL string) (string, error) {
 
 	u, err := url.Parse(repositoryURL)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	components := strings.Split(u.Path, "/")
 	if len(components) < 3 {
 		err := fmt.Errorf("invalid repository path: %q (expected at least three components)",
 			u.Path)
-		return "", err
+		return "", "", err
 	}
 
-	return strings.Join(components[1:3], "/"), nil
+	return components[1], components[2], nil
 }
 
 func Prefix(s string, prefix string) string {
@@ -302,6 +302,7 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 		cmd := exec.Command("git", "show", sha, "--pretty=format:%H")
 		bs, err := cmd.Output()
 		if err != nil {
+			// FIXME There may also be multiple commit matching the abbreviated sha
 			return "", Commit{}, plumbing.ErrObjectNotFound
 		}
 

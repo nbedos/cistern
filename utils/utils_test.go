@@ -130,16 +130,16 @@ func TestRepositorySlugFromURL(t *testing.T) {
 		"http://gitlab.com/nbedos/citop",
 		"gitlab.com/nbedos/citop",
 	}
-	expected := "nbedos/citop"
+	expectedOwner, expectedRepo := "nbedos", "citop"
 
 	for _, u := range urls {
 		t.Run(fmt.Sprintf("URL: %v", u), func(t *testing.T) {
-			slug, err := RepositorySlugFromURL(u)
+			owner, repo, err := RepoOwnerAndName(u)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if slug != expected {
-				t.Fatalf("expected %q but got %q for URL %q", expected, slug, u)
+			if owner != expectedOwner || repo != expectedRepo {
+				t.Fatalf("expected %s/%s but got %s/%s", expectedOwner, expectedRepo, owner, repo)
 			}
 		})
 	}
@@ -153,7 +153,7 @@ func TestRepositorySlugFromURL(t *testing.T) {
 
 	for _, u := range urls {
 		t.Run(fmt.Sprintf("URL: %v", u), func(t *testing.T) {
-			if _, err := RepositorySlugFromURL(u); err == nil {
+			if _, _, err := RepoOwnerAndName(u); err == nil {
 				t.Fatalf("expected error but got nil for URL %q", u)
 			}
 		})

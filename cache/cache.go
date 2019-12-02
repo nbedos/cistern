@@ -25,6 +25,7 @@ type CIProvider interface {
 type SourceProvider interface {
 	// BuildURLs must close 'urls' channel
 	BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error)
+	Commit(ctx context.Context, owner string, repo string, sha string) (utils.Commit, error)
 }
 
 type State string
@@ -321,15 +322,10 @@ func (c *Cache) MonitorPipeline(ctx context.Context, p CIProvider, u string, upd
 
 func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, commit utils.Commit, updates chan time.Time) error {
 	var err error
-	slug, err := utils.RepositorySlugFromURL(repositoryURL)
+	owner, repo, err := utils.RepoOwnerAndName(repositoryURL)
 	if err != nil {
 		return err
 	}
-	cs := strings.Split(slug, "/")
-	if len(cs) != 2 {
-		return errors.New("invalid repository slug")
-	}
-	owner, repo := cs[0], cs[1]
 
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)

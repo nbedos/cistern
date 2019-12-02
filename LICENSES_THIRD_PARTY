@@ -106,7 +106,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-====== go/pkg/mod/github.com/cenkalti/backoff/v3@v3.0.0 ======
+====== go/pkg/mod/github.com/cenkalti/backoff/v3@v3.1.1 ======
 
 The MIT License (MIT)
 
@@ -700,7 +700,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-====== go/pkg/mod/github.com/google/go-github/v28@v28.1.1 ======
+====== go/pkg/mod/github.com/google/go-github/v28@v28.1.2-0.20190908002931-9ee92864bda9 ======
 
 Copyright (c) 2013 The go-github AUTHORS. All rights reserved.
 
@@ -1077,7 +1077,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
-====== go/pkg/mod/github.com/xanzy/go-gitlab@v0.22.0 ======
+====== go/pkg/mod/github.com/xanzy/go-gitlab@v0.22.1 ======
 
 Apache License
                            Version 2.0, January 2004
@@ -1489,7 +1489,7 @@ Apache License
 
 
 
-====== go/pkg/mod/golang.org/x/crypto@v0.0.0-20191112222119-e1110fd1c708 ======
+====== go/pkg/mod/golang.org/x/crypto@v0.0.0-20191128160524-b544559bb6d1 ======
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
@@ -1520,7 +1520,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-====== go/pkg/mod/golang.org/x/net@v0.0.0-20191112182307-2180aed22343 ======
+====== go/pkg/mod/golang.org/x/net@v0.0.0-20191126235420-ef20fe5d7933 ======
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
@@ -1551,7 +1551,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-====== go/pkg/mod/golang.org/x/oauth2@v0.0.0-20190604053449-0f29369cfe45 ======
+====== go/pkg/mod/golang.org/x/oauth2@v0.0.0-20191122200657-5d9234df094c ======
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
@@ -1582,7 +1582,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-====== go/pkg/mod/golang.org/x/sys@v0.0.0-20191113165036-4c7a9d0fe056 ======
+====== go/pkg/mod/golang.org/x/sys@v0.0.0-20191128015809-6d18c012aee9 ======
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 

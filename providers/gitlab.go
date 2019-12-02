@@ -36,6 +36,49 @@ func NewGitLabClient(id string, name string, token string, rateLimit time.Durati
 	}
 }
 
+func (c GitLabClient) Commit(ctx context.Context, owner string, repo string, sha string) (utils.Commit, error) {
+	repository, err := c.Repository(ctx, fmt.Sprintf("%s/%s", owner, repo))
+	if err != nil {
+		return utils.Commit{}, err
+	}
+
+	gitlabCommit, _, err := c.remote.Commits.GetCommit(repository.ID, sha)
+	if err != nil {
+		return utils.Commit{}, err
+	}
+
+	commit := utils.Commit{
+		Sha:     gitlabCommit.ID,
+		Author:  fmt.Sprintf("%s <%s>", gitlabCommit.AuthorName, gitlabCommit.AuthorEmail),
+		Date:    *gitlabCommit.AuthoredDate,
+		Message: gitlabCommit.Message,
+	}
+
+	opt := gitlab.GetCommitRefsOptions{}
+	for {
+		refs, resp, err := c.remote.Commits.GetCommitRefs(repository.ID, commit.Sha, &opt)
+		if err != nil {
+			return utils.Commit{}, err
+		}
+
+		for _, ref := range refs {
+			switch ref.Type {
+			case "tag":
+				commit.Tags = append(commit.Tags, ref.Name)
+			case "branch":
+				commit.Branches = append(commit.Branches, ref.Name)
+			}
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+
+	return commit, nil
+}
+
 func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error) {
 	repository, err := c.Repository(ctx, fmt.Sprintf("%s/%s", owner, repo))
 	if err != nil {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"flag"
@@ -22,7 +23,7 @@ import (
 	"github.com/pelletier/go-toml"
 )
 
-const usage = "Usage: citop [repository_URL]"
+var Version = "undefined"
 
 const ConfDir = "citop"
 const ConfFilename = "citop.toml"
@@ -156,32 +157,79 @@ func (c ProvidersConfiguration) Providers(ctx context.Context) ([]cache.SourcePr
 	return source, ci, nil
 }
 
+const DefaultCommit = "HEAD"
+const DefaultRepository = "."
+
+const usage = `usage: citop [-r REPOSITORY | --repository REPOSITORY] [COMMIT]
+       citop -h | --help
+       citop --version
+
+Monitor CI pipelines associated to a commit of a git repository
+
+Positional arguments:
+  COMMIT        Specify the SHA identifier of the commit to monitor. If
+                this argument is missing, citop will monitor the commit
+                referenced by HEAD.
+
+Options:
+  -r REPOSITORY, --repository REPOSITORY
+                Specify the URL of the repository to monitor.
+                REPOSITORY is expected to be the URL of an online
+                repository hosted at GitHub or GitLab. It may be either
+                a git URL (over SSH or HTTPS) or a web URL.
+
+                In the absence of this option, citop must be run from
+                a directory containing a git repository. citop will
+                then monitor the repository identified by the first
+                push URL associated to the remote named "origin".
+
+  -h, --help    Show usage
+
+  --version     Print the version of citop being run`
+
 func main() {
 	signal.Ignore(syscall.SIGINT)
 	// FIXME Do not ignore SIGTSTP/SIGCONT
 	signal.Ignore(syscall.SIGTSTP)
 
-	defaultCommit := "HEAD"
-	commitFlag := flag.String("commit", defaultCommit, "commit to monitor")
-	commitShortFlag := flag.String("c", defaultCommit, "shorthand for --commit")
+	f := flag.NewFlagSet("citop", flag.ContinueOnError)
+	null := bytes.NewBuffer(nil)
+	f.SetOutput(null)
 
-	flag.Parse()
+	versionFlag := f.Bool("version", false, "")
+	helpFlagShort := f.Bool("h", false, "")
+	helpFlag := f.Bool("help", false, "")
+	repoFlag := f.String("repository", DefaultRepository, "")
+	repoFlagShort := f.String("r", DefaultRepository, "")
 
-	sha := *commitFlag
-	if sha == defaultCommit {
-		sha = *commitShortFlag
-	}
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+	if err := f.Parse(os.Args[1:]); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
+		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(1)
 	}
 
-	repository, commit, err := utils.GitOriginURL(cwd, sha)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+	if *versionFlag {
+		fmt.Fprintf(os.Stderr, "citop %s\n", Version)
+		os.Exit(0)
+	}
+
+	if *helpFlag || *helpFlagShort {
+		fmt.Fprintln(os.Stderr, usage)
+		os.Exit(0)
+	}
+
+	sha := DefaultCommit
+	if commits := f.Args(); len(commits) == 1 {
+		sha = commits[0]
+	} else if len(commits) > 1 {
+		fmt.Fprintln(os.Stderr, "Error: at most one commit can be specified")
+		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(1)
+	}
+
+	repo := *repoFlag
+	if repo == DefaultRepository {
+		repo = *repoFlagShort
 	}
 
 	paths := utils.XDGConfigLocations(path.Join(ConfDir, ConfFilename))
@@ -197,7 +245,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	if err := tui.RunApplication(ctx, tcell.NewScreen, repository, commit, ciProviders, sourceProviders, time.Local); err != nil {
+	if err := tui.RunApplication(ctx, tcell.NewScreen, repo, sha, ciProviders, sourceProviders, time.Local); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}

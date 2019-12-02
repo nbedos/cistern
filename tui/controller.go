@@ -220,7 +220,7 @@ func (c *Controller) process(ctx context.Context, event tcell.Event) error {
 
 				cmd := ExecCmd{
 					name: "man",
-					args: []string{path.Join(c.tempDir, path.Base(file.Name()))},
+					args: []string{"-l", path.Join(c.tempDir, path.Base(file.Name()))},
 				}
 				if err := c.tui.Exec(ctx, cmd); err != nil {
 					return err

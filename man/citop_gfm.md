@@ -4,7 +4,9 @@ citop – Continuous Integration Table Of Pipelines
 
 # SYNOPSIS
 
-**`citop`** `[--commit=COMMIT]` `[--repository=REPOSITORY]`
+**`citop`** `[-r REPOSITORY | --repository REPOSITORY] [COMMIT]`
+
+**`citop`** `-h | --help`
 
 **`citop`** `--version`
 
@@ -29,21 +31,23 @@ the service is one or both of the following:
 | CircleCI  | no     | yes | https://circleci.com/                             |
 | Travis CI | no     | yes | https://travis-ci.org/ and https://travis-ci.com/ |
 
-# OPTIONS
+# POSITIONAL ARGUMENT
 
-## `-c, --commit=COMMIT`
+## `COMMIT`
 
-Specify the commit to monitor. COMMIT is expected to be the sha1
+Specify the commit to monitor. COMMIT is expected to be the SHA
 identifier of a commit. If this option is missing, citop will monitor
 the commit referenced by HEAD.
 
 Example:
 
 ``` shell
-citop -c 64be3c6
+citop 64be3c6
 ```
 
-## `-r, --repository=REPOSITORY`
+# OPTIONS
+
+## `-r=REPOSITORY, --repository=REPOSITORY`
 
 Specify the URL of the repository to monitor. REPOSITORY is expected to
 be the URL of an online repository hosted at GitHub or GitLab. It may be
@@ -60,6 +64,10 @@ Examples:
 citop -r 'https://github.com/nbedos/citop'
 citop -r 'git@github.com:nbedos/citop.git'
 ```
+
+## `-h, --help`
+
+Show usage of citop
 
 ## `--version`
 
@@ -261,11 +269,22 @@ Monitor pipelines on GitLab CI for a repository hosted on GitLab itself:
 token = "gitlab_api_token"
 ```
 
-# ENVIRONMENT VARIABLES
+# ENVIRONMENT
+
+## ENVIRONMENT VARIABLES
 
   - `BROWSER` is used to find the path of the default web browser
   - `HOME`, `XDG_CONFIG_HOME` and `XDG_CONFIG_DIRS` are used to locate
     the configuration file
+
+## LOCAL PROGRAMS
+
+citop relies on the following local executables:
+
+  - `git` to translate the abbreviated SHA identifier of a commit into a
+    non-abbreviated SHA
+  - `less` to show job logs
+  - `man` to show the manual page
 
 # EXAMPLES
 

@@ -7,7 +7,7 @@ require (
 	github.com/gdamore/tcell v1.3.0
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.3.1
-	github.com/google/go-github/v28 v28.1.1
+	github.com/google/go-github/v28 v28.1.2-0.20190908002931-9ee92864bda9
 	github.com/lucasb-eyer/go-colorful v1.0.3 // indirect
 	github.com/mattn/go-runewidth v0.0.6
 	github.com/pelletier/go-toml v1.6.0
