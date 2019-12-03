@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <meta name="author" content="Nicolas Bedos" />
   <meta name="dcterms.date" content="2019-12-03" />
-  <title>CITOP(1) | version 0.0.0-78-geb588b5</title>
+  <title>CITOP(1) | version 0.0.0-79-g9440cfc-dirty</title>
   <style>
       code{white-space: pre-wrap;}
       span.smallcaps{font-variant: small-caps;}
@@ -20,7 +20,7 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">CITOP(1) | version 0.0.0-78-geb588b5</h1>
+<h1 class="title">CITOP(1) | version 0.0.0-79-g9440cfc-dirty</h1>
 <p class="author">Nicolas Bedos</p>
 <p class="date">December 03, 2019</p>
 </header>
@@ -89,11 +89,11 @@
 <h2 id="commit"><code>COMMIT</code></h2>
 <p>Specify the commit to monitor. COMMIT is expected to be the SHA identifier of a commit, or the name of a tag or a branch. If this option is missing citop will monitor the commit referenced by HEAD.</p>
 <p>Example:</p>
-<pre class="shell"><code># Show pipelines associated to the commit 64be3c6
+<pre class="shell"><code># Show pipelines for commit 64be3c6
 citop 64be3c6
-# Show pipelines associated to the commit referenced by the tag &#39;0.9.0&#39;
+# Show pipelines for the commit referenced by the tag &#39;0.9.0&#39;
 citop 0.9.0
-# Show pipelines associated to the commit at the tip of the branch &#39;feature/doc&#39;
+# Show pipelines for the commit at the tip of a branch
 citop feature/doc</code></pre>
 <h1 id="options">OPTIONS</h1>
 <h2 id="rrepository---repositoryrepository"><code>-r=REPOSITORY, --repository=REPOSITORY</code></h2>

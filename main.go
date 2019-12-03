@@ -157,8 +157,6 @@ func (c ProvidersConfiguration) Providers(ctx context.Context) ([]cache.SourcePr
 	return source, ci, nil
 }
 
-const DefaultCommit = "HEAD"
-
 const usage = `usage: citop [-r REPOSITORY | --repository REPOSITORY] [COMMIT]
        citop -h | --help
        citop --version
@@ -195,6 +193,7 @@ func main() {
 	null := bytes.NewBuffer(nil)
 	f.SetOutput(null)
 
+	defaultCommit := "HEAD"
 	defaultRepository, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
@@ -222,7 +221,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	sha := DefaultCommit
+	sha := defaultCommit
 	if commits := f.Args(); len(commits) == 1 {
 		sha = commits[0]
 	} else if len(commits) > 1 {

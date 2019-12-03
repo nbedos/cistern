@@ -45,11 +45,11 @@ HEAD.
 
 Example:
 ```shell
-# Show pipelines associated to the commit 64be3c6
+# Show pipelines for commit 64be3c6
 citop 64be3c6
-# Show pipelines associated to the commit referenced by the tag '0.9.0'
+# Show pipelines for the commit referenced by the tag '0.9.0'
 citop 0.9.0
-# Show pipelines associated to the commit at the tip of the branch 'feature/doc'
+# Show pipelines for the commit at the tip of a branch
 citop feature/doc
 ```
 
