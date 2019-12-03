@@ -36,13 +36,14 @@ func NewGitLabClient(id string, name string, token string, rateLimit time.Durati
 	}
 }
 
-func (c GitLabClient) Commit(ctx context.Context, owner string, repo string, sha string) (utils.Commit, error) {
-	repository, err := c.Repository(ctx, fmt.Sprintf("%s/%s", owner, repo))
-	if err != nil {
-		return utils.Commit{}, err
+func (c GitLabClient) Commit(ctx context.Context, repo string, sha string) (utils.Commit, error) {
+	host, owner, repo, err := utils.RepoHostOwnerAndName(repo)
+	if err != nil || !strings.Contains(host, c.remote.BaseURL().Hostname()) {
+		return utils.Commit{}, cache.ErrUnknownURL
 	}
 
-	gitlabCommit, _, err := c.remote.Commits.GetCommit(repository.ID, sha)
+	slug := fmt.Sprintf("%s/%s", owner, repo)
+	gitlabCommit, _, err := c.remote.Commits.GetCommit(slug, sha)
 	if err != nil {
 		return utils.Commit{}, err
 	}
@@ -56,7 +57,7 @@ func (c GitLabClient) Commit(ctx context.Context, owner string, repo string, sha
 
 	opt := gitlab.GetCommitRefsOptions{}
 	for {
-		refs, resp, err := c.remote.Commits.GetCommitRefs(repository.ID, commit.Sha, &opt)
+		refs, resp, err := c.remote.Commits.GetCommitRefs(slug, commit.Sha, &opt)
 		if err != nil {
 			return utils.Commit{}, err
 		}
@@ -80,11 +81,6 @@ func (c GitLabClient) Commit(ctx context.Context, owner string, repo string, sha
 }
 
 func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error) {
-	repository, err := c.Repository(ctx, fmt.Sprintf("%s/%s", owner, repo))
-	if err != nil {
-		return nil, err
-	}
-
 	options := gitlab.ListProjectPipelinesOptions{
 		SHA: &sha,
 	}
@@ -95,8 +91,12 @@ func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, 
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
-		pipelines, resp, err := c.remote.Pipelines.ListProjectPipelines(repository.ID, &options)
+		slug := fmt.Sprintf("%s/%s", owner, repo)
+		pipelines, resp, err := c.remote.Pipelines.ListProjectPipelines(slug, &options)
 		if err != nil {
+			if err, ok := err.(*gitlab.ErrorResponse); ok && err.Response.StatusCode == 404 {
+				return nil, cache.ErrRepositoryNotFound
+			}
 			return nil, err
 		}
 
@@ -138,7 +138,7 @@ func parseGitlabWebURL(baseURL *url.URL, u string) (string, string, int, error) 
 		return "", "", 0, err
 	}
 
-	if v.Hostname() != strings.TrimPrefix(baseURL.Hostname(), "api.") {
+	if v.Hostname() != baseURL.Hostname() {
 		return "", "", 0, cache.ErrUnknownURL
 	}
 

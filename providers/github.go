@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/google/go-github/v28/github"
@@ -31,7 +32,13 @@ func NewGitHubClient(ctx context.Context, token *string) GitHubClient {
 	}
 }
 
-func (c GitHubClient) Commit(ctx context.Context, owner string, repo string, sha string) (utils.Commit, error) {
+func (c GitHubClient) Commit(ctx context.Context, repo string, sha string) (utils.Commit, error) {
+	host, owner, repo, err := utils.RepoHostOwnerAndName(repo)
+	expectedHost := strings.TrimPrefix(c.client.BaseURL.Hostname(), "api.")
+	if err != nil || !strings.Contains(host, expectedHost) {
+		return utils.Commit{}, cache.ErrUnknownURL
+	}
+
 	repoCommit, _, err := c.client.Repositories.GetCommit(ctx, owner, repo, sha)
 	if err != nil {
 		return utils.Commit{}, err
@@ -62,7 +69,7 @@ func (c GitHubClient) Commit(ctx context.Context, owner string, repo string, sha
 
 		for _, tag := range tags {
 			if tag.GetCommit().GetSHA() == commit.Sha {
-				commit.Tags = append(commit.Branches, tag.GetName())
+				commit.Tags = append(commit.Tags, tag.GetName())
 			}
 		}
 		if resp.NextPage == 0 {

@@ -134,7 +134,7 @@ func TestRepositorySlugFromURL(t *testing.T) {
 
 	for _, u := range urls {
 		t.Run(fmt.Sprintf("URL: %v", u), func(t *testing.T) {
-			owner, repo, err := RepoOwnerAndName(u)
+			_, owner, repo, err := RepoHostOwnerAndName(u)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -153,7 +153,7 @@ func TestRepositorySlugFromURL(t *testing.T) {
 
 	for _, u := range urls {
 		t.Run(fmt.Sprintf("URL: %v", u), func(t *testing.T) {
-			if _, _, err := RepoOwnerAndName(u); err == nil {
+			if _, _, _, err := RepoHostOwnerAndName(u); err == nil {
 				t.Fatalf("expected error but got nil for URL %q", u)
 			}
 		})

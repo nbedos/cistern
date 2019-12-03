@@ -25,7 +25,7 @@ type CIProvider interface {
 type SourceProvider interface {
 	// BuildURLs must close 'urls' channel
 	BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error)
-	Commit(ctx context.Context, owner string, repo string, sha string) (utils.Commit, error)
+	Commit(ctx context.Context, repo string, sha string) (utils.Commit, error)
 }
 
 type State string
@@ -322,7 +322,7 @@ func (c *Cache) MonitorPipeline(ctx context.Context, p CIProvider, u string, upd
 
 func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, commit utils.Commit, updates chan time.Time) error {
 	var err error
-	owner, repo, err := utils.RepoOwnerAndName(repositoryURL)
+	_, owner, repo, err := utils.RepoHostOwnerAndName(repositoryURL)
 	if err != nil {
 		return err
 	}

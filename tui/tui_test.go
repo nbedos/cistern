@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -145,7 +146,11 @@ func (p mockProvider) BuildFromURL(ctx context.Context, u string) (cache.Build, 
 func TestRunApplication(t *testing.T) {
 	t.Run("no provider should cause the function to return with an error", func(t *testing.T) {
 		ctx := context.Background()
-		err := RunApplication(ctx, newScreen, ".", "HEAD", nil, nil, time.UTC)
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = RunApplication(ctx, newScreen, pwd, "HEAD", nil, nil, time.UTC)
 		if err != ErrNoProvider {
 			t.Fatalf("expected %v but got %v", ErrNoProvider, err)
 		}

@@ -158,30 +158,29 @@ func (c ProvidersConfiguration) Providers(ctx context.Context) ([]cache.SourcePr
 }
 
 const DefaultCommit = "HEAD"
-const DefaultRepository = "."
 
 const usage = `usage: citop [-r REPOSITORY | --repository REPOSITORY] [COMMIT]
        citop -h | --help
        citop --version
 
-Monitor CI pipelines associated to a commit of a git repository
+Monitor CI pipelines associated to a specific commit of a git repository
 
 Positional arguments:
-  COMMIT        Specify the SHA identifier of the commit to monitor. If
-                this argument is missing, citop will monitor the commit
-                referenced by HEAD.
+  COMMIT        Specify the commit to monitor. COMMIT is expected to be
+                the SHA identifier of a commit, or the name of a tag or
+                a branch. If this option is missing citop will monitor
+                the commit referenced by HEAD.
 
 Options:
   -r REPOSITORY, --repository REPOSITORY
-                Specify the URL of the repository to monitor.
-                REPOSITORY is expected to be the URL of an online
-                repository hosted at GitHub or GitLab. It may be either
-                a git URL (over SSH or HTTPS) or a web URL.
+                Specify the git repository to work with. REPOSITORY can
+                be either a path to a local git repository, or the URL
+                of an online repository hosted at GitHub or GitLab.
+                Both web URLs and git URLs are accepted.
 
-                In the absence of this option, citop must be run from
-                a directory containing a git repository. citop will
-                then monitor the repository identified by the first
-                push URL associated to the remote named "origin".
+                In the absence of this option, citop will work with the
+                git repository located in the current directory. If
+                there is no such repository, citop will fail.
 
   -h, --help    Show usage
 
@@ -196,11 +195,16 @@ func main() {
 	null := bytes.NewBuffer(nil)
 	f.SetOutput(null)
 
+	defaultRepository, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
+		os.Exit(1)
+	}
 	versionFlag := f.Bool("version", false, "")
 	helpFlagShort := f.Bool("h", false, "")
 	helpFlag := f.Bool("help", false, "")
-	repoFlag := f.String("repository", DefaultRepository, "")
-	repoFlagShort := f.String("r", DefaultRepository, "")
+	repoFlag := f.String("repository", defaultRepository, "")
+	repoFlagShort := f.String("r", defaultRepository, "")
 
 	if err := f.Parse(os.Args[1:]); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
@@ -228,7 +232,7 @@ func main() {
 	}
 
 	repo := *repoFlag
-	if repo == DefaultRepository {
+	if repo == defaultRepository {
 		repo = *repoFlagShort
 	}
 
