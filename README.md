@@ -18,7 +18,7 @@ The remaining steps before a first alpha release are:
 * Improving quality by adding tests
 
 # Features
-## Monitor pipelines of repositories hosted on GitHub or GitLab from the command line
+## Monitor pipelines of GitHub or GitLab repository 
 This is as simple as running `git push && citop` to monitor the pipelines triggered by your last
 `push` or running `citop <commit>` to monitor a specific commit. citop will show the status, timings
 and logs of pipelines, stages and jobs.
@@ -99,7 +99,7 @@ Options:
 ```
 
 ## Examples
-Show pipelines associated to the HEAD of the current git repository
+Show pipelines associated to the last commit of the current git repository
 ```shell
 citop
 ```
@@ -129,3 +129,12 @@ citop -r github.com/nbedos/citop 64be3c6
 ```
 
 More information is available in the [manual page](https://nbedos.github.io/citop/man.html).
+
+
+## Support
+Question, bug reports and feature requests are welcome and should be submitted [here](https://github.com/nbedos/citop/issues).
+
+## Contributing
+Pull requests are welcome. If you foresee that a PR will take any significant amount of your time,
+you probably want to open an issue first to discuss your changes and make sure they are
+likely to be accepted. 
