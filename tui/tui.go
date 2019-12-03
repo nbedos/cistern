@@ -23,7 +23,7 @@ type ExecCmd struct {
 
 var ErrNoProvider = errors.New("list of providers must not be empty")
 
-func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repositoryURL string, commit utils.Commit, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location) (err error) {
+func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, sha string, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location) (err error) {
 	if len(CIProviders) == 0 || len(SourceProviders) == 0 {
 		return ErrNoProvider
 	}
@@ -77,6 +77,21 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  v:Logs  b:Browser  ?:Help  q:Quit"
 
 	ctx, cancel := context.WithCancel(ctx)
+
+	repositoryURL, commit, err := utils.GitOriginURL(repo, sha)
+	if err != nil {
+		for i, p := range SourceProviders {
+			commit, err = p.Commit(ctx, repo, sha)
+			if err == nil {
+				repositoryURL = repo
+				break
+			}
+			if i >= len(SourceProviders)-1 {
+				return err
+			}
+		}
+	}
+
 	cacheDB := cache.NewCache(CIProviders, SourceProviders)
 	source := cacheDB.BuildsByCommit()
 

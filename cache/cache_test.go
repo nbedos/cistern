@@ -163,7 +163,9 @@ func TestBuild_Get(t *testing.T) {
 
 func TestCache_Save(t *testing.T) {
 	repository := Repository{
-		AccountID: "testAccount",
+		Provider: Provider{
+			ID: "testAccount",
+		},
 	}
 
 	t.Run("Saved build must be returned by fetchBuild()", func(t *testing.T) {
@@ -172,7 +174,7 @@ func TestCache_Save(t *testing.T) {
 		if err := c.Save(build); err != nil {
 			t.Fatal(err)
 		}
-		savedBuild, exists := c.fetchBuild(build.Repository.AccountID, build.ID)
+		savedBuild, exists := c.fetchBuild(build.Repository.Provider.ID, build.ID)
 		if !exists {
 			t.Fatal("build was not saved")
 		}
@@ -202,7 +204,7 @@ func TestCache_Save(t *testing.T) {
 		if err := c.Save(buildNew); err != nil {
 			t.Fatal(err)
 		}
-		savedBuild, exists := c.fetchBuild(buildOld.Repository.AccountID, buildNew.ID)
+		savedBuild, exists := c.fetchBuild(buildOld.Repository.Provider.ID, buildNew.ID)
 		if !exists {
 			t.Fatal("build was not saved")
 		}
@@ -233,7 +235,9 @@ func TestCache_Save(t *testing.T) {
 
 func TestCache_SaveJob(t *testing.T) {
 	repository := Repository{
-		AccountID: "testAccount",
+		Provider: Provider{
+			ID: "testAccount",
+		},
 	}
 
 	build := Build{
@@ -254,10 +258,10 @@ func TestCache_SaveJob(t *testing.T) {
 		}
 
 		job := Job{ID: "43"}
-		if err := c.SaveJob(repository.AccountID, build.ID, 0, job); err != nil {
+		if err := c.SaveJob(repository.Provider.ID, build.ID, 0, job); err != nil {
 			t.Fatal(err)
 		}
-		savedJob, _ := c.fetchJob(repository.AccountID, build.ID, 0, "43")
+		savedJob, _ := c.fetchJob(repository.Provider.ID, build.ID, 0, "43")
 		if diff := cmp.Diff(savedJob, job); len(diff) > 0 {
 			t.Fatal(diff)
 		}
@@ -270,10 +274,10 @@ func TestCache_SaveJob(t *testing.T) {
 		}
 
 		job := Job{ID: "45"}
-		if err := c.SaveJob(repository.AccountID, build.ID, 43, job); err != nil {
+		if err := c.SaveJob(repository.Provider.ID, build.ID, 43, job); err != nil {
 			t.Fatal(err)
 		}
-		savedJob, exists := c.fetchJob(repository.AccountID, build.ID, 43, "45")
+		savedJob, exists := c.fetchJob(repository.Provider.ID, build.ID, 43, "45")
 		if !exists {
 			t.Fatal("job not found")
 		}
@@ -288,7 +292,7 @@ func TestCache_SaveJob(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := c.SaveJob(repository.AccountID, build.ID, 404, Job{ID: "45"}); err == nil {
+		if err := c.SaveJob(repository.Provider.ID, build.ID, 404, Job{ID: "45"}); err == nil {
 			t.Fatal("expected error but got nil")
 		}
 	})
@@ -296,7 +300,9 @@ func TestCache_SaveJob(t *testing.T) {
 
 func TestCache_Builds(t *testing.T) {
 	repository := Repository{
-		AccountID: "testAccount",
+		Provider: Provider{
+			ID: "testAccount",
+		},
 	}
 
 	ids := []string{"1", "2", "3", "4"}
@@ -308,7 +314,7 @@ func TestCache_Builds(t *testing.T) {
 	}
 
 	for _, id := range ids {
-		_, exists := c.fetchBuild(repository.AccountID, id)
+		_, exists := c.fetchBuild(repository.Provider.ID, id)
 		if !exists {
 			t.Fatal("build not found")
 		}
@@ -320,9 +326,9 @@ type mockProvider struct {
 	builds []Build
 }
 
-func (p mockProvider) AccountID() string { return p.id }
+func (p mockProvider) ID() string { return p.id }
 func (p mockProvider) Log(ctx context.Context, repository Repository, jobID string) (string, error) {
-	return p.id + "\n", nil
+	return "log\n", nil
 }
 func (p mockProvider) BuildFromURL(ctx context.Context, u string) (Build, error) {
 	return Build{}, nil
@@ -341,8 +347,12 @@ func TestCache_WriteLog(t *testing.T) {
 
 		builds := []Build{
 			{
-				Repository: &Repository{AccountID: "provider1"},
-				ID:         "1",
+				Repository: &Repository{
+					Provider: Provider{
+						ID: "provider1",
+					},
+				},
+				ID: "1",
 				Jobs: []*Job{
 					{
 						ID:    "1",
@@ -353,9 +363,30 @@ func TestCache_WriteLog(t *testing.T) {
 					},
 				},
 			},
-			{Repository: &Repository{AccountID: "provider1"}, ID: "2"},
-			{Repository: &Repository{AccountID: "provider1"}, ID: "3"},
-			{Repository: &Repository{AccountID: "provider1"}, ID: "4"},
+			{
+				Repository: &Repository{
+					Provider: Provider{
+						ID: "provider1",
+					},
+				},
+				ID: "2",
+			},
+			{
+				Repository: &Repository{
+					Provider: Provider{
+						ID: "provider1",
+					},
+				},
+				ID: "3",
+			},
+			{
+				Repository: &Repository{
+					Provider: Provider{
+						ID: "provider1",
+					},
+				},
+				ID: "4",
+			},
 		}
 
 		for _, build := range builds {
@@ -370,7 +401,7 @@ func TestCache_WriteLog(t *testing.T) {
 		}
 
 		// Value return by provider.Log()
-		expected := "provider1\n"
+		expected := "log\n"
 		if buf.String() != expected {
 			t.Fatalf("expected %q but got %q", expected, buf.String())
 		}
@@ -381,8 +412,12 @@ func TestCache_WriteLog(t *testing.T) {
 		c := NewCache([]CIProvider{mockProvider{id: "provider1"}}, nil)
 		builds := []Build{
 			{
-				Repository: &Repository{AccountID: "provider1"},
-				ID:         "1",
+				Repository: &Repository{
+					Provider: Provider{
+						ID: "provider1",
+					},
+				},
+				ID: "1",
 				Jobs: []*Job{
 					{
 						ID:    "1",
@@ -394,9 +429,29 @@ func TestCache_WriteLog(t *testing.T) {
 					},
 				},
 			},
-			{Repository: &Repository{AccountID: "provider1"}, ID: "2"},
-			{Repository: &Repository{AccountID: "provider1"}, ID: "3"},
-			{Repository: &Repository{AccountID: "provider1"}, ID: "4"},
+			{
+				Repository: &Repository{
+					Provider: Provider{
+						ID: "provider1",
+					},
+				},
+				ID: "2",
+			},
+			{
+				Repository: &Repository{
+					Provider: Provider{
+						ID: "provider1",
+					},
+				}, ID: "3",
+			},
+			{
+				Repository: &Repository{
+					Provider: Provider{
+						ID: "provider1",
+					},
+				},
+				ID: "4",
+			},
 		}
 
 		for _, build := range builds {
@@ -420,8 +475,12 @@ func TestCache_WriteLog(t *testing.T) {
 	t.Run("requesting log of non existent job must return an error", func(t *testing.T) {
 		c := NewCache([]CIProvider{mockProvider{id: "provider1"}}, nil)
 		build := Build{
-			Repository: &Repository{AccountID: "provider1"},
-			ID:         "1",
+			Repository: &Repository{
+				Provider: Provider{
+					ID: "provider1",
+				},
+			},
+			ID: "1",
 			Jobs: []*Job{
 				{
 					ID:    "1",

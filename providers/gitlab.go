@@ -16,16 +16,19 @@ import (
 )
 
 type GitLabClient struct {
-	accountID            string
+	provider             cache.Provider
 	remote               *gitlab.Client
 	rateLimiter          <-chan time.Time
 	updateTimePerBuildID map[string]time.Time
 	mux                  *sync.Mutex
 }
 
-func NewGitLabClient(accountID string, token string, rateLimit time.Duration) GitLabClient {
+func NewGitLabClient(id string, name string, token string, rateLimit time.Duration) GitLabClient {
 	return GitLabClient{
-		accountID:            accountID,
+		provider: cache.Provider{
+			ID:   id,
+			Name: name,
+		},
 		remote:               gitlab.NewClient(nil, token),
 		rateLimiter:          time.Tick(rateLimit),
 		updateTimePerBuildID: make(map[string]time.Time),
@@ -33,12 +36,51 @@ func NewGitLabClient(accountID string, token string, rateLimit time.Duration) Gi
 	}
 }
 
-func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error) {
-	repository, err := c.Repository(ctx, fmt.Sprintf("%s/%s", owner, repo))
-	if err != nil {
-		return nil, err
+func (c GitLabClient) Commit(ctx context.Context, repo string, sha string) (utils.Commit, error) {
+	host, owner, repo, err := utils.RepoHostOwnerAndName(repo)
+	if err != nil || !strings.Contains(host, c.remote.BaseURL().Hostname()) {
+		return utils.Commit{}, cache.ErrUnknownURL
 	}
 
+	slug := fmt.Sprintf("%s/%s", owner, repo)
+	gitlabCommit, _, err := c.remote.Commits.GetCommit(slug, sha)
+	if err != nil {
+		return utils.Commit{}, err
+	}
+
+	commit := utils.Commit{
+		Sha:     gitlabCommit.ID,
+		Author:  fmt.Sprintf("%s <%s>", gitlabCommit.AuthorName, gitlabCommit.AuthorEmail),
+		Date:    *gitlabCommit.AuthoredDate,
+		Message: gitlabCommit.Message,
+	}
+
+	opt := gitlab.GetCommitRefsOptions{}
+	for {
+		refs, resp, err := c.remote.Commits.GetCommitRefs(slug, commit.Sha, &opt)
+		if err != nil {
+			return utils.Commit{}, err
+		}
+
+		for _, ref := range refs {
+			switch ref.Type {
+			case "tag":
+				commit.Tags = append(commit.Tags, ref.Name)
+			case "branch":
+				commit.Branches = append(commit.Branches, ref.Name)
+			}
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+
+	return commit, nil
+}
+
+func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error) {
 	options := gitlab.ListProjectPipelinesOptions{
 		SHA: &sha,
 	}
@@ -49,8 +91,12 @@ func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, 
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
-		pipelines, resp, err := c.remote.Pipelines.ListProjectPipelines(repository.ID, &options)
+		slug := fmt.Sprintf("%s/%s", owner, repo)
+		pipelines, resp, err := c.remote.Pipelines.ListProjectPipelines(slug, &options)
 		if err != nil {
+			if err, ok := err.(*gitlab.ErrorResponse); ok && err.Response.StatusCode == 404 {
+				return nil, cache.ErrRepositoryNotFound
+			}
 			return nil, err
 		}
 
@@ -67,8 +113,8 @@ func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, 
 	return urls, nil
 }
 
-func (c GitLabClient) AccountID() string {
-	return c.accountID
+func (c GitLabClient) ID() string {
+	return c.provider.ID
 }
 
 func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
@@ -92,7 +138,7 @@ func parseGitlabWebURL(baseURL *url.URL, u string) (string, string, int, error) 
 		return "", "", 0, err
 	}
 
-	if v.Hostname() != strings.TrimPrefix(baseURL.Hostname(), "api.") {
+	if v.Hostname() != baseURL.Hostname() {
 		return "", "", 0, cache.ErrUnknownURL
 	}
 
@@ -146,11 +192,11 @@ func (c GitLabClient) Repository(ctx context.Context, slug string) (cache.Reposi
 	}
 
 	return cache.Repository{
-		ID:        project.ID,
-		Owner:     splitPath[0],
-		Name:      splitPath[1],
-		URL:       project.WebURL,
-		AccountID: c.accountID,
+		ID:       project.ID,
+		Owner:    splitPath[0],
+		Name:     splitPath[1],
+		URL:      project.WebURL,
+		Provider: c.provider,
 	}, nil
 }
 

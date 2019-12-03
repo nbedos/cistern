@@ -35,20 +35,26 @@ func TestTravisClientfetchBuild(t *testing.T) {
 	}
 
 	client := TravisClient{
-		baseURL:        *URL,
-		httpClient:     ts.Client(),
-		rateLimiter:    time.Tick(time.Millisecond),
-		token:          "token",
-		accountID:      "travis",
+		baseURL:     *URL,
+		httpClient:  ts.Client(),
+		rateLimiter: time.Tick(time.Millisecond),
+		token:       "token",
+		provider: cache.Provider{
+			ID:   "id",
+			Name: "name",
+		},
 		buildsPageSize: 10,
 	}
 
 	repository := cache.Repository{
-		AccountID: "account",
-		ID:        42,
-		URL:       "github.com/nbedos/citop",
-		Owner:     "nbedos",
-		Name:      "citop",
+		Provider: cache.Provider{
+			ID:   "id",
+			Name: "name",
+		},
+		ID:    42,
+		URL:   "github.com/nbedos/citop",
+		Owner: "nbedos",
+		Name:  "citop",
 	}
 
 	build, err := client.fetchBuild(context.Background(), &repository, "609256446")
@@ -227,11 +233,14 @@ func TestTravisClientRepository(t *testing.T) {
 	}
 
 	client := TravisClient{
-		baseURL:        *URL,
-		httpClient:     ts.Client(),
-		rateLimiter:    time.Tick(time.Millisecond),
-		token:          "token",
-		accountID:      "travis",
+		baseURL:     *URL,
+		httpClient:  ts.Client(),
+		rateLimiter: time.Tick(time.Millisecond),
+		token:       "token",
+		provider: cache.Provider{
+			ID:   "id",
+			Name: "name",
+		},
 		buildsPageSize: 10,
 	}
 
@@ -242,11 +251,14 @@ func TestTravisClientRepository(t *testing.T) {
 		}
 
 		expected := cache.Repository{
-			AccountID: "travis",
-			ID:        25564643,
-			URL:       "https://github.com/nbedos/citop",
-			Owner:     "nbedos",
-			Name:      "citop",
+			Provider: cache.Provider{
+				ID:   "id",
+				Name: "name",
+			},
+			ID:    25564643,
+			URL:   "https://github.com/nbedos/citop",
+			Owner: "nbedos",
+			Name:  "citop",
 		}
 
 		if diff := cmp.Diff(expected, repository); diff != "" {

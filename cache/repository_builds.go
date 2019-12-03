@@ -150,7 +150,7 @@ func buildRowFromBuild(b Build) buildRow {
 		key: buildRowKey{
 			ref:       ref,
 			sha:       b.Commit.Sha,
-			accountID: b.Repository.AccountID,
+			accountID: b.Repository.Provider.ID,
 			buildID:   b.ID,
 		},
 		type_:      "P",
@@ -161,7 +161,7 @@ func buildRowFromBuild(b Build) buildRow {
 		updatedAt:  utils.NullTime{Time: b.UpdatedAt, Valid: true},
 		url:        b.WebURL,
 		duration:   b.Duration,
-		provider:   b.Repository.AccountID,
+		provider:   b.Repository.Provider.Name,
 	}
 
 	// Prefix only numeric IDs with hash
@@ -172,7 +172,7 @@ func buildRowFromBuild(b Build) buildRow {
 	}
 
 	for _, job := range b.Jobs {
-		child := buildRowFromJob(b.Repository.AccountID, b.Commit.Sha, ref, b.ID, 0, *job)
+		child := buildRowFromJob(b.Repository.Provider, b.Commit.Sha, ref, b.ID, 0, *job)
 		row.children = append(row.children, &child)
 	}
 
@@ -182,19 +182,19 @@ func buildRowFromBuild(b Build) buildRow {
 	}
 	sort.Ints(stageIDs)
 	for _, stageID := range stageIDs {
-		child := buildRowFromStage(b.Repository.AccountID, b.Commit.Sha, ref, b.ID, b.WebURL, *b.Stages[stageID])
+		child := buildRowFromStage(b.Repository.Provider, b.Commit.Sha, ref, b.ID, b.WebURL, *b.Stages[stageID])
 		row.children = append(row.children, &child)
 	}
 
 	return row
 }
 
-func buildRowFromStage(accountID string, sha string, ref string, buildID string, webURL string, s Stage) buildRow {
+func buildRowFromStage(provider Provider, sha string, ref string, buildID string, webURL string, s Stage) buildRow {
 	row := buildRow{
 		key: buildRowKey{
 			ref:       ref,
 			sha:       sha,
-			accountID: accountID,
+			accountID: provider.ID,
 			buildID:   buildID,
 			stageID:   s.ID,
 		},
@@ -202,7 +202,7 @@ func buildRowFromStage(accountID string, sha string, ref string, buildID string,
 		state:    s.State,
 		name:     s.Name,
 		url:      webURL,
-		provider: accountID,
+		provider: provider.Name,
 	}
 
 	// We aggregate jobs by name and only keep the most recent to weed out previous runs of the job.
@@ -230,14 +230,14 @@ func buildRowFromStage(accountID string, sha string, ref string, buildID string,
 	}
 
 	for _, job := range s.Jobs {
-		child := buildRowFromJob(accountID, sha, ref, buildID, s.ID, *job)
+		child := buildRowFromJob(provider, sha, ref, buildID, s.ID, *job)
 		row.children = append(row.children, &child)
 	}
 
 	return row
 }
 
-func buildRowFromJob(accountID string, sha string, ref string, buildID string, stageID int, j Job) buildRow {
+func buildRowFromJob(provider Provider, sha string, ref string, buildID string, stageID int, j Job) buildRow {
 	name := j.Name
 	if name == "" {
 		name = j.ID
@@ -246,7 +246,7 @@ func buildRowFromJob(accountID string, sha string, ref string, buildID string, s
 		key: buildRowKey{
 			ref:       ref,
 			sha:       sha,
-			accountID: accountID,
+			accountID: provider.ID,
 			buildID:   buildID,
 			stageID:   stageID,
 			jobID:     j.ID,
@@ -260,7 +260,7 @@ func buildRowFromJob(accountID string, sha string, ref string, buildID string, s
 		updatedAt:  utils.MaxNullTime(j.FinishedAt, j.StartedAt, j.CreatedAt),
 		url:        j.WebURL,
 		duration:   j.Duration,
-		provider:   accountID,
+		provider:   provider.Name,
 	}
 }
 

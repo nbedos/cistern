@@ -43,13 +43,13 @@ func fromTravisState(s string) cache.State {
 	}
 }
 
-func (r travisRepository) toCacheRepository(accountID string) cache.Repository {
+func (r travisRepository) toCacheRepository(provider cache.Provider) cache.Repository {
 	return cache.Repository{
-		ID:        r.ID,
-		AccountID: accountID,
-		URL:       fmt.Sprintf("https://github.com/%v", r.Slug), // FIXME
-		Name:      r.Name,
-		Owner:     r.Owner.Login,
+		ID:       r.ID,
+		Provider: provider,
+		URL:      fmt.Sprintf("https://github.com/%v", r.Slug), // FIXME
+		Name:     r.Name,
+		Owner:    r.Owner.Login,
 	}
 }
 
@@ -62,7 +62,7 @@ type travisCommit struct {
 	Date string `json:"committed_at"`
 }
 
-func (c travisCommit) toCacheCommit(accountID string, repository *cache.Repository) (cache.Commit, error) {
+func (c travisCommit) toCacheCommit() (cache.Commit, error) {
 	committedAt, err := utils.NullTimeFromString(c.Date)
 	if err != nil {
 		return cache.Commit{}, err
@@ -99,8 +99,8 @@ type travisBuild struct {
 	Jobs []travisJob
 }
 
-func (b travisBuild) toCacheBuild(accountID string, repository *cache.Repository, webURL string) (build cache.Build, err error) {
-	commit, err := b.Commit.toCacheCommit(accountID, repository)
+func (b travisBuild) toCacheBuild(repository *cache.Repository, webURL string) (build cache.Build, err error) {
+	commit, err := b.Commit.toCacheCommit()
 	if err != nil {
 		return build, err
 	}
@@ -279,26 +279,29 @@ type TravisClient struct {
 	logBackoffInterval time.Duration
 	buildsPageSize     int
 	token              string
-	accountID          string
+	provider           cache.Provider
 }
 
 var TravisOrgURL = url.URL{Scheme: "https", Host: "api.travis-ci.org"}
 var TravisComURL = url.URL{Scheme: "https", Host: "api.travis-ci.com"}
 
-func NewTravisClient(accountID string, token string, URL url.URL, rateLimit time.Duration) TravisClient {
+func NewTravisClient(id string, name string, token string, URL url.URL, rateLimit time.Duration) TravisClient {
 	return TravisClient{
 		baseURL:            URL,
 		httpClient:         &http.Client{Timeout: 10 * time.Second},
 		rateLimiter:        time.Tick(rateLimit),
 		logBackoffInterval: 10 * time.Second,
 		token:              token,
-		accountID:          accountID,
-		buildsPageSize:     10,
+		provider: cache.Provider{
+			ID:   id,
+			Name: name,
+		},
+		buildsPageSize: 10,
 	}
 }
 
-func (c TravisClient) AccountID() string {
-	return c.accountID
+func (c TravisClient) ID() string {
+	return c.provider.ID
 }
 
 func (c TravisClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
@@ -355,7 +358,7 @@ func (c TravisClient) repository(ctx context.Context, slug string) (cache.Reposi
 		return cache.Repository{}, err
 	}
 
-	return travisRepo.toCacheRepository(c.accountID), nil
+	return travisRepo.toCacheRepository(c.provider), nil
 }
 
 func (c TravisClient) webURL(repository cache.Repository) (url.URL, error) {
@@ -436,7 +439,7 @@ func (c TravisClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 	if err != nil {
 		return cache.Build{}, err
 	}
-	cacheBuild, err := build.toCacheBuild(c.accountID, repository, webURL.String())
+	cacheBuild, err := build.toCacheBuild(repository, webURL.String())
 	if err != nil {
 		return cache.Build{}, err
 	}

@@ -17,7 +17,7 @@ var ErrRepositoryNotFound = errors.New("repository not found")
 var ErrUnknownURL = errors.New("URL not recognized")
 
 type CIProvider interface {
-	AccountID() string
+	ID() string
 	Log(ctx context.Context, repository Repository, jobID string) (string, error)
 	BuildFromURL(ctx context.Context, u string) (Build, error)
 }
@@ -25,6 +25,7 @@ type CIProvider interface {
 type SourceProvider interface {
 	// BuildURLs must close 'urls' channel
 	BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error)
+	Commit(ctx context.Context, repo string, sha string) (utils.Commit, error)
 }
 
 type State string
@@ -77,19 +78,17 @@ func AggregateStatuses(ss []Statuser) State {
 	return state
 }
 
-type Account struct {
-	ID       string
-	URL      string
-	UserID   string
-	Username string
+type Provider struct {
+	ID   string
+	Name string
 }
 
 type Repository struct {
-	AccountID string
-	ID        int
-	URL       string
-	Owner     string
-	Name      string
+	Provider Provider
+	ID       int
+	URL      string
+	Owner    string
+	Name     string
 }
 
 func (r Repository) Slug() string {
@@ -183,7 +182,7 @@ type Cache struct {
 func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache {
 	providersByAccountID := make(map[string]CIProvider, len(CIProviders))
 	for _, provider := range CIProviders {
-		providersByAccountID[provider.AccountID()] = provider
+		providersByAccountID[provider.ID()] = provider
 	}
 
 	return Cache{
@@ -201,7 +200,7 @@ func (c *Cache) Save(build Build) error {
 		return errors.New("build.repository must not be nil")
 	}
 
-	cacheBuild, exists := c.fetchBuild(build.Repository.AccountID, build.ID)
+	cacheBuild, exists := c.fetchBuild(build.Repository.Provider.ID, build.ID)
 	// UpdatedAt does not reflect an eventual update of a job so default to always updating
 	// an active build
 	if exists && !build.State.IsActive() && !build.UpdatedAt.After(cacheBuild.UpdatedAt) {
@@ -223,7 +222,7 @@ func (c *Cache) Save(build Build) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.builds[buildKey{
-		AccountID: build.Repository.AccountID,
+		AccountID: build.Repository.Provider.ID,
 		BuildID:   build.ID,
 	}] = &build
 
@@ -323,15 +322,10 @@ func (c *Cache) MonitorPipeline(ctx context.Context, p CIProvider, u string, upd
 
 func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, commit utils.Commit, updates chan time.Time) error {
 	var err error
-	slug, err := utils.RepositorySlugFromURL(repositoryURL)
+	_, owner, repo, err := utils.RepoHostOwnerAndName(repositoryURL)
 	if err != nil {
 		return err
 	}
-	cs := strings.Split(slug, "/")
-	if len(cs) != 2 {
-		return errors.New("invalid repository slug")
-	}
-	owner, repo := cs[0], cs[1]
 
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
+	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -67,7 +70,7 @@ func DepthFirstTraversal(node TreeNode, traverseAll bool) []TreeNode {
 	return explored
 }
 
-func RepositorySlugFromURL(repositoryURL string) (string, error) {
+func RepoHostOwnerAndName(repositoryURL string) (string, string, string, error) {
 	// Turn "git@host:path.git" into "host/path" so that it is compatible with url.Parse()
 	if strings.HasPrefix(repositoryURL, "git@") {
 		repositoryURL = strings.TrimPrefix(repositoryURL, "git@")
@@ -77,17 +80,26 @@ func RepositorySlugFromURL(repositoryURL string) (string, error) {
 
 	u, err := url.Parse(repositoryURL)
 	if err != nil {
-		return "", err
+		return "", "", "", err
+	}
+	if u.Host == "" && !strings.Contains(repositoryURL, "://") {
+		// example.com/aaa/bbb is parsed as url.URL{Host: "", Path:"example.com/aaa/bbb"}
+		// but we expect url.URL{Host: "example.com", Path:"/aaa/bbb"}. Adding a scheme fixes this.
+		//
+		u, err = url.Parse("https://" + repositoryURL)
+		if err != nil {
+			return "", "", "", err
+		}
 	}
 
 	components := strings.Split(u.Path, "/")
 	if len(components) < 3 {
 		err := fmt.Errorf("invalid repository path: %q (expected at least three components)",
 			u.Path)
-		return "", err
+		return "", "", "", err
 	}
 
-	return strings.Join(components[1:3], "/"), nil
+	return u.Hostname(), components[1], components[2], nil
 }
 
 func Prefix(s string, prefix string) string {
@@ -263,7 +275,22 @@ func (c Commit) Strings() []text.StyledString {
 	return texts
 }
 
-func GitOriginURL(path string) (string, Commit, error) {
+func GitOriginURL(path string, sha string) (string, Commit, error) {
+	// If a path does not refer to an existing file or directory, go-git will continue
+	// running and will walk its way up the directory structure looking for a .git repository.
+	// This is not ideal for us since running 'citop -r github.com/owner/remoterepo' from
+	// /home/user/localrepo will make go-git look for a .git repository in
+	// /home/user/localrepo/github.com/owner/remoterepo which will inevitably lead to
+	// /home/user/localrepo which is not what the user expected since the user was
+	// refering to the online repository https://github.com/owner/remoterepo. So instead
+	// we bail out early if the path is invalid, meaning it's not a local path but a URL.
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			err = plumbing.ErrObjectNotFound
+		}
+		return "", Commit{}, err
+	}
+
 	r, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
 		return "", Commit{}, err
@@ -283,13 +310,41 @@ func GitOriginURL(path string) (string, Commit, error) {
 		return "", Commit{}, err
 	}
 
-	commit, err := r.CommitObject(head.Hash())
-	if err != nil {
+	var hash plumbing.Hash
+	if sha == "HEAD" {
+		hash = head.Hash()
+	} else {
+		p, err := r.ResolveRevision(plumbing.Revision(sha))
+		if err != nil {
+			return "", Commit{}, err
+		}
+		hash = *p
+	}
+	commit, err := r.CommitObject(hash)
+	switch err {
+	case nil:
+		// Do nothing
+	case plumbing.ErrObjectNotFound:
+		// go-git cannot resolve a revision from an abbreviated SHA. This is quite
+		// useful so, for now, circumvent the problem by using the local git binary.
+		cmd := exec.Command("git", "show", sha, "--pretty=format:%H")
+		bs, err := cmd.Output()
+		if err != nil {
+			// FIXME There may also be multiple commit matching the abbreviated sha
+			return "", Commit{}, plumbing.ErrObjectNotFound
+		}
+
+		hash = plumbing.NewHash(strings.SplitN(string(bs), "\n", 2)[0])
+		commit, err = r.CommitObject(hash)
+		if err != nil {
+			return "", Commit{}, err
+		}
+	default:
 		return "", Commit{}, err
 	}
 
 	c := Commit{
-		Sha:      head.Hash().String(),
+		Sha:      commit.Hash.String(),
 		Author:   commit.Author.String(),
 		Date:     commit.Author.When,
 		Message:  commit.Message,
@@ -345,4 +400,28 @@ func (d NullDuration) String() string {
 		return fmt.Sprintf("%ds", seconds)
 	}
 	return fmt.Sprintf("%dm%02ds", minutes, seconds)
+}
+
+func getEnvWithDefault(key string, d string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		value = d
+	}
+	return value
+}
+
+// Return possible locations of configuration files based on
+// https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+func XDGConfigLocations(filename string) []string {
+	confHome := getEnvWithDefault("XDG_CONFIG_HOME", path.Join(os.Getenv("HOME"), ".config"))
+	locations := []string{
+		path.Join(confHome, filename),
+	}
+
+	dirs := getEnvWithDefault("XDG_CONFIG_DIRS", "/etc/xdg")
+	for _, dir := range strings.Split(dirs, ":") {
+		locations = append(locations, path.Join(dir, filename))
+	}
+
+	return locations
 }

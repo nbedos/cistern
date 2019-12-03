@@ -175,6 +175,7 @@ func (c *Controller) process(ctx context.Context, event tcell.Event) error {
 		case tcell.KeyRune:
 			if c.inputMode {
 				c.status.InputBuffer += string(ev.Rune())
+				break
 			}
 			switch keyRune := ev.Rune(); keyRune {
 			case 'b':
@@ -218,8 +219,8 @@ func (c *Controller) process(ctx context.Context, event tcell.Event) error {
 				}
 
 				cmd := ExecCmd{
-					name: "less",
-					args: []string{path.Join(c.tempDir, path.Base(file.Name()))},
+					name: "man",
+					args: []string{"-l", path.Join(c.tempDir, path.Base(file.Name()))},
 				}
 				if err := c.tui.Exec(ctx, cmd); err != nil {
 					return err

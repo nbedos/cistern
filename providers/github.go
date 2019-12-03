@@ -2,11 +2,14 @@ package providers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/google/go-github/v28/github"
 	"github.com/nbedos/citop/cache"
+	"github.com/nbedos/citop/utils"
 	"golang.org/x/oauth2"
 )
 
@@ -29,6 +32,55 @@ func NewGitHubClient(ctx context.Context, token *string) GitHubClient {
 	}
 }
 
+func (c GitHubClient) Commit(ctx context.Context, repo string, sha string) (utils.Commit, error) {
+	host, owner, repo, err := utils.RepoHostOwnerAndName(repo)
+	expectedHost := strings.TrimPrefix(c.client.BaseURL.Hostname(), "api.")
+	if err != nil || !strings.Contains(host, expectedHost) {
+		return utils.Commit{}, cache.ErrUnknownURL
+	}
+
+	repoCommit, _, err := c.client.Repositories.GetCommit(ctx, owner, repo, sha)
+	if err != nil {
+		return utils.Commit{}, err
+	}
+
+	githubCommit := repoCommit.Commit
+	commit := utils.Commit{
+		Sha:     repoCommit.GetSHA(),
+		Author:  fmt.Sprintf("%s <%s>", githubCommit.GetAuthor().GetName(), githubCommit.GetAuthor().GetEmail()),
+		Date:    githubCommit.GetAuthor().GetDate(),
+		Message: githubCommit.GetMessage(),
+	}
+
+	branches, _, err := c.client.Repositories.ListBranchesHeadCommit(ctx, owner, repo, commit.Sha)
+	if err != nil {
+		return utils.Commit{}, err
+	}
+	for _, branch := range branches {
+		commit.Branches = append(commit.Branches, branch.GetName())
+	}
+
+	opt := github.ListOptions{}
+	for {
+		tags, resp, err := c.client.Repositories.ListTags(ctx, owner, repo, &opt)
+		if err != nil {
+			return utils.Commit{}, err
+		}
+
+		for _, tag := range tags {
+			if tag.GetCommit().GetSHA() == commit.Sha {
+				commit.Tags = append(commit.Tags, tag.GetName())
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+
+	return commit, nil
+}
+
 func (c GitHubClient) BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error) {
 	errc := make(chan error)
 
@@ -36,36 +88,52 @@ func (c GitHubClient) BuildURLs(ctx context.Context, owner string, repo string, 
 	mux := sync.Mutex{}
 
 	go func() {
-		statuses, _, err := c.client.Repositories.ListStatuses(ctx, owner, repo, sha, nil)
-		if err != nil {
-			errc <- err
-			return
-		}
-		for _, status := range statuses {
-			if status.TargetURL == nil {
-				continue
+		opt := github.ListOptions{}
+		for {
+			statuses, resp, err := c.client.Repositories.ListStatuses(ctx, owner, repo, sha, &opt)
+			if err != nil {
+				errc <- err
+				return
 			}
-			mux.Lock()
-			previousURLs[*status.TargetURL] = struct{}{}
-			mux.Unlock()
+			for _, status := range statuses {
+				if status.TargetURL == nil {
+					continue
+				}
+				mux.Lock()
+				previousURLs[*status.TargetURL] = struct{}{}
+				mux.Unlock()
+			}
+
+			if resp.NextPage == 0 {
+				break
+			}
+			opt.Page = resp.NextPage
 		}
 		errc <- nil
 	}()
 
 	go func() {
-		runs, _, err := c.client.Checks.ListCheckRunsForRef(ctx, owner, repo, sha, nil)
-		if err != nil {
-			errc <- err
-			return
-		}
-
-		for _, run := range runs.CheckRuns {
-			if run == nil || run.DetailsURL == nil {
-				continue
+		opt := github.ListCheckRunsOptions{}
+		for {
+			runs, resp, err := c.client.Checks.ListCheckRunsForRef(ctx, owner, repo, sha, &opt)
+			if err != nil {
+				errc <- err
+				return
 			}
-			mux.Lock()
-			previousURLs[*run.DetailsURL] = struct{}{}
-			mux.Unlock()
+
+			for _, run := range runs.CheckRuns {
+				if run == nil || run.DetailsURL == nil {
+					continue
+				}
+				mux.Lock()
+				previousURLs[*run.DetailsURL] = struct{}{}
+				mux.Unlock()
+			}
+
+			if resp.NextPage == 0 {
+				break
+			}
+			opt.Page = resp.NextPage
 		}
 		errc <- nil
 	}()

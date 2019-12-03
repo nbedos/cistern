@@ -21,7 +21,7 @@ type AppVeyorClient struct {
 	client      *http.Client
 	rateLimiter <-chan time.Time
 	token       string
-	accountID   string
+	provider    cache.Provider
 }
 
 var appVeyorURL = url.URL{
@@ -31,18 +31,21 @@ var appVeyorURL = url.URL{
 	RawPath: "/api",
 }
 
-func NewAppVeyorClient(accountID string, token string, rateLimit time.Duration) AppVeyorClient {
+func NewAppVeyorClient(id string, name string, token string, rateLimit time.Duration) AppVeyorClient {
 	return AppVeyorClient{
 		url:         appVeyorURL,
 		client:      &http.Client{Timeout: 10 * time.Second},
 		rateLimiter: time.Tick(rateLimit),
 		token:       token,
-		accountID:   accountID,
+		provider: cache.Provider{
+			ID:   id,
+			Name: name,
+		},
 	}
 }
 
-func (c AppVeyorClient) AccountID() string {
-	return c.accountID
+func (c AppVeyorClient) ID() string {
+	return c.provider.ID
 }
 
 func (c AppVeyorClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
@@ -152,11 +155,11 @@ func (c AppVeyorClient) fetchBuild(ctx context.Context, owner string, repoName s
 	version := b.Builds[0].Version
 
 	repository := cache.Repository{
-		AccountID: c.accountID,
-		ID:        b.Project.ID,
-		URL:       "",
-		Owner:     b.Project.Owner,
-		Name:      b.Project.Name,
+		Provider: c.provider,
+		ID:       b.Project.ID,
+		URL:      "",
+		Owner:    b.Project.Owner,
+		Name:     b.Project.Name,
 	}
 
 	endpoint := c.url
@@ -171,7 +174,7 @@ func (c AppVeyorClient) fetchBuild(ctx context.Context, owner string, repoName s
 		return cache.Build{}, err
 	}
 
-	return bVersion.Build.toCacheBuild(c.accountID, &repository)
+	return bVersion.Build.toCacheBuild(c.provider.ID, &repository)
 }
 
 // Extract owner, repository and build ID from web URL of build

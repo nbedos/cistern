@@ -22,7 +22,7 @@ type CircleCIClient struct {
 	httpClient  *http.Client
 	rateLimiter <-chan time.Time
 	token       string
-	accountID   string
+	provider    cache.Provider
 	mux         *sync.Mutex
 }
 
@@ -33,14 +33,17 @@ var CircleCIURL = url.URL{
 	RawPath: "api/v1.1",
 }
 
-func NewCircleCIClient(accountID string, token string, URL url.URL, rateLimit time.Duration) CircleCIClient {
+func NewCircleCIClient(id string, name string, token string, URL url.URL, rateLimit time.Duration) CircleCIClient {
 	return CircleCIClient{
 		baseURL:     URL,
 		httpClient:  &http.Client{Timeout: 10 * time.Second},
 		rateLimiter: time.Tick(rateLimit),
 		token:       token,
-		accountID:   accountID,
 		mux:         &sync.Mutex{},
+		provider: cache.Provider{
+			ID:   id,
+			Name: name,
+		},
 	}
 }
 
@@ -157,8 +160,8 @@ func (c CircleCIClient) projectEndpoint(owner string, name string) url.URL {
 	return endpoint
 }
 
-func (c CircleCIClient) AccountID() string {
-	return c.accountID
+func (c CircleCIClient) ID() string {
+	return c.provider.ID
 }
 
 func (c CircleCIClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
@@ -224,10 +227,10 @@ func (c *CircleCIClient) repository(ctx context.Context, owner string, repo stri
 
 	// FIXME What about repository.ID?
 	return cache.Repository{
-		AccountID: c.accountID,
-		URL:       fmt.Sprintf("https://github.com/%s/%s", owner, repo),
-		Owner:     owner,
-		Name:      repo,
+		Provider: c.provider,
+		URL:      fmt.Sprintf("https://github.com/%s/%s", owner, repo),
+		Owner:    owner,
+		Name:     repo,
 	}, nil
 }
 
@@ -246,7 +249,7 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 		return build, err
 	}
 
-	build, err = circleCIBuild.ToCacheBuild(c.accountID, repo)
+	build, err = circleCIBuild.ToCacheBuild(c.provider.ID, repo)
 	if err != nil {
 		return build, err
 	}

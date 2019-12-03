@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"github.com/gdamore/tcell"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/text"
-	"github.com/nbedos/citop/utils"
 )
 
 var newScreen = func() (tcell.Screen, error) {
@@ -146,7 +146,11 @@ func (p mockProvider) BuildFromURL(ctx context.Context, u string) (cache.Build, 
 func TestRunApplication(t *testing.T) {
 	t.Run("no provider should cause the function to return with an error", func(t *testing.T) {
 		ctx := context.Background()
-		err := RunApplication(ctx, newScreen, "https://example.com/owner/project", utils.Commit{}, nil, nil, time.UTC)
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = RunApplication(ctx, newScreen, pwd, "HEAD", nil, nil, time.UTC)
 		if err != ErrNoProvider {
 			t.Fatalf("expected %v but got %v", ErrNoProvider, err)
 		}

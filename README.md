@@ -1,13 +1,12 @@
 [![Travis Build Status](https://travis-ci.org/nbedos/citop.svg?branch=master)](https://travis-ci.org/nbedos/citop/builds)
 
 # citop
-A UNIX program that displays information about pipelines of continuous
-integration services. citop stands for Continous Integration Table Of Pipelines.
+A UNIX program that displays information about pipelines of Continuous
+Integration services. citop stands for Continous Integration Table Of Pipelines.
 
 ![User Interface](citop.svg)
 
-[Live demo \[SVG, 290kB\]](https://nbedos.github.io/citop/demo.svg)
-
+[Animated demo \[SVG, 290kB\]](https://nbedos.github.io/citop/demo.svg)
 
 # Project status
 citop is under active development and not yet ready for public release.
@@ -15,47 +14,127 @@ citop is under active development and not yet ready for public release.
 Integration with a few CI providers has been implemented and is usable.
 
 The remaining steps before a first alpha release are:
-* Implementing the SourceProvider interface for GitLab
-* Allowing application configuration (essentially for credentials in a first time)
+* Implementing application configuration (essentially for credentials in a first time)
 * Improving quality by adding tests
- 
-# Use cases
-The first use case I aim to address with citop is **following the status of CI pipelines
-from the command line**. I've always found it cumbersome to go look for a pipeline on the website
-of a CI provider after running `git push`. I'd much rather have a terminal application that defaults
-to listing the builds associated to git HEAD since it's almost always what I need.
-
-Another use case that I'd like to address is **monitoring pipelines from multiple providers in a
-single location**. Most CI providers have free plans for free software making it tempting to use several providers for redundancy or for testing on multiple platforms. Relying on multiple providers is made easier when all pipelines can be monitored with a single application.      
 
 # Features
-* Display builds associated to git HEAD
-* Update build status in quasi real time
-* Show job log in `$PAGER`
-* Integrates with travis CI, AppVeyor, CircleCI and GitLab 
+## Monitor pipelines of GitHub or GitLab repository 
+This is as simple as running `git push && citop` to monitor the pipelines triggered by your last
+`push` or running `citop <commit>` to monitor a specific commit. citop will show the status, timings
+and logs of pipelines, stages and jobs.
+
+## Integration with Travis CI, AppVeyor, CircleCI and GitLab CI
+For repositories that rely on multiple CI providers this allows monitoring pipelines of multiple
+providers in a single place.
+
+## Quick access to pipeline web pages
+Just select the pipeline, stage or job you're interested in and press 'b' to open the corresponding
+web page on the CI provider's website. This gives easy access to features offered by CI providers
+that are not implemented by citop (pipeline cancellation, artifact download...)
 
 # Installation
-Install from source by running the following commands. Requires golang >= 1.12.
+Install from source by running the following commands. Requires golang >= 1.12 and a UNIX system.
 ```shell
 $ git clone git@github.com:nbedos/citop.git
 $ go build .
-``` 
+```
 
 # Configuration
-For now configuration is done via environment variables. Set the following variables with
-a valid API token.
+citop requires access to various APIs. Credentials are stored in a configuration file located
+at `$XDG_CONFIG_HOME/citop/citop.toml` which usually defaults to `~/.config/citop/citop.toml`.
 
-* `GITHUB_API_TOKEN`
-* `TRAVIS_API_TOKEN`
-* `GITLAB_API_TOKEN`
-* `CIRCLECI_API_TOKEN`
-* `APPVEYOR_API_TOKEN`
+Below is an example of a minimal configuration file. Each API token must be replaced by your own
+token. For each service, the [manual page](https://nbedos.github.io/citop/man.html) has a link
+to the web page dedicated to API token management.
+```toml
+[[providers.github]]
+token = "github_api_token"
 
-GITHUB_API_TOKEN is mandatory and at least another variable must be set.
+[[providers.gitlab]]
+token = "gitlab_api_token"
+
+[[providers.travis]]
+url = "org"
+token = "travis_org_api_token"
+
+[[providers.appveyor]]
+token = "appveyor_api_key"
+
+[[providers.circleci]]
+token = "circleci_api_token"
+```
+
+You may remove the section for any one service but do note that citop needs access to at
+least one of GitLab or GitHub (depending on where your repositories are hosted) and at least one
+of GitLab, Travis, AppVeyor or CircleCI depending on which CI provider you use.
 
 # Usage
-Running `citop` in a directory containing a git repository will show pipelines associated to git HEAD
+```
+usage: citop [-r REPOSITORY | --repository REPOSITORY] [COMMIT]
+       citop -h | --help
+       citop --version
 
-See the [manual page](./man/citop.md) for additional information.
- 
+Monitor CI pipelines associated to a specific commit of a git repository
 
+Positional arguments:
+  COMMIT        Specify the commit to monitor. COMMIT is expected to be
+                the SHA identifier of a commit, or the name of a tag or
+                a branch. If this option is missing citop will monitor
+                the commit referenced by HEAD.
+
+Options:
+  -r REPOSITORY, --repository REPOSITORY
+                Specify the git repository to work with. REPOSITORY can
+                be either a path to a local git repository, or the URL
+                of an online repository hosted at GitHub or GitLab.
+                Both web URLs and git URLs are accepted.
+
+                In the absence of this option, citop will work with the
+                git repository located in the current directory. If
+                there is no such repository, citop will fail.
+
+  -h, --help    Show usage
+
+  --version     Print the version of citop being run
+```
+
+## Examples
+Show pipelines associated to the last commit of the current git repository
+```shell
+citop
+```
+
+Show pipelines associated to a specific commit, tag or branch
+```shell
+citop 64be3c6
+citop 0.9.0
+citop feature/doc
+```
+
+Show pipelines of a repository specified by a URL
+```shell
+citop -r https://gitlab.com/nbedos/citop
+citop -r git@github.com:nbedos/citop.git
+citop -r github.com/nbedos/citop
+```
+
+Show pipelines of a local repository specified by a path
+```shell
+citop -r /home/user/repos/myrepo
+```
+
+Specify both repository and commit
+```shell
+citop -r github.com/nbedos/citop 64be3c6
+```
+
+More information is available in the [manual page](https://nbedos.github.io/citop/man.html).
+
+
+## Support
+Question, bug reports and feature requests are welcome and should be submitted [here](https://github.com/nbedos/citop/issues).
+
+## Contributing
+Pull requests are welcome. If you foresee that a PR will take any significant amount of your time,
+you probably want to open an issue first to discuss your changes and make sure they are
+likely to be accepted. 

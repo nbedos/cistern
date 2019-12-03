@@ -13,11 +13,14 @@ import (
 
 var build = Build{
 	Repository: &Repository{
-		AccountID: "provider",
-		ID:        42,
-		URL:       "github.com/owner/project",
-		Owner:     "owner",
-		Name:      "project",
+		Provider: Provider{
+			ID:   "id",
+			Name: "name",
+		},
+		ID:    42,
+		URL:   "github.com/owner/project",
+		Owner: "owner",
+		Name:  "project",
 	},
 	ID: "42",
 	Commit: Commit{
@@ -60,13 +63,13 @@ var buildAsRow = buildRow{
 	key: buildRowKey{
 		ref:       "master",
 		sha:       "c2bb562365d40caec0b37138f73a87b6339a8b7a",
-		accountID: "provider",
+		accountID: "id",
 		buildID:   "42",
 	},
 	type_:    "P",
 	state:    "passed",
 	name:     "#42",
-	provider: "provider",
+	provider: "name",
 	prefix:   "",
 	createdAt: utils.NullTime{
 		Valid: true,
@@ -105,14 +108,14 @@ var stageAsRow = buildRow{
 	key: buildRowKey{
 		ref:       "master",
 		sha:       "c2bb562365d40caec0b37138f73a87b6339a8b7a",
-		accountID: "provider",
+		accountID: "id",
 		buildID:   "42",
 		stageID:   1,
 	},
 	type_:    "S",
 	state:    "passed",
 	name:     "test",
-	provider: "provider",
+	provider: "name",
 	createdAt: utils.NullTime{
 		Valid: true,
 		Time:  time.Date(2019, 11, 13, 13, 12, 11, 0, time.UTC),
@@ -168,7 +171,7 @@ var jobAsRow = buildRow{
 	key: buildRowKey{
 		ref:       "master",
 		sha:       "c2bb562365d40caec0b37138f73a87b6339a8b7a",
-		accountID: "provider",
+		accountID: "id",
 		buildID:   "42",
 		stageID:   1,
 		jobID:     "54",
@@ -176,7 +179,7 @@ var jobAsRow = buildRow{
 	type_:    "J",
 	state:    "passed",
 	name:     "golang 1.12",
-	provider: "provider",
+	provider: "name",
 	createdAt: utils.NullTime{
 		Valid: true,
 		Time:  time.Date(2019, 11, 13, 13, 12, 11, 0, time.UTC),
@@ -201,7 +204,11 @@ var jobAsRow = buildRow{
 }
 
 func Test_buildRowFromJob(t *testing.T) {
-	row := buildRowFromJob(build.Repository.AccountID, build.Commit.Sha, build.Ref, build.ID, 1, job)
+	p := Provider{
+		ID:   "id",
+		Name: "name",
+	}
+	row := buildRowFromJob(p, build.Commit.Sha, build.Ref, build.ID, 1, job)
 	if diff := row.Diff(jobAsRow); diff != "" {
 		t.Log(diff)
 		t.Fail()
@@ -209,7 +216,11 @@ func Test_buildRowFromJob(t *testing.T) {
 }
 
 func Test_buildRowFromStage(t *testing.T) {
-	row := buildRowFromStage(build.Repository.AccountID, build.Commit.Sha, build.Ref, build.ID, build.WebURL, stage)
+	p := Provider{
+		ID:   "id",
+		Name: "name",
+	}
+	row := buildRowFromStage(p, build.Commit.Sha, build.Ref, build.ID, build.WebURL, stage)
 	if diff := row.Diff(stageAsRow); diff != "" {
 		t.Log(diff)
 		t.Fail()
@@ -282,7 +293,7 @@ func TestBuildRow_Tabular(t *testing.T) {
 			"CREATED":  "Nov 13 13:12",
 			"DURATION": "3s",
 			"FINISHED": "Nov 13 13:12",
-			"NAME":     "provider",
+			"NAME":     "name",
 			"REF":      "master",
 			"STARTED":  "Nov 13 13:12",
 			"STATE":    "passed",
@@ -322,7 +333,7 @@ func TestBuildsByCommit_WriteToDisk(t *testing.T) {
 	builds := []Build{build}
 	c := NewCache([]CIProvider{
 		mockProvider{
-			id:     "provider",
+			id:     "id",
 			builds: builds,
 		},
 	}, nil)
@@ -363,7 +374,7 @@ func TestBuildsByCommit_WriteToDisk(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if log := "provider\n"; string(p) != log {
+		if log := "log\n"; string(p) != log {
 			t.Fatalf("expected %q but got %q", log, string(p))
 		}
 	})
