@@ -41,6 +41,7 @@ type ProvidersConfiguration struct {
 	CircleCI []ProviderConfiguration
 	Travis   []ProviderConfiguration
 	AppVeyor []ProviderConfiguration
+	Azure    []ProviderConfiguration
 }
 
 type Configuration struct {
@@ -154,6 +155,19 @@ func (c ProvidersConfiguration) Providers(ctx context.Context) ([]cache.SourcePr
 		ci = append(ci, client)
 	}
 
+	for i, conf := range c.Azure {
+		rateLimit := time.Second / 10
+		if conf.RequestsPerSecond > 0 {
+			rateLimit = time.Second / time.Duration(conf.RequestsPerSecond)
+		}
+		id := fmt.Sprintf("azure-%d", i)
+		name := "azure"
+		if conf.Name != "" {
+			name = conf.Name
+		}
+		client := providers.NewAzurePipelinesClient(id, name, conf.Token, rateLimit)
+		ci = append(ci, client)
+	}
 	return source, ci, nil
 }
 

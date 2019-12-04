@@ -246,13 +246,8 @@ func (j travisJob) toCacheJob(build *cache.Build, stage *cache.Stage, webURL str
 		}
 	}
 
-	if job.StartedAt.Valid && job.FinishedAt.Valid {
-		d := int64(job.FinishedAt.Time.Sub(job.StartedAt.Time).Seconds())
-		job.Duration = utils.NullDuration{
-			Valid:    true,
-			Duration: time.Duration(d) * time.Second,
-		}
-	}
+	job.Duration = utils.NullSub(job.FinishedAt, job.StartedAt)
+	job.Duration.Duration.Truncate(time.Second)
 
 	return job, nil
 }

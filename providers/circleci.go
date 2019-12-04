@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/nbedos/citop/cache"
@@ -23,7 +22,6 @@ type CircleCIClient struct {
 	rateLimiter <-chan time.Time
 	token       string
 	provider    cache.Provider
-	mux         *sync.Mutex
 }
 
 var CircleCIURL = url.URL{
@@ -39,7 +37,6 @@ func NewCircleCIClient(id string, name string, token string, URL url.URL, rateLi
 		httpClient:  &http.Client{Timeout: 10 * time.Second},
 		rateLimiter: time.Tick(rateLimit),
 		token:       token,
-		mux:         &sync.Mutex{},
 		provider: cache.Provider{
 			ID:   id,
 			Name: name,

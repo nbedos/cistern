@@ -402,6 +402,13 @@ func (d NullDuration) String() string {
 	return fmt.Sprintf("%dm%02ds", minutes, seconds)
 }
 
+func NullSub(after NullTime, before NullTime) NullDuration {
+	return NullDuration{
+		Valid:    after.Valid && before.Valid,
+		Duration: after.Time.Sub(before.Time),
+	}
+}
+
 func getEnvWithDefault(key string, d string) string {
 	value := os.Getenv(key)
 	if value == "" {

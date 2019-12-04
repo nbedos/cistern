@@ -91,7 +91,7 @@ stages:
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
 
-   - job: macoOS_10_14
+   - job: macOS_10_14
      pool:
        vmImage: 'macOS-10.14'
      steps:

@@ -273,13 +273,7 @@ func (b appVeyorBuild) toCacheBuild(accountID string, repo *cache.Repository) (c
 		return build, err
 	}
 
-	if build.FinishedAt.Valid && build.StartedAt.Valid {
-		build.Duration = utils.NullDuration{
-			Valid:    true,
-			Duration: build.FinishedAt.Time.Sub(build.StartedAt.Time),
-		}
-	}
-
+	build.Duration = utils.NullSub(build.FinishedAt, build.StartedAt)
 	build.WebURL = fmt.Sprintf("https://ci.appveyor.com/project/%s/%s/builds/%d",
 		url.PathEscape(repo.Owner), url.PathEscape(repo.Name), b.ID)
 
@@ -329,12 +323,7 @@ func (j appVeyorJob) toCacheJob(id string, buildURL string) (cache.Job, error) {
 	if err != nil {
 		return job, err
 	}
-	if job.FinishedAt.Valid && job.StartedAt.Valid {
-		job.Duration = utils.NullDuration{
-			Valid:    true,
-			Duration: job.FinishedAt.Time.Sub(job.StartedAt.Time),
-		}
-	}
+	job.Duration = utils.NullSub(job.FinishedAt, job.StartedAt)
 
 	return job, nil
 }
