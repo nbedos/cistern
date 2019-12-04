@@ -11,9 +11,9 @@ variables:
   modulePath: '$(GOPATH)/src/github.com/$(build.repository.name)' # Path to the module's code
 
 stages:
- - stage: 'Run unit tests'
+ - stage: tests
    jobs:
-   - job: 'Ubuntu 16.04'
+   - job: Ubuntu_16_04
      pool:
        vmImage: 'ubuntu-16.04'
      steps:
@@ -39,7 +39,7 @@ stages:
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
 
-   - job: 'Ubuntu 18.04'
+   - job: Ubuntu_18_04
      pool:
        vmImage: 'ubuntu-18.04'
      steps:
@@ -65,7 +65,7 @@ stages:
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
 
-   - job: 'macOS-10.13'
+   - job:  macOS_10_13
      pool:
        vmImage: 'macOS-10.13'
      steps:
@@ -91,7 +91,7 @@ stages:
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
 
-   - job: 'macoOS-10.14'
+   - job: macoOS_10_14
      pool:
        vmImage: 'macOS-10.14'
      steps:
