@@ -80,7 +80,7 @@ func (c GitLabClient) Commit(ctx context.Context, repo string, sha string) (util
 	return commit, nil
 }
 
-func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error) {
+func (c GitLabClient) buildURLsPipelines(ctx context.Context, owner string, repo string, sha string) ([]string, error) {
 	options := gitlab.ListProjectPipelinesOptions{
 		SHA: &sha,
 	}
@@ -109,6 +109,65 @@ func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, 
 		}
 		options.Page = resp.NextPage
 	}
+
+	return urls, nil
+}
+
+func (c GitLabClient) buildURLsStatuses(ctx context.Context, owner string, repo string, sha string) ([]string, error) {
+	options := gitlab.GetCommitStatusesOptions{}
+	urls := make([]string, 0)
+	for {
+		select {
+		case <-c.rateLimiter:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		slug := fmt.Sprintf("%s/%s", owner, repo)
+		statuses, resp, err := c.remote.Commits.GetCommitStatuses(slug, sha, &options)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, status := range statuses {
+			if status.TargetURL != "" {
+				urls = append(urls, status.TargetURL)
+			}
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		options.Page = resp.NextPage
+	}
+
+	return urls, nil
+}
+
+func (c GitLabClient) BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error) {
+	errc := make(chan error)
+	ctx, cancel := context.WithCancel(ctx)
+	var statusURLs []string
+	go func() {
+		var err error
+		statusURLs, err = c.buildURLsStatuses(ctx, owner, repo, sha)
+		errc <- err
+	}()
+
+	var pipelineURLs []string
+	go func() {
+		var err error
+		pipelineURLs, err = c.buildURLsPipelines(ctx, owner, repo, sha)
+		errc <- err
+	}()
+
+	var err error
+	for i := 0; i < 2; i++ {
+		if e := <-errc; e != nil && err == nil {
+			cancel()
+			err = e
+		}
+	}
+	urls := append(pipelineURLs, statusURLs...)
 
 	return urls, nil
 }
