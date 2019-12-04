@@ -14,10 +14,11 @@ import (
 )
 
 type GitHubClient struct {
+	id     string
 	client *github.Client
 }
 
-func NewGitHubClient(ctx context.Context, token *string) GitHubClient {
+func NewGitHubClient(ctx context.Context, id string, token *string) GitHubClient {
 	var httpClient *http.Client
 
 	if token != nil {
@@ -28,8 +29,13 @@ func NewGitHubClient(ctx context.Context, token *string) GitHubClient {
 	}
 
 	return GitHubClient{
+		id:     id,
 		client: github.NewClient(httpClient),
 	}
+}
+
+func (c GitHubClient) ID() string {
+	return c.id
 }
 
 func (c GitHubClient) Commit(ctx context.Context, repo string, sha string) (utils.Commit, error) {

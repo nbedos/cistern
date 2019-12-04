@@ -94,8 +94,9 @@ func (c ProvidersConfiguration) Providers(ctx context.Context) ([]cache.SourcePr
 		ci = append(ci, client)
 	}
 
-	for _, conf := range c.GitHub {
-		client := providers.NewGitHubClient(ctx, &conf.Token)
+	for i, conf := range c.GitHub {
+		id := fmt.Sprintf("github-%d", i)
+		client := providers.NewGitHubClient(ctx, id, &conf.Token)
 		source = append(source, client)
 	}
 

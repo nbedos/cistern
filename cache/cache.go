@@ -23,6 +23,7 @@ type CIProvider interface {
 }
 
 type SourceProvider interface {
+	ID() string
 	// BuildURLs must close 'urls' channel
 	BuildURLs(ctx context.Context, owner string, repo string, sha string) ([]string, error)
 	Commit(ctx context.Context, repo string, sha string) (utils.Commit, error)
@@ -356,7 +357,7 @@ func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, commit u
 
 				us, err := p.BuildURLs(ctx, owner, repo, commit.Sha)
 				if err != nil {
-					errc <- err
+					errc <- fmt.Errorf("provider %s: %v (%s@%s/%s)", p.ID(), err, commit.Sha, owner, repo)
 					return
 				}
 				for _, u := range us {
@@ -367,7 +368,7 @@ func (c *Cache) GetPipelines(ctx context.Context, repositoryURL string, commit u
 							defer wg.Done()
 							err := c.MonitorPipeline(ctx, p, u, updates)
 							if err != nil && err != ErrUnknownURL {
-								errc <- err
+								errc <- fmt.Errorf("provider %s: MonitorPipeline failed with %v (%s)", p.ID(), err, u)
 								return
 							}
 						}(p, u)
@@ -396,8 +397,10 @@ errLoop:
 			}
 		}
 
-		cancel()
-		err = e
+		if err == nil {
+			cancel()
+			err = e
+		}
 	}
 
 	return err

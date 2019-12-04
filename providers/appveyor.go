@@ -270,7 +270,13 @@ func (b appVeyorBuild) toCacheBuild(accountID string, repo *cache.Repository) (c
 		return build, err
 	}
 	if build.UpdatedAt, err = time.Parse(time.RFC3339, b.UpdatedAt); err != nil {
-		return build, err
+		// Best effort since it sometimes happens that UpdatedAt is null but another date is
+		// available
+		nullUpdateAt := utils.MinNullTime(build.CreatedAt, build.StartedAt, build.FinishedAt)
+		if !nullUpdateAt.Valid {
+			return build, err
+		}
+		build.UpdatedAt = nullUpdateAt.Time
 	}
 
 	build.Duration = utils.NullSub(build.FinishedAt, build.StartedAt)
