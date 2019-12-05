@@ -284,7 +284,7 @@ func (c AzurePipelinesClient) getTimeline(ctx context.Context, u string) (map[in
 			recordsByID[record.ID] = &record
 		}
 
-		if strings.ToLower(record.Type) == "job" {
+		if strings.ToLower(record.Type) == "job" && record.Log.URL != "" {
 			u, err := url.Parse(record.Log.URL)
 			if err != nil {
 				return nil, err

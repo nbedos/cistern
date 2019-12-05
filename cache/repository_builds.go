@@ -17,8 +17,6 @@ import (
 	"github.com/nbedos/citop/utils"
 )
 
-var shaLength = 7
-
 type buildRowKey struct {
 	ref       string
 	sha       string
