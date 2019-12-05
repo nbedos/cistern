@@ -38,6 +38,7 @@ stages:
      - script: go test -v ./...
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
+       failOnStderr: false
 
    - job: Ubuntu_18_04
      pool:
@@ -64,55 +65,5 @@ stages:
      - script: go test -v ./...
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
+       failOnStderr: false
 
-   - job:  macOS_10_13
-     pool:
-       vmImage: 'macOS-10.13'
-     steps:
-     - script: |
-         mkdir -p '$(GOBIN)'
-         mkdir -p '$(GOPATH)/pkg'
-         mkdir -p '$(modulePath)'
-         shopt -s extglob
-         shopt -s dotglob
-         mv !(gopath) '$(modulePath)'
-         echo '##vso[task.prependpath]$(GOBIN)'
-         echo '##vso[task.prependpath]$(GOROOT)/bin'
-       displayName: 'Set up the Go workspace'
-
-     - script: |
-         go version
-         go get -v -t -d ./...
-         go build -v .
-       workingDirectory: '$(modulePath)'
-       displayName: 'Build'
-
-     - script: go test -v ./...
-       workingDirectory: '$(modulePath)'
-       displayName: 'Run unit tests'
-
-   - job: macOS_10_14
-     pool:
-       vmImage: 'macOS-10.14'
-     steps:
-     - script: |
-         mkdir -p '$(GOBIN)'
-         mkdir -p '$(GOPATH)/pkg'
-         mkdir -p '$(modulePath)'
-         shopt -s extglob
-         shopt -s dotglob
-         mv !(gopath) '$(modulePath)'
-         echo '##vso[task.prependpath]$(GOBIN)'
-         echo '##vso[task.prependpath]$(GOROOT)/bin'
-       displayName: 'Set up the Go workspace'
-
-     - script: |
-         go version
-         go get -v -t -d ./...
-         go build -v .
-       workingDirectory: '$(modulePath)'
-       displayName: 'Build'
-
-     - script: go test -v ./...
-       workingDirectory: '$(modulePath)'
-       displayName: 'Run unit tests'
