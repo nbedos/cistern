@@ -38,7 +38,6 @@ stages:
      - script: go test -v ./...
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
-       failOnStderr: false
 
    - job: Ubuntu_18_04
      pool:
@@ -65,5 +64,4 @@ stages:
      - script: go test -v ./...
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
-       failOnStderr: false
 
