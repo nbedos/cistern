@@ -1,0 +1,133 @@
+{
+    "count": 1,
+    "value": [
+        {
+            "_links": {
+                "self": {
+                    "href": "https://example.com/owner/repo/_apis/build/Builds/16"
+                },
+                "web": {
+                    "href": "https://example.com/owner/repo/_build/results?buildId=16"
+                },
+                "sourceVersionDisplayUri": {
+                    "href": "https://example.com/owner/repo/_apis/build/builds/16/sources"
+                },
+                "timeline": {
+                    "href": "https://example.com/owner/repo/_apis/build/builds/16/Timeline"
+                },
+                "badge": {
+                    "href": "https://example.com/owner/repo/_apis/build/status/2"
+                }
+            },
+            "properties": {},
+            "tags": [],
+            "validationResults": [],
+            "plans": [
+                {
+                    "planId": "8181923c-4508-4427-8ae3-1002b791fd01"
+                }
+            ],
+            "triggerInfo": {},
+            "id": 16,
+            "buildNumber": "20191204.3",
+            "status": "completed",
+            "result": "failed",
+            "queueTime": "2019-12-04T13:09:34.7341612Z",
+            "startTime": "2019-12-04T13:09:52.764105Z",
+            "finishTime": "2019-12-04T13:11:34.3397013Z",
+            "url": "https://example.com/owner/repo/_apis/build/Builds/16",
+            "definition": {
+                "drafts": [],
+                "id": 2,
+                "name": "owner.repo (1)",
+                "url": "https://example.com/owner/repo/_apis/build/Definitions/2?revision=1",
+                "uri": "vstfs:///Build/Definition/2",
+                "path": "\\",
+                "type": "build",
+                "queueStatus": "enabled",
+                "revision": 1,
+                "project": {
+                    "id": "repo",
+                    "name": "repo",
+                    "url": "https://example.com/owner/_apis/projects/repo",
+                    "state": "wellFormed",
+                    "revision": 21,
+                    "visibility": "public",
+                    "lastUpdateTime": "2019-10-14T15:49:49.11Z"
+                }
+            },
+            "buildNumberRevision": 3,
+            "project": {
+                "id": "repo",
+                "name": "repo",
+                "url": "https://example.com/owner/_apis/projects/repo",
+                "state": "wellFormed",
+                "revision": 21,
+                "visibility": "public",
+                "lastUpdateTime": "2019-10-14T15:49:49.11Z"
+            },
+            "uri": "vstfs:///Build/Build/16",
+            "sourceBranch": "refs/heads/azure-pipelines",
+            "sourceVersion": "5e4d496d63086609cb3c03aa0ee4e032e4b6b08b",
+            "priority": "normal",
+            "reason": "individualCI",
+            "requestedFor": {
+                "displayName": "GitHub",
+                "url": "https://spsprodweu1.vssps.visualstudio.com/A8e8d198d-3913-4a06-9119-22ecb4964068/_apis/Identities/3135c409-e54e-4a5a-9618-07f9a208d710",
+                "_links": {
+                    "avatar": {
+                        "href": "https://example.com/owner/_apis/GraphProfile/MemberAvatars/svc.OGU4ZDE5OGQtMzkxMy00YTA2LTkxMTktMjJlY2I0OTY0MDY4OkdpdEh1YiBBcHA6NTE5MGVlN2ItZDgyNi00NDVlLWIxOWUtNmRjMDk4YmUwNDM2"
+                    }
+                },
+                "id": "3135c409-e54e-4a5a-9618-07f9a208d710",
+                "uniqueName": null,
+                "imageUrl": null,
+                "descriptor": "svc.OGU4ZDE5OGQtMzkxMy00YTA2LTkxMTktMjJlY2I0OTY0MDY4OkdpdEh1YiBBcHA6NTE5MGVlN2ItZDgyNi00NDVlLWIxOWUtNmRjMDk4YmUwNDM2"
+            },
+            "requestedBy": {
+                "displayName": "GitHub",
+                "url": "https://spsprodweu1.vssps.visualstudio.com/A8e8d198d-3913-4a06-9119-22ecb4964068/_apis/Identities/3135c409-e54e-4a5a-9618-07f9a208d710",
+                "_links": {
+                    "avatar": {
+                        "href": "https://example.com/owner/_apis/GraphProfile/MemberAvatars/svc.OGU4ZDE5OGQtMzkxMy00YTA2LTkxMTktMjJlY2I0OTY0MDY4OkdpdEh1YiBBcHA6NTE5MGVlN2ItZDgyNi00NDVlLWIxOWUtNmRjMDk4YmUwNDM2"
+                    }
+                },
+                "id": "3135c409-e54e-4a5a-9618-07f9a208d710",
+                "uniqueName": null,
+                "imageUrl": null,
+                "descriptor": "svc.OGU4ZDE5OGQtMzkxMy00YTA2LTkxMTktMjJlY2I0OTY0MDY4OkdpdEh1YiBBcHA6NTE5MGVlN2ItZDgyNi00NDVlLWIxOWUtNmRjMDk4YmUwNDM2"
+            },
+            "lastChangedDate": "2019-12-04T13:11:34.487Z",
+            "lastChangedBy": {
+                "displayName": "Microsoft.VisualStudio.Services.TFS",
+                "url": "https://spsprodweu1.vssps.visualstudio.com/A8e8d198d-3913-4a06-9119-22ecb4964068/_apis/Identities/00000002-0000-8888-8000-000000000000",
+                "_links": {
+                    "avatar": {
+                        "href": "https://example.com/owner/_apis/GraphProfile/MemberAvatars/s2s.MDAwMDAwMDItMDAwMC04ODg4LTgwMDAtMDAwMDAwMDAwMDAwQDJjODk1OTA4LTA0ZTAtNDk1Mi04OWZkLTU0YjAwNDZkNjI4OA"
+                    }
+                },
+                "id": "00000002-0000-8888-8000-000000000000",
+                "uniqueName": null,
+                "imageUrl": null,
+                "descriptor": "s2s.MDAwMDAwMDItMDAwMC04ODg4LTgwMDAtMDAwMDAwMDAwMDAwQDJjODk1OTA4LTA0ZTAtNDk1Mi04OWZkLTU0YjAwNDZkNjI4OA"
+            },
+            "orchestrationPlan": {
+                "planId": "8181923c-4508-4427-8ae3-1002b791fd01"
+            },
+            "logs": {
+                "id": 0,
+                "type": "Container",
+                "url": "https://example.com/owner/repo/_apis/build/builds/16/logs"
+            },
+            "repository": {
+                "id": "owner/repo",
+                "type": "GitHub",
+                "clean": null,
+                "checkoutSubmodules": false
+            },
+            "keepForever": false,
+            "retainedByRelease": false,
+            "triggeredByBuild": null
+        }
+    ]
+}

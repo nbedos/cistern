@@ -1,8 +1,0 @@
-REF                    COMMIT     TYPE   STATE     DATE                             NAME
-feature/tui            07da54a2   C      success   2019-09-21 14:51:21 +0000 UTC   -Use cmp.Equal for result comparison
-feature/tui            07da54a2   P      success   2019-09-21 14:51:21 +0000 UTC    ├── gitlab (#22)
-feature/tui            07da54a2   S      meh.      2019-09-21 14:51:21 +0000 UTC    │   └── test
-feature/tui            07da54a2   J      success   2019-09-21 14:51:21 +0000 UTC    │       └── golang 1.13
-feature/tui            07da54a2   P      passed    2019-09-21 14:51:21 +0000 UTC    └── travis (#83580490)
-feature/tui            07da54a2   J      passed    2019-09-21 14:51:21 +0000 UTC        └── linux - go
-

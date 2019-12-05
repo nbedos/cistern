@@ -314,32 +314,27 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 	if sha == "HEAD" {
 		hash = head.Hash()
 	} else {
-		p, err := r.ResolveRevision(plumbing.Revision(sha))
-		if err != nil {
+		switch p, err := r.ResolveRevision(plumbing.Revision(sha)); err {
+		case nil:
+			hash = *p
+		case plumbing.ErrReferenceNotFound:
+			// go-git cannot resolve a revision from an abbreviated SHA. This is quite
+			// useful so, for now, circumvent the problem by using the local git binary.
+			cmd := exec.Command("git", "show", sha, "--pretty=format:%H")
+			bs, err := cmd.Output()
+			if err != nil {
+				// FIXME There may also be multiple commit matching the abbreviated sha
+				return "", Commit{}, plumbing.ErrObjectNotFound
+			}
+
+			hash = plumbing.NewHash(strings.SplitN(string(bs), "\n", 2)[0])
+		default:
 			return "", Commit{}, err
-		}
-		hash = *p
-	}
-	commit, err := r.CommitObject(hash)
-	switch err {
-	case nil:
-		// Do nothing
-	case plumbing.ErrObjectNotFound:
-		// go-git cannot resolve a revision from an abbreviated SHA. This is quite
-		// useful so, for now, circumvent the problem by using the local git binary.
-		cmd := exec.Command("git", "show", sha, "--pretty=format:%H")
-		bs, err := cmd.Output()
-		if err != nil {
-			// FIXME There may also be multiple commit matching the abbreviated sha
-			return "", Commit{}, plumbing.ErrObjectNotFound
 		}
 
-		hash = plumbing.NewHash(strings.SplitN(string(bs), "\n", 2)[0])
-		commit, err = r.CommitObject(hash)
-		if err != nil {
-			return "", Commit{}, err
-		}
-	default:
+	}
+	commit, err := r.CommitObject(hash)
+	if err != nil {
 		return "", Commit{}, err
 	}
 
@@ -370,7 +365,7 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 		switch {
 		case ref.Name().IsTag():
 			c.Tags = append(c.Tags, ref.Name().Short())
-		case ref.Name().IsBranch():
+		case ref.Name().IsBranch(), ref.Name().IsRemote():
 			c.Branches = append(c.Branches, ref.Name().Short())
 		}
 
@@ -400,6 +395,13 @@ func (d NullDuration) String() string {
 		return fmt.Sprintf("%ds", seconds)
 	}
 	return fmt.Sprintf("%dm%02ds", minutes, seconds)
+}
+
+func NullSub(after NullTime, before NullTime) NullDuration {
+	return NullDuration{
+		Valid:    after.Valid && before.Valid,
+		Duration: after.Time.Sub(before.Time),
+	}
 }
 
 func getEnvWithDefault(key string, d string) string {

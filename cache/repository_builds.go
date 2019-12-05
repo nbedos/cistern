@@ -17,8 +17,6 @@ import (
 	"github.com/nbedos/citop/utils"
 )
 
-var shaLength = 7
-
 type buildRowKey struct {
 	ref       string
 	sha       string
@@ -68,7 +66,7 @@ func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
 	nullTimeToString := func(t utils.NullTime) text.StyledString {
 		s := nullPlaceholder
 		if t.Valid {
-			s = t.Time.In(loc).Truncate(time.Second).Format("Jan _2 15:04")
+			s = t.Time.In(loc).Truncate(time.Second).Format("Jan 2 15:04")
 		}
 		return text.NewStyledString(s)
 	}
@@ -222,12 +220,7 @@ func buildRowFromStage(provider Provider, sha string, ref string, buildID string
 		row.updatedAt = utils.MaxNullTime(row.updatedAt, job.FinishedAt, job.StartedAt, job.CreatedAt)
 	}
 
-	if row.startedAt.Valid && row.finishedAt.Valid {
-		row.duration = utils.NullDuration{
-			Valid:    true,
-			Duration: row.finishedAt.Time.Sub(row.startedAt.Time),
-		}
-	}
+	row.duration = utils.NullSub(row.finishedAt, row.startedAt)
 
 	for _, job := range s.Jobs {
 		child := buildRowFromJob(provider, sha, ref, buildID, s.ID, *job)

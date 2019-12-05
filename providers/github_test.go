@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"sort"
 	"testing"
 
@@ -29,20 +28,19 @@ func TestClient(t *testing.T) {
 
 		bs, err := ioutil.ReadFile(fmt.Sprintf("test_data/%s", filename))
 		if err != nil {
-			t.Fatal(err)
+			w.WriteHeader(500)
+			fmt.Fprint(w, err.Error())
+			return
 		}
 		if _, err := fmt.Fprint(w, string(bs)); err != nil {
-			t.Fatal(err)
+			w.WriteHeader(500)
+			fmt.Fprint(w, err.Error())
+			return
 		}
 	}))
 	defer ts.Close()
 
-	tsu, err := url.Parse(ts.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c, err := github.NewEnterpriseClient(tsu.String(), "example.com", ts.Client())
+	c, err := github.NewEnterpriseClient(ts.URL, ts.URL, ts.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
