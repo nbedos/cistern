@@ -276,7 +276,7 @@ func (c AzurePipelinesClient) getTimeline(ctx context.Context, u string) (map[in
 	}
 
 	recordsByID := make(map[string]*azureRecord)
-	c.mux.Lock()
+
 	for _, record := range timeline.Records {
 		switch strings.ToLower(record.Type) {
 		case "stage", "phase", "job":
@@ -289,11 +289,11 @@ func (c AzurePipelinesClient) getTimeline(ctx context.Context, u string) (map[in
 			if err != nil {
 				return nil, err
 			}
+			c.mux.Lock()
 			c.logURLByJobID[record.ID] = *u
+			c.mux.Unlock()
 		}
-
 	}
-	c.mux.Unlock()
 
 	// Build tree structure from flat list and ID -> parentIDs links
 	topLevelRecords := make([]*azureRecord, 0)
@@ -422,12 +422,6 @@ func (r azureRecord) ToCacheJob() (cache.Job, error) {
 	if err != nil {
 		return cache.Job{}, err
 	}
-	if job.StartedAt.Valid && job.FinishedAt.Valid {
-		job.Duration = utils.NullDuration{
-			Valid:    false,
-			Duration: 0,
-		}
-	}
 	job.Duration = utils.NullSub(job.FinishedAt, job.StartedAt)
 
 	return job, nil
@@ -472,12 +466,14 @@ func (c AzurePipelinesClient) get(ctx context.Context, u url.URL) (io.ReadCloser
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		_ = resp.Body.Close()
+		buf := bytes.Buffer{}
+		buf.ReadFrom(resp.Body)
+		resp.Body.Close()
 		return nil, HTTPError{
 			Method:  req.Method,
 			URL:     u.String(),
 			Status:  resp.StatusCode,
-			Message: "",
+			Message: buf.String(),
 		}
 	}
 
@@ -503,10 +499,8 @@ func fromAzureState(result string, status string) cache.State {
 		case "completed", "none", "":
 			// Do we ever take this path?
 			return cache.Unknown
-		default:
-			return cache.Unknown
 		}
-	default:
-		return cache.Unknown
 	}
+
+	return cache.Unknown
 }
