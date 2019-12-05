@@ -78,12 +78,12 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 
 	ctx, cancel := context.WithCancel(ctx)
 
+	// FIXME
 	repositoryURL, commit, err := utils.GitOriginURL(repo, sha)
 	if err != nil {
 		for i, p := range SourceProviders {
-			commit, err = p.Commit(ctx, repo, sha)
+			commit, err = p.Commit(ctx, repositoryURL, sha)
 			if err == nil {
-				repositoryURL = repo
 				break
 			}
 			if i >= len(SourceProviders)-1 {

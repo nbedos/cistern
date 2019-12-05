@@ -444,6 +444,9 @@ func (c AzurePipelinesClient) getJSON(ctx context.Context, u url.URL, v interfac
 }
 
 func (c AzurePipelinesClient) get(ctx context.Context, u url.URL) (io.ReadCloser, error) {
+	if u.Hostname() != c.baseURL.Hostname() {
+		return nil, fmt.Errorf("expected URL host to be %q but got %q", u.Hostname(), c.baseURL.Hostname())
+	}
 	params := u.Query()
 	params.Add("api-version", c.version)
 	u.RawQuery = params.Encode()
@@ -453,6 +456,10 @@ func (c AzurePipelinesClient) get(ctx context.Context, u url.URL) (io.ReadCloser
 		return nil, err
 	}
 	req.WithContext(ctx)
+
+	if c.token != "" {
+		req.SetBasicAuth("", c.token)
+	}
 
 	select {
 	case <-c.rateLimiter:
