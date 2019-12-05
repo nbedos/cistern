@@ -1,6 +1,5 @@
-% CITOP(1) | version <version>
+% CITOP(1) | version \<version\>
 % Nicolas Bedos
-% <date>
 
 # NAME
 **citop** – Continuous Integration Table Of Pipelines
@@ -22,18 +21,20 @@ of the following:
 * A "CI provider" that is used to get detailed information about CI builds
 
 --------------------------------------------------------
-Service     Source   CI      URL
-----------  -------  ------  ---------------------------
-GitHub      yes      no      [https://github.com/](https://github.com/)
+Service        Source   CI      URL
+-------------  -------  ------  ---------------------------
+GitHub         yes      no      [https://github.com/](https://github.com/)
 
-GitLab      yes      yes     [https://gitlab.com/](https://gitlab.com/)
+GitLab         yes      yes     [https://gitlab.com/](https://gitlab.com/)
 
-AppVeyor    no       yes     [https://www.appveyor.com/](https://www.appveyor.com/)
+AppVeyor       no       yes     [https://www.appveyor.com/](https://www.appveyor.com/)
 
-CircleCI    no       yes     [https://circleci.com/](https://circleci.com/)
+CircleCI       no       yes     [https://circleci.com/](https://circleci.com/)
 
-Travis CI   no       yes     [https://travis-ci.org/](https://travis-ci.org/)
-                             [https://travis-ci.com/](https://travis-ci.com/)
+Travis CI      no       yes     [https://travis-ci.org/](https://travis-ci.org/)
+                                [https://travis-ci.com/](https://travis-ci.com/)
+                             
+Azure Devops   no       yes     [https://dev.azure.com](https://dev.azure.com)
 
 --------------------------------------------------------
 
@@ -149,7 +150,7 @@ relies on two types of providers:
 - 'source providers' are used for listing the CI pipelines associated to a given commit
 (GitHub and GitLab are source providers)
 - 'CI providers' are used to get detailed information about CI pipelines (GitLab, AppVeyor,
-CircleCI and Travis are CI providers)
+CircleCI, Travis and Azure Devops are CI providers)
 
 citop requires credentials for at least one source provider and one CI provider to run.
 
@@ -274,6 +275,29 @@ Example:
 name = "circleci"
 token = "circleci_api_token"
 ```
+
+### Table `[[providers.azure]]`
+`[[providers.azure]]` defines an Azure Devops account
+
+----------------------------------------------------------
+Key     Description
+------  --------------------------------------------------
+name    Name under which this provider appears in the TUI (string, optional, default: "azure")
+
+token   Personal access token for the Azure Devops API (string, optional, default: "")
+
+----------------------------------------------------------
+
+Azure Devops personal access tokens are managed at [https://dev.azure.com/](https://dev.azure.com/)
+
+
+Example:
+```toml
+[[providers.azure]]
+name = "azure"
+token = "azure_api_token"
+```
+
 
 ### Examples
 Here are a few examples of `citop.toml` configuration files.

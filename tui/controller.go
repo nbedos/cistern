@@ -11,7 +11,6 @@ import (
 
 	"github.com/gdamore/tcell"
 	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/man"
 	"github.com/nbedos/citop/text"
 	"github.com/nbedos/citop/utils"
 )
@@ -24,11 +23,12 @@ type Controller struct {
 	tempDir       string
 	inputMode     bool
 	defaultStatus string
+	help          string
 }
 
 var ErrExit = errors.New("exit")
 
-func NewController(tui *TUI, source cache.HierarchicalTabularDataSource, loc *time.Location, tempDir string, defaultStatus string) (Controller, error) {
+func NewController(tui *TUI, source cache.HierarchicalTabularDataSource, loc *time.Location, tempDir string, defaultStatus string, help string) (Controller, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := 10, 10
 	header, err := NewTextArea(width, height)
@@ -54,6 +54,7 @@ func NewController(tui *TUI, source cache.HierarchicalTabularDataSource, loc *ti
 		status:        &status,
 		tempDir:       tempDir,
 		defaultStatus: defaultStatus,
+		help:          help,
 	}, nil
 }
 
@@ -213,7 +214,7 @@ func (c *Controller) process(ctx context.Context, event tcell.Event) error {
 				if err != nil {
 					return err
 				}
-				_, err = file.Write([]byte(man.Section1))
+				_, err = file.Write([]byte(c.help))
 				if err != nil {
 					return err
 				}

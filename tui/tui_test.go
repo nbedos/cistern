@@ -150,7 +150,7 @@ func TestRunApplication(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = RunApplication(ctx, newScreen, pwd, "HEAD", nil, nil, time.UTC)
+		err = RunApplication(ctx, newScreen, pwd, "HEAD", nil, nil, time.UTC, "")
 		if err != ErrNoProvider {
 			t.Fatalf("expected %v but got %v", ErrNoProvider, err)
 		}

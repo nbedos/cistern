@@ -23,7 +23,7 @@ type ExecCmd struct {
 
 var ErrNoProvider = errors.New("list of providers must not be empty")
 
-func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, sha string, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location) (err error) {
+func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, sha string, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location, help string) (err error) {
 	if len(CIProviders) == 0 || len(SourceProviders) == 0 {
 		return ErrNoProvider
 	}
@@ -103,7 +103,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		ui.Finish()
 	}()
 
-	controller, err := NewController(&ui, &source, loc, tmpDir, defaultStatus)
+	controller, err := NewController(&ui, &source, loc, tmpDir, defaultStatus, help)
 	if err != nil {
 		return err
 	}

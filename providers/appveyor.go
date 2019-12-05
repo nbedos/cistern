@@ -1,11 +1,12 @@
 package providers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -57,8 +58,18 @@ func (c AppVeyorClient) Log(ctx context.Context, repository cache.Repository, jo
 	if err != nil {
 		return "", err
 	}
+	defer func() {
+		if errClose := body.Close(); err == nil {
+			err = errClose
+		}
+	}()
 
-	return body.String(), nil
+	log, err := ioutil.ReadAll(body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(log), err
 }
 
 func (c AppVeyorClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
@@ -70,20 +81,22 @@ func (c AppVeyorClient) BuildFromURL(ctx context.Context, u string) (cache.Build
 	return c.fetchBuild(ctx, owner, repo, id)
 }
 
-func (c AppVeyorClient) getJSON(ctx context.Context, u url.URL, i interface{}) error {
-	body, err := c.get(ctx, u)
+func (c AppVeyorClient) getJSON(ctx context.Context, u url.URL, v interface{}) error {
+	r, err := c.get(ctx, u)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if errClose := r.Close(); err == nil {
+			err = errClose
+		}
+	}()
 
-	if err := json.Unmarshal(body.Bytes(), i); err != nil {
-		return err
-	}
-
-	return nil
+	err = json.NewDecoder(r).Decode(v)
+	return err
 }
 
-func (c AppVeyorClient) get(ctx context.Context, u url.URL) (*bytes.Buffer, error) {
+func (c AppVeyorClient) get(ctx context.Context, u url.URL) (io.ReadCloser, error) {
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, err
@@ -100,23 +113,22 @@ func (c AppVeyorClient) get(ctx context.Context, u url.URL) (*bytes.Buffer, erro
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close() // FIXME return error
-
-	body := new(bytes.Buffer)
-	if _, err := body.ReadFrom(resp.Body); err != nil {
-		return nil, err
-	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		err = HTTPError{
+		message, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			message = nil
+		}
+		resp.Body.Close()
+		return nil, HTTPError{
 			Method:  req.Method,
-			URL:     req.URL.String(),
+			URL:     u.String(),
 			Status:  resp.StatusCode,
-			Message: body.String(),
+			Message: string(message),
 		}
 	}
 
-	return body, err
+	return resp.Body, err
 }
 
 func (c AppVeyorClient) fetchBuild(ctx context.Context, owner string, repoName string, id int) (cache.Build, error) {

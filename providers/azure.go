@@ -1,12 +1,12 @@
 package providers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"sort"
@@ -107,12 +107,12 @@ func (c AzurePipelinesClient) Log(ctx context.Context, repository cache.Reposito
 		}
 	}()
 
-	buf := bytes.Buffer{}
-	if _, err = buf.ReadFrom(r); err != nil {
+	log, err := ioutil.ReadAll(r)
+	if err != nil {
 		return "", err
 	}
 
-	return buf.String(), nil
+	return string(log), nil
 }
 
 type azureBuild struct {
@@ -473,14 +473,16 @@ func (c AzurePipelinesClient) get(ctx context.Context, u url.URL) (io.ReadCloser
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		buf := bytes.Buffer{}
-		buf.ReadFrom(resp.Body)
+		message, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			message = nil
+		}
 		resp.Body.Close()
 		return nil, HTTPError{
 			Method:  req.Method,
 			URL:     u.String(),
 			Status:  resp.StatusCode,
-			Message: buf.String(),
+			Message: string(message),
 		}
 	}
 
