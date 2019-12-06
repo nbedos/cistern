@@ -1,0 +1,4 @@
+image: alpine/edge
+tasks:
+  - example: |
+      echo "hello world"
