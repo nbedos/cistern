@@ -5,4 +5,4 @@ sources:
     - https://github.com/nbedos/citop
 tasks:
   - test: |
-      make tests
+      cd citop && make tests
