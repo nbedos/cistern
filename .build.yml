@@ -1,4 +1,8 @@
-image: alpine/edge
+image: archlinux
+packages:
+    - go
+sources:
+    - https://github.com/nbedos/citop
 tasks:
-  - example: |
-      echo "hello world"
+  - test: |
+      make tests
