@@ -1,24 +1,19 @@
 package providers
 
 import (
-	"net/url"
 	"testing"
+	"time"
 )
 
-func TestParseGitlabWebURL(t *testing.T) {
-	u := "https://gitlab.com/nbedos/citop/pipelines/97604657"
-	baseURL := url.URL{
-		Scheme: "https",
-		Host:   "gitlab.com",
-		Path:   "/api/v4",
-	}
+func TestParsePipelineURL(t *testing.T) {
+	c := NewGitLabClient("gitlab", "gitlab", "", time.Millisecond)
 
-	owner, repo, id, err := parseGitlabWebURL(&baseURL, u)
+	slug, id, err := c.parsePipelineURL("https://gitlab.com/nbedos/citop/pipelines/97604657")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if owner != "nbedos" || repo != "citop" || id != 97604657 {
+	if slug != "nbedos/citop" || id != 97604657 {
 		t.Fail()
 	}
 }

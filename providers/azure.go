@@ -62,18 +62,18 @@ func (c AzurePipelinesClient) parseAzureWebURL(s string) (string, string, string
 		return "", "", "", err
 	}
 	if u.Hostname() != c.baseURL.Hostname() {
-		return "", "", "", cache.ErrUnknownURL
+		return "", "", "", cache.ErrUnknownPipelineURL
 	}
 
 	cs := strings.Split(u.EscapedPath(), "/")
 	if len(cs) < 5 || cs[3] != "_build" || cs[4] != "results" {
-		return "", "", "", cache.ErrUnknownURL
+		return "", "", "", cache.ErrUnknownPipelineURL
 	}
 	owner, repo := cs[1], cs[2]
 
 	buildID := u.Query().Get("buildId")
 	if buildID == "" {
-		return "", "", "", cache.ErrUnknownURL
+		return "", "", "", cache.ErrUnknownPipelineURL
 	}
 
 	return owner, repo, buildID, nil
@@ -172,12 +172,8 @@ func (b azureBuild) toCacheBuild(p cache.Provider) (cache.Build, error) {
 			Owner:    owner,
 			Name:     repo,
 		},
-		ID: strconv.Itoa(b.ID),
-		Commit: cache.Commit{
-			Sha:     b.SourceVersion,
-			Message: "",
-			Date:    utils.NullTime{},
-		},
+		ID:              strconv.Itoa(b.ID),
+		Sha:             b.SourceVersion,
 		Ref:             ref,
 		IsTag:           isTag,
 		RepoBuildNumber: b.Number,

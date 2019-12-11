@@ -147,7 +147,7 @@ func buildRowFromBuild(b Build) buildRow {
 	row := buildRow{
 		key: buildRowKey{
 			ref:       ref,
-			sha:       b.Commit.Sha,
+			sha:       b.Sha,
 			accountID: b.Repository.Provider.ID,
 			buildID:   b.ID,
 		},
@@ -170,18 +170,20 @@ func buildRowFromBuild(b Build) buildRow {
 	}
 
 	for _, job := range b.Jobs {
-		child := buildRowFromJob(b.Repository.Provider, b.Commit.Sha, ref, b.ID, 0, *job)
+		child := buildRowFromJob(b.Repository.Provider, b.Sha, ref, b.ID, 0, *job)
 		row.children = append(row.children, &child)
 	}
 
-	stageIDs := make([]int, 0, len(b.Stages))
-	for stageID := range b.Stages {
-		stageIDs = append(stageIDs, stageID)
-	}
-	sort.Ints(stageIDs)
-	for _, stageID := range stageIDs {
-		child := buildRowFromStage(b.Repository.Provider, b.Commit.Sha, ref, b.ID, b.WebURL, *b.Stages[stageID])
-		row.children = append(row.children, &child)
+	if b.Stages != nil {
+		stageIDs := make([]int, 0, len(b.Stages))
+		for stageID := range b.Stages {
+			stageIDs = append(stageIDs, stageID)
+		}
+		sort.Ints(stageIDs)
+		for _, stageID := range stageIDs {
+			child := buildRowFromStage(b.Repository.Provider, b.Sha, ref, b.ID, b.WebURL, *b.Stages[stageID])
+			row.children = append(row.children, &child)
+		}
 	}
 
 	return row
@@ -259,11 +261,13 @@ func buildRowFromJob(provider Provider, sha string, ref string, buildID string, 
 
 type BuildsByCommit struct {
 	cache Cache
+	ref   string
 }
 
-func (c *Cache) BuildsByCommit() BuildsByCommit {
+func (c Cache) BuildsOfRef(ref string) HierarchicalTabularDataSource {
 	return BuildsByCommit{
-		cache: *c,
+		cache: c,
+		ref:   ref,
 	}
 }
 
@@ -287,7 +291,7 @@ func (s BuildsByCommit) Alignment() map[string]text.Alignment {
 
 func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 	rows := make([]HierarchicalTabularSourceRow, 0)
-	for _, build := range s.cache.Builds() {
+	for _, build := range s.cache.BuildsByRef(s.ref) {
 		row := buildRowFromBuild(build)
 		rows = append(rows, &row)
 	}

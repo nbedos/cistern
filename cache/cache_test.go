@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -171,7 +173,7 @@ func TestCache_Save(t *testing.T) {
 	t.Run("Saved build must be returned by fetchBuild()", func(t *testing.T) {
 		c := NewCache(nil, nil)
 		build := Build{Repository: &repository, ID: "42", State: Failed}
-		if err := c.Save(build); err != nil {
+		if err := c.SaveBuild("", build); err != nil {
 			t.Fatal(err)
 		}
 		savedBuild, exists := c.fetchBuild(build.Repository.Provider.ID, build.ID)
@@ -198,10 +200,10 @@ func TestCache_Save(t *testing.T) {
 	t.Run("existing build must be overwritten if it's older than the current build", func(t *testing.T) {
 		c := NewCache(nil, nil)
 
-		if err := c.Save(buildOld); err != nil {
+		if err := c.SaveBuild("", buildOld); err != nil {
 			t.Fatal(err)
 		}
-		if err := c.Save(buildNew); err != nil {
+		if err := c.SaveBuild("", buildNew); err != nil {
 			t.Fatal(err)
 		}
 		savedBuild, exists := c.fetchBuild(buildOld.Repository.Provider.ID, buildNew.ID)
@@ -213,21 +215,21 @@ func TestCache_Save(t *testing.T) {
 		}
 	})
 
-	t.Run("cache.Save must return ErrOlderBuild if the build to save is older than the one in cache", func(t *testing.T) {
+	t.Run("cache.SaveBuild must return ErrObsoleteBuild if the build to save is older than the one in cache", func(t *testing.T) {
 		c := NewCache(nil, nil)
 
-		if err := c.Save(buildNew); err != nil {
+		if err := c.SaveBuild("", buildNew); err != nil {
 			t.Fatal(err)
 		}
-		if err := c.Save(buildOld); err != ErrOlderBuild {
-			t.Fatalf("expected %v but got %v", ErrOlderBuild, err)
+		if err := c.SaveBuild("", buildOld); err != ErrObsoleteBuild {
+			t.Fatalf("expected %v but got %v", ErrObsoleteBuild, err)
 		}
 	})
 
 	t.Run("Pointer to repository must not be nil", func(t *testing.T) {
 		c := NewCache(nil, nil)
 		build := Build{Repository: nil, ID: "42", State: Passed}
-		if err := c.Save(build); err == nil {
+		if err := c.SaveBuild("", build); err == nil {
 			t.Fatal("expected error but got nil")
 		}
 	})
@@ -253,7 +255,7 @@ func TestCache_SaveJob(t *testing.T) {
 
 	t.Run("Save job without stage", func(t *testing.T) {
 		c := NewCache(nil, nil)
-		if err := c.Save(build); err != nil {
+		if err := c.SaveBuild("", build); err != nil {
 			t.Fatal(err)
 		}
 
@@ -269,7 +271,7 @@ func TestCache_SaveJob(t *testing.T) {
 
 	t.Run("Save job with stage", func(t *testing.T) {
 		c := NewCache(nil, nil)
-		if err := c.Save(build); err != nil {
+		if err := c.SaveBuild("", build); err != nil {
 			t.Fatal(err)
 		}
 
@@ -288,7 +290,7 @@ func TestCache_SaveJob(t *testing.T) {
 
 	t.Run("Saving job to non-existent stage must fail", func(t *testing.T) {
 		c := NewCache(nil, nil)
-		if err := c.Save(build); err != nil {
+		if err := c.SaveBuild("", build); err != nil {
 			t.Fatal(err)
 		}
 
@@ -308,7 +310,7 @@ func TestCache_Builds(t *testing.T) {
 	ids := []string{"1", "2", "3", "4"}
 	c := NewCache(nil, nil)
 	for _, id := range ids {
-		if err := c.Save(Build{Repository: &repository, ID: id}); err != nil {
+		if err := c.SaveBuild("", Build{Repository: &repository, ID: id}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -390,7 +392,7 @@ func TestCache_WriteLog(t *testing.T) {
 		}
 
 		for _, build := range builds {
-			if err := c.Save(build); err != nil {
+			if err := c.SaveBuild("", build); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -455,7 +457,7 @@ func TestCache_WriteLog(t *testing.T) {
 		}
 
 		for _, build := range builds {
-			if err := c.Save(build); err != nil {
+			if err := c.SaveBuild("", build); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -492,7 +494,7 @@ func TestCache_WriteLog(t *testing.T) {
 				},
 			},
 		}
-		if err := c.Save(build); err != nil {
+		if err := c.SaveBuild("", build); err != nil {
 			t.Fatal(err)
 		}
 
@@ -538,4 +540,73 @@ func TestCache_WriteLog(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestCache_BuildsByRef(t *testing.T) {
+	repo := Repository{
+		Provider: Provider{
+			ID: "provider1",
+		},
+	}
+	c := NewCache(nil, nil)
+
+	builds := []Build{
+		{
+			Repository: &repo,
+			ID:         "1",
+			Ref:        "ref1",
+			IsTag:      false,
+			UpdatedAt:  time.Date(2019, 12, 7, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			Repository: &repo,
+			ID:         "1",
+			Ref:        "ref2",
+			IsTag:      false,
+			UpdatedAt:  time.Date(2019, 12, 8, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			Repository: &repo,
+			ID:         "2",
+			Ref:        "ref2",
+			IsTag:      false,
+			UpdatedAt:  time.Date(2019, 12, 9, 0, 0, 0, 0, time.UTC),
+		},
+	}
+	for _, build := range builds {
+		if err := c.SaveBuild("", build); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	expected := []Build{builds[1], builds[2]}
+	buildRef2 := c.Builds()
+	sortBuilds(expected)
+	sortBuilds(buildRef2)
+
+	if diff := cmp.Diff(expected, buildRef2); len(diff) > 0 {
+		t.Fatal(diff)
+	}
+
+	// Build with ID 1 must have moved from ref1 to ref2
+	if len(c.BuildsByRef("ref1")) != 0 {
+		t.Fatalf("expected empty list but got %+v", c.BuildsByRef("ref1"))
+	}
+}
+
+func sortBuilds(builds []Build) {
+	sort.Slice(builds, func(i, j int) bool {
+		return builds[i].ID < builds[j].ID
+	})
+}
+
+func TestGitOriginURL(t *testing.T) {
+	u, _, err := GitOriginURL(".", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(u, "nbedos/citop") {
+		t.Fatalf("expected url to contain 'nbedos/citop' but got %q", u)
+	}
 }

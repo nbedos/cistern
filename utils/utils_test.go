@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 )
 
@@ -99,17 +98,6 @@ func TestDepthFirstTraversal(t *testing.T) {
 		if fmt.Sprintf("%s", n) != expectedvalues[i] {
 			t.Fatalf("unexpected node: %q", n)
 		}
-	}
-}
-
-func TestGitOriginURL(t *testing.T) {
-	u, _, err := GitOriginURL(".", "HEAD")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !strings.Contains(u, "nbedos/citop") {
-		t.Fatalf("expected url to contain 'nbedos/citop' but got %q", u)
 	}
 }
 

@@ -53,28 +53,6 @@ func (r travisRepository) toCacheRepository(provider cache.Provider) cache.Repos
 	}
 }
 
-type travisCommit struct {
-	ID      string `json:"sha"`
-	Message string
-	Author  struct {
-		Name string
-	}
-	Date string `json:"committed_at"`
-}
-
-func (c travisCommit) toCacheCommit() (cache.Commit, error) {
-	committedAt, err := utils.NullTimeFromString(c.Date)
-	if err != nil {
-		return cache.Commit{}, err
-	}
-
-	return cache.Commit{
-		Sha:     c.ID,
-		Message: c.Message,
-		Date:    committedAt,
-	}, nil
-}
-
 type travisBuild struct {
 	APIURL     string `json:"@href"`
 	ID         int
@@ -91,7 +69,9 @@ type travisBuild struct {
 	Branch struct {
 		Name string
 	}
-	Commit     travisCommit
+	Commit struct {
+		Sha string `json:"sha"`
+	}
 	Repository travisRepository
 	CreatedBy  struct {
 		Login string
@@ -100,15 +80,10 @@ type travisBuild struct {
 }
 
 func (b travisBuild) toCacheBuild(repository *cache.Repository, webURL string) (build cache.Build, err error) {
-	commit, err := b.Commit.toCacheCommit()
-	if err != nil {
-		return build, err
-	}
-
 	build = cache.Build{
 		Repository: repository,
 		ID:         strconv.Itoa(b.ID),
-		Commit:     commit,
+		Sha:        b.Commit.Sha,
 		IsTag:      b.Tag.Name != "",
 		State:      fromTravisState(b.State),
 		CreatedAt:  utils.NullTime{}, // FIXME We need this
@@ -321,13 +296,13 @@ func parseTravisWebURL(baseURL *url.URL, u string) (string, string, string, erro
 	}
 
 	if v.Hostname() != strings.TrimPrefix(baseURL.Hostname(), "api.") {
-		return "", "", "", cache.ErrUnknownURL
+		return "", "", "", cache.ErrUnknownPipelineURL
 	}
 
 	// URL format: https://travis-ci.org/nbedos/termtosvg/builds/612815758
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 5 || cs[3] != "builds" {
-		return "", "", "", cache.ErrUnknownURL
+		return "", "", "", cache.ErrUnknownPipelineURL
 	}
 
 	owner, repo, id := cs[1], cs[2], cs[4]
@@ -343,7 +318,7 @@ func (c TravisClient) repository(ctx context.Context, slug string) (cache.Reposi
 	body, err := c.get(ctx, "GET", reqURL)
 	if err != nil {
 		if err, ok := err.(HTTPError); ok && err.Status == 404 {
-			return cache.Repository{}, cache.ErrRepositoryNotFound
+			return cache.Repository{}, cache.ErrUnknownRepositoryURL
 		}
 		return cache.Repository{}, err
 	}
@@ -372,7 +347,9 @@ func (c TravisClient) get(ctx context.Context, method string, resourceURL url.UR
 		return nil, err
 	}
 	req.Header.Add("Travis-API-Version", "3")
-	req.Header.Add("Authorization", fmt.Sprintf("token %s", c.token))
+	if c.token != "" {
+		req.Header.Add("Authorization", fmt.Sprintf("token %s", c.token))
+	}
 	req = req.WithContext(ctx)
 
 	select {

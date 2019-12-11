@@ -184,13 +184,13 @@ func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, int, error
 	}
 
 	if v.Hostname() != strings.TrimPrefix(baseURL.Hostname(), "api.") {
-		return "", "", 0, cache.ErrUnknownURL
+		return "", "", 0, cache.ErrUnknownPipelineURL
 	}
 
 	// URL format: https://circleci.com/gh/nbedos/citop/36
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 5 {
-		return "", "", 0, cache.ErrUnknownURL
+		return "", "", 0, cache.ErrUnknownPipelineURL
 	}
 
 	owner, repo := cs[2], cs[3]
@@ -217,7 +217,7 @@ func (c *CircleCIClient) repository(ctx context.Context, owner string, repo stri
 	endPoint.RawQuery = parameters.Encode()
 	if _, err := c.get(ctx, endPoint); err != nil {
 		if err, ok := err.(HTTPError); ok && err.Status == 404 {
-			return cache.Repository{}, cache.ErrRepositoryNotFound
+			return cache.Repository{}, cache.ErrUnknownRepositoryURL
 		}
 		return cache.Repository{}, err
 	}
@@ -246,7 +246,7 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 		return build, err
 	}
 
-	build, err = circleCIBuild.ToCacheBuild(c.provider.ID, repo)
+	build, err = circleCIBuild.ToCacheBuild(repo)
 	if err != nil {
 		return build, err
 	}
@@ -308,13 +308,10 @@ type circleCIBuild struct {
 	} `json:"steps"`
 }
 
-func (b circleCIBuild) ToCacheBuild(accountID string, repository *cache.Repository) (cache.Build, error) {
+func (b circleCIBuild) ToCacheBuild(repository *cache.Repository) (cache.Build, error) {
 	build := cache.Build{
-		Repository: repository,
-		Commit: cache.Commit{
-			Sha:     b.Sha,
-			Message: b.Message,
-		},
+		Repository:      repository,
+		Sha:             b.Sha,
 		ID:              strconv.Itoa(b.ID),
 		RepoBuildNumber: strconv.Itoa(b.ID),
 		State:           fromCircleCIStatus(b.Lifecycle, b.Outcome),
@@ -344,11 +341,6 @@ func (b circleCIBuild) ToCacheBuild(accountID string, repository *cache.Reposito
 		return build, errors.New("updatedAt attribute cannot be null")
 	}
 	build.UpdatedAt = updatedAt.Time
-
-	build.Commit.Date, err = utils.NullTimeFromString(b.CommittedAt)
-	if err != nil {
-		return cache.Build{}, err
-	}
 
 	if build.IsTag = b.Tag != ""; build.IsTag {
 		build.Ref = b.Tag

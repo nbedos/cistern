@@ -13,7 +13,6 @@ import (
 	"github.com/gdamore/tcell/encoding"
 	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/text"
-	"github.com/nbedos/citop/utils"
 )
 
 type ExecCmd struct {
@@ -23,7 +22,7 @@ type ExecCmd struct {
 
 var ErrNoProvider = errors.New("list of providers must not be empty")
 
-func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, sha string, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location, help string) (err error) {
+func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, ref string, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location, help string) (err error) {
 	if len(CIProviders) == 0 || len(SourceProviders) == 0 {
 		return ErrNoProvider
 	}
@@ -76,25 +75,6 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 	}
 	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  v:Logs  b:Browser  ?:Help  q:Quit"
 
-	ctx, cancel := context.WithCancel(ctx)
-
-	// FIXME
-	repositoryURL, commit, err := utils.GitOriginURL(repo, sha)
-	if err != nil {
-		for i, p := range SourceProviders {
-			commit, err = p.Commit(ctx, repositoryURL, sha)
-			if err == nil {
-				break
-			}
-			if i >= len(SourceProviders)-1 {
-				return err
-			}
-		}
-	}
-
-	cacheDB := cache.NewCache(CIProviders, SourceProviders)
-	source := cacheDB.BuildsByCommit()
-
 	ui, err := NewTUI(newScreen, defaultStyle, styleSheet)
 	if err != nil {
 		return err
@@ -103,43 +83,14 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		ui.Finish()
 	}()
 
-	controller, err := NewController(&ui, &source, loc, tmpDir, defaultStatus, help)
+	cacheDB := cache.NewCache(CIProviders, SourceProviders)
+
+	controller, err := NewController(&ui, ref, cacheDB, loc, tmpDir, defaultStatus, help)
 	if err != nil {
 		return err
 	}
-	controller.SetHeader(commit.Strings())
 
-	errCache := make(chan error)
-	updates := make(chan time.Time)
-	go func() {
-		errCache <- cacheDB.GetPipelines(ctx, repositoryURL, commit, updates)
-	}()
-
-	errController := make(chan error)
-	go func() {
-		errController <- controller.Run(ctx, updates)
-	}()
-
-	var e error
-	errSet := false
-	for i := 0; i < 2; i++ {
-		select {
-		case e = <-errCache:
-			if e != nil && !errSet {
-				cancel()
-				err = e
-				errSet = true
-			}
-		case e = <-errController:
-			if !errSet {
-				cancel()
-				err = e
-				errSet = true
-			}
-		}
-	}
-
-	return err
+	return controller.Run(ctx, repo)
 }
 
 type TUI struct {

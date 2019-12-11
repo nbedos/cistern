@@ -6,15 +6,10 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/nbedos/citop/text"
-	"gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing"
 )
 
 func Modulo(a, b int) int {
@@ -92,14 +87,14 @@ func RepoHostOwnerAndName(repositoryURL string) (string, string, string, error) 
 		}
 	}
 
-	components := strings.Split(u.Path, "/")
-	if len(components) < 3 {
-		err := fmt.Errorf("invalid repository path: %q (expected at least three components)",
-			u.Path)
+	components := strings.FieldsFunc(u.Path, func(c rune) bool { return c == '/' })
+	if len(components) < 2 {
+		err := fmt.Errorf("invalid repository path: %q (expected at least two components)",
+			u.String())
 		return "", "", "", err
 	}
 
-	return u.Hostname(), components[1], components[2], nil
+	return u.Hostname(), components[0], components[1], nil
 }
 
 func Prefix(s string, prefix string) string {
@@ -220,162 +215,6 @@ func (a ANSIStripper) Close() error {
 	}
 
 	return a.writer.Close()
-}
-
-type Commit struct {
-	Sha      string
-	Author   string
-	Date     time.Time
-	Message  string
-	Branches []string
-	Tags     []string
-	Head     string
-}
-
-func (c Commit) Strings() []text.StyledString {
-	var title text.StyledString
-	commit := text.NewStyledString(fmt.Sprintf("commit %s", c.Sha), text.GitSha)
-	if len(c.Branches) > 0 || len(c.Tags) > 0 {
-		refs := make([]text.StyledString, 0, len(c.Branches)+len(c.Tags))
-		for _, tag := range c.Tags {
-			refs = append(refs, text.NewStyledString(fmt.Sprintf("tag: %s", tag), text.GitTag))
-		}
-		for _, branch := range c.Branches {
-			if branch == c.Head {
-				var s text.StyledString
-				s.Append("HEAD -> ", text.GitHead)
-				s.Append(branch, text.GitBranch)
-				refs = append([]text.StyledString{s}, refs...)
-			} else {
-				refs = append(refs, text.NewStyledString(branch, text.GitBranch))
-			}
-		}
-
-		title = text.Join([]text.StyledString{
-			commit,
-			text.NewStyledString(" (", text.GitSha),
-			text.Join(refs, text.NewStyledString(", ", text.GitSha)),
-			text.NewStyledString(")", text.GitSha),
-		}, text.NewStyledString(""))
-	} else {
-		title = commit
-	}
-
-	texts := []text.StyledString{
-		title,
-		text.NewStyledString(fmt.Sprintf("Author: %s", c.Author)),
-		text.NewStyledString(fmt.Sprintf("Date: %s", c.Date.Truncate(time.Second).String())),
-		text.NewStyledString(""),
-	}
-	for _, line := range strings.Split(c.Message, "\n") {
-		texts = append(texts, text.NewStyledString("    "+line))
-		break
-	}
-
-	return texts
-}
-
-func GitOriginURL(path string, sha string) (string, Commit, error) {
-	// If a path does not refer to an existing file or directory, go-git will continue
-	// running and will walk its way up the directory structure looking for a .git repository.
-	// This is not ideal for us since running 'citop -r github.com/owner/remoterepo' from
-	// /home/user/localrepo will make go-git look for a .git repository in
-	// /home/user/localrepo/github.com/owner/remoterepo which will inevitably lead to
-	// /home/user/localrepo which is not what the user expected since the user was
-	// refering to the online repository https://github.com/owner/remoterepo. So instead
-	// we bail out early if the path is invalid, meaning it's not a local path but a URL.
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			err = plumbing.ErrObjectNotFound
-		}
-		return "", Commit{}, err
-	}
-
-	r, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{DetectDotGit: true})
-	if err != nil {
-		return "", Commit{}, err
-	}
-
-	remote, err := r.Remote("origin")
-	if err != nil {
-		return "", Commit{}, err
-	}
-
-	if len(remote.Config().URLs) == 0 {
-		return "", Commit{}, fmt.Errorf("GIT repository %q: remote 'origin' has no associated URL", path)
-	}
-
-	head, err := r.Head()
-	if err != nil {
-		return "", Commit{}, err
-	}
-
-	var hash plumbing.Hash
-	if sha == "HEAD" {
-		hash = head.Hash()
-	} else {
-		switch p, err := r.ResolveRevision(plumbing.Revision(sha)); err {
-		case nil:
-			hash = *p
-		case plumbing.ErrReferenceNotFound:
-			// go-git cannot resolve a revision from an abbreviated SHA. This is quite
-			// useful so, for now, circumvent the problem by using the local git binary.
-			cmd := exec.Command("git", "show", sha, "--pretty=format:%H")
-			bs, err := cmd.Output()
-			if err != nil {
-				// FIXME There may also be multiple commit matching the abbreviated sha
-				return "", Commit{}, plumbing.ErrObjectNotFound
-			}
-
-			hash = plumbing.NewHash(strings.SplitN(string(bs), "\n", 2)[0])
-		default:
-			return "", Commit{}, err
-		}
-
-	}
-	commit, err := r.CommitObject(hash)
-	if err != nil {
-		return "", Commit{}, err
-	}
-
-	c := Commit{
-		Sha:      commit.Hash.String(),
-		Author:   commit.Author.String(),
-		Date:     commit.Author.When,
-		Message:  commit.Message,
-		Branches: nil,
-		Tags:     nil,
-		Head:     head.Name().Short(),
-	}
-
-	refs, err := r.References()
-	if err != nil {
-		return "", Commit{}, err
-	}
-
-	err = refs.ForEach(func(ref *plumbing.Reference) error {
-		if ref.Hash() != commit.Hash {
-			return nil
-		}
-
-		if ref.Name() == head.Name() {
-			c.Head = head.Name().Short()
-		}
-
-		switch {
-		case ref.Name().IsTag():
-			c.Tags = append(c.Tags, ref.Name().Short())
-		case ref.Name().IsBranch(), ref.Name().IsRemote():
-			c.Branches = append(c.Branches, ref.Name().Short())
-		}
-
-		return nil
-	})
-	if err != nil {
-		return "", Commit{}, err
-	}
-
-	return remote.Config().URLs[0], c, nil
 }
 
 type NullDuration struct {

@@ -82,10 +82,8 @@ var expectedBuild = cache.Build{
 		Owner: "owner",
 		Name:  "repo",
 	},
-	ID: "16",
-	Commit: cache.Commit{
-		Sha: "5e4d496d63086609cb3c03aa0ee4e032e4b6b08b",
-	},
+	ID:              "16",
+	Sha:             "5e4d496d63086609cb3c03aa0ee4e032e4b6b08b",
 	Ref:             "azure-pipelines",
 	RepoBuildNumber: "20191204.3",
 	State:           cache.Failed,

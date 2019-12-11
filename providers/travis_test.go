@@ -63,16 +63,9 @@ func TestTravisClientfetchBuild(t *testing.T) {
 	}
 
 	expectedBuild := cache.Build{
-		Repository: &repository,
-		ID:         "609256446",
-		Commit: cache.Commit{
-			Sha:     "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
-			Message: "Order builds unambiguously",
-			Date: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 8, 14, 26, 18, 0, time.UTC),
-			},
-		},
+		Repository:      &repository,
+		ID:              "609256446",
+		Sha:             "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
 		Ref:             "feature/travis_improvements",
 		IsTag:           false,
 		RepoBuildNumber: "72",
@@ -267,10 +260,10 @@ func TestTravisClientRepository(t *testing.T) {
 		}
 	})
 
-	t.Run("ErrRepositoryNotFound", func(t *testing.T) {
+	t.Run("ErrUnknownRepositoryURL", func(t *testing.T) {
 		_, err := client.repository(context.Background(), "nbedos/does_not_exist")
-		if err != cache.ErrRepositoryNotFound {
-			t.Fatalf("expected %v but got %v", cache.ErrRepositoryNotFound, err)
+		if err != cache.ErrUnknownRepositoryURL {
+			t.Fatalf("expected %v but got %v", cache.ErrUnknownRepositoryURL, err)
 		}
 	})
 }

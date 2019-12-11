@@ -22,15 +22,8 @@ var build = Build{
 		Owner: "owner",
 		Name:  "project",
 	},
-	ID: "42",
-	Commit: Commit{
-		Sha:     "c2bb562365d40caec0b37138f73a87b6339a8b7a",
-		Message: "commit title\nline #1\nline #2\nline #3\n",
-		Date: utils.NullTime{
-			Valid: true,
-			Time:  time.Date(2019, 11, 13, 13, 12, 11, 0, time.UTC),
-		},
-	},
+	ID:              "42",
+	Sha:             "c2bb562365d40caec0b37138f73a87b6339a8b7a",
 	Ref:             "master",
 	IsTag:           false,
 	RepoBuildNumber: "43",
@@ -208,7 +201,7 @@ func Test_buildRowFromJob(t *testing.T) {
 		ID:   "id",
 		Name: "name",
 	}
-	row := buildRowFromJob(p, build.Commit.Sha, build.Ref, build.ID, 1, job)
+	row := buildRowFromJob(p, build.Sha, build.Ref, build.ID, 1, job)
 	if diff := row.Diff(jobAsRow); diff != "" {
 		t.Log(diff)
 		t.Fail()
@@ -220,7 +213,7 @@ func Test_buildRowFromStage(t *testing.T) {
 		ID:   "id",
 		Name: "name",
 	}
-	row := buildRowFromStage(p, build.Commit.Sha, build.Ref, build.ID, build.WebURL, stage)
+	row := buildRowFromStage(p, build.Sha, build.Ref, build.ID, build.WebURL, stage)
 	if diff := row.Diff(stageAsRow); diff != "" {
 		t.Log(diff)
 		t.Fail()
@@ -310,22 +303,22 @@ func TestBuildRow_Tabular(t *testing.T) {
 
 func TestBuildsByCommit_Rows(t *testing.T) {
 	c := NewCache(nil, nil)
-	shas := []string{"aaaaaa", "bbbbbb", "cccccc"}
+	shas := []string{"a", "b", "c"}
 	ids := []int{1, 2, 4, 8, 16, 32}
 	for i, sha := range shas {
 		for _, n := range ids {
 			build := Delay(build, time.Duration(n)*time.Hour)
 			build.ID = strconv.Itoa(1000*i + n)
-			build.Commit.Sha = sha
-			if err := c.Save(build); err != nil {
+			build.Sha = sha
+			if err := c.SaveBuild("", build); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
 
-	rows := c.BuildsByCommit().Rows()
+	rows := c.BuildsOfRef("").Rows()
 	if len(rows) != len(shas)*len(ids) {
-		t.Fatalf("expected %d row but got %d", len(shas), len(rows))
+		t.Fatalf("expected %d rows but got %d", len(shas)*len(ids), len(rows))
 	}
 }
 
@@ -338,12 +331,12 @@ func TestBuildsByCommit_WriteToDisk(t *testing.T) {
 		},
 	}, nil)
 	for _, build := range builds {
-		if err := c.Save(build); err != nil {
+		if err := c.SaveBuild("", build); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	source := c.BuildsByCommit()
+	source := c.BuildsOfRef("master")
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {
 		t.Fatal(err)

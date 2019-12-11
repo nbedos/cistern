@@ -36,6 +36,7 @@ that are not implemented by citop (pipeline cancellation, artifact download...)
 Install from source by running the following commands. Requires golang >= 1.12 and a UNIX system.
 ```shell
 $ git clone git@github.com:nbedos/citop.git
+$ cd citop
 $ go build .
 ```
 

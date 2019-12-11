@@ -101,16 +101,9 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 	}
 
 	expectedBuild := cache.Build{
-		Repository: &repo,
-		ID:         "42",
-		Commit: cache.Commit{
-			Sha:     "fd4c4ae5a4005e38c66566e2480087072620e9de",
-			Message: "message",
-			Date: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 23, 12, 23, 9, 0, time.UTC),
-			},
-		},
+		Repository:      &repo,
+		ID:              "42",
+		Sha:             "fd4c4ae5a4005e38c66566e2480087072620e9de",
 		Ref:             "feature/appveyor",
 		IsTag:           false,
 		RepoBuildNumber: "42",

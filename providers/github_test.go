@@ -47,10 +47,9 @@ func TestClient(t *testing.T) {
 	client := GitHubClient{
 		client: c,
 	}
-	owner := "nbedos"
-	repo := "termtosvg"
+
 	sha := "d58600a58bf1738c6529ce3489a546bfa2178e07"
-	urls, err := client.BuildURLs(context.Background(), owner, repo, sha)
+	urls, err := client.RefStatuses(context.Background(), ts.URL+"/nbedos/termtosvg", sha)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -197,13 +197,13 @@ func parseAppVeyorURL(u string) (string, string, int, error) {
 	}
 
 	if !strings.HasSuffix(v.Hostname(), "appveyor.com") {
-		return "", "", 0, cache.ErrUnknownURL
+		return "", "", 0, cache.ErrUnknownPipelineURL
 	}
 
 	// URL format: https://ci.appveyor.com/project/nbedos/citop/builds/29070120
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 6 || cs[1] != "project" || cs[4] != "builds" {
-		return "", "", 0, cache.ErrUnknownURL
+		return "", "", 0, cache.ErrUnknownPipelineURL
 	}
 
 	owner, repo := cs[2], cs[3]
@@ -251,12 +251,9 @@ type appVeyorBuild struct {
 
 func (b appVeyorBuild) toCacheBuild(accountID string, repo *cache.Repository) (cache.Build, error) {
 	build := cache.Build{
-		Repository: repo,
-		ID:         strconv.Itoa(b.ID),
-		Commit: cache.Commit{
-			Sha:     b.Sha,
-			Message: b.Message,
-		},
+		Repository:      repo,
+		ID:              strconv.Itoa(b.ID),
+		Sha:             b.Sha,
 		Ref:             b.Branch,
 		IsTag:           b.IsTag,
 		RepoBuildNumber: strconv.Itoa(b.Number),
@@ -265,10 +262,6 @@ func (b appVeyorBuild) toCacheBuild(accountID string, repo *cache.Repository) (c
 		Jobs:            make([]*cache.Job, 0),
 	}
 	var err error
-	build.Commit.Date, err = utils.NullTimeFromString(b.CommittedAt)
-	if err != nil {
-		return build, err
-	}
 	build.CreatedAt, err = utils.NullTimeFromString(b.CreatedAt)
 	if err != nil {
 		return build, err
