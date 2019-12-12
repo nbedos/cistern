@@ -217,7 +217,7 @@ func TestAzurePipelinesClient_fetchBuild(t *testing.T) {
 	defer teardown()
 
 	ctx := context.Background()
-	build, err := client.fetchBuild(ctx, "owner", "repo", "16")
+	build, err := client.fetchPipeline(ctx, "owner", "repo", "16")
 	if err != nil {
 		t.Fatal(err)
 	}

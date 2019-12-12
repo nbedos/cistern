@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -17,17 +16,9 @@ import (
 	"github.com/nbedos/citop/utils"
 )
 
-type buildRowKey struct {
-	ref       string
-	sha       string
-	accountID string
-	buildID   string
-	stageID   int
-	jobID     string
-}
-
-type buildRow struct {
-	key         buildRowKey
+type task struct {
+	key         PipelineStepKey
+	ref         GitRef
 	type_       string
 	state       State
 	name        string
@@ -38,29 +29,29 @@ type buildRow struct {
 	finishedAt  utils.NullTime
 	updatedAt   utils.NullTime
 	duration    utils.NullDuration
-	children    []*buildRow
+	children    []*task
 	traversable bool
 	url         string
 }
 
-func (b buildRow) Diff(other buildRow) string {
-	options := cmp.AllowUnexported(buildRowKey{}, buildRow{})
-	return cmp.Diff(b, other, options)
+func (t task) Diff(other task) string {
+	options := cmp.AllowUnexported(PipelineStepKey{}, task{})
+	return cmp.Diff(t, other, options)
 }
 
-func (b buildRow) Traversable() bool {
-	return b.traversable
+func (t task) Traversable() bool {
+	return t.traversable
 }
 
-func (b buildRow) Children() []utils.TreeNode {
-	children := make([]utils.TreeNode, len(b.children))
-	for i := range b.children {
-		children[i] = b.children[i]
+func (t task) Children() []utils.TreeNode {
+	children := make([]utils.TreeNode, len(t.children))
+	for i := range t.children {
+		children[i] = t.children[i]
 	}
 	return children
 }
 
-func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
+func (t task) Tabular(loc *time.Location) map[string]text.StyledString {
 	const nullPlaceholder = "-"
 
 	nullTimeToString := func(t utils.NullTime) text.StyledString {
@@ -71,8 +62,8 @@ func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
 		return text.NewStyledString(s)
 	}
 
-	state := text.NewStyledString(string(b.state))
-	switch b.state {
+	state := text.NewStyledString(string(t.state))
+	switch t.state {
 	case Failed, Canceled:
 		state.Add(text.StatusFailed)
 	case Passed:
@@ -83,58 +74,59 @@ func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
 		state.Add(text.StatusSkipped)
 	}
 
-	name := text.NewStyledString(b.prefix)
-	if b.type_ == "P" {
-		name.Append(b.provider, text.Provider)
+	name := text.NewStyledString(t.prefix)
+	if t.type_ == "P" {
+		name.Append(t.provider, text.Provider)
 	} else {
-		name.Append(b.name)
+		name.Append(t.name)
 	}
 
-	pipeline := b.key.buildID
-	if _, err := strconv.Atoi(b.key.buildID); err == nil {
+	pipeline := t.key.ID
+	if _, err := strconv.Atoi(t.key.ID); err == nil {
 		pipeline = "#" + pipeline
 	}
 
 	refClass := text.GitBranch
-	if strings.HasPrefix(b.key.ref, "tag:") {
+	if t.ref.IsTag {
 		refClass = text.GitTag
 	}
 
 	return map[string]text.StyledString{
-		"REF":      text.NewStyledString(b.key.ref, refClass),
+		"REF":      text.NewStyledString(t.ref.Ref, refClass),
 		"PIPELINE": text.NewStyledString(pipeline),
-		"TYPE":     text.NewStyledString(b.type_),
+		"TYPE":     text.NewStyledString(t.type_),
 		"STATE":    state,
 		"NAME":     name,
-		"CREATED":  nullTimeToString(b.createdAt),
-		"STARTED":  nullTimeToString(b.startedAt),
-		"FINISHED": nullTimeToString(b.finishedAt),
-		"UPDATED":  nullTimeToString(b.updatedAt),
-		"DURATION": text.NewStyledString(b.duration.String()),
+		"CREATED":  nullTimeToString(t.createdAt),
+		"STARTED":  nullTimeToString(t.startedAt),
+		"FINISHED": nullTimeToString(t.finishedAt),
+		"UPDATED":  nullTimeToString(t.updatedAt),
+		"DURATION": text.NewStyledString(t.duration.String()),
 	}
 }
 
-func (b buildRow) Key() interface{} {
-	return b.key
+func (t task) Key() interface{} {
+	return t.key
 }
 
-func (b buildRow) URL() string {
-	return b.url
+func (t task) URL() string {
+	return t.url
 }
 
-func (b *buildRow) SetTraversable(traversable bool, recursive bool) {
-	b.traversable = traversable
+func (t *task) SetTraversable(traversable bool, recursive bool) {
+	t.traversable = traversable
 	if recursive {
-		for _, child := range b.children {
+		for _, child := range t.children {
 			child.SetTraversable(traversable, recursive)
 		}
 	}
 }
 
-func (b *buildRow) SetPrefix(s string) {
-	b.prefix = s
+func (t *task) SetPrefix(s string) {
+	t.prefix = s
 }
 
+/*
 func ref(ref string, tag bool) string {
 	if tag {
 		return fmt.Sprintf("tag: %s", ref)
@@ -142,12 +134,12 @@ func ref(ref string, tag bool) string {
 	return ref
 }
 
-func buildRowFromBuild(b Build) buildRow {
+func taskFromBuild(b Build) task {
 	ref := ref(b.Ref, b.IsTag)
-	row := buildRow{
-		key: buildRowKey{
+	row := task{
+		key: taskKey{
 			ref:       ref,
-			sha:       b.Sha,
+			SHA:       b.SHA,
 			accountID: b.Repository.Provider.ID,
 			buildID:   b.ID,
 		},
@@ -170,7 +162,7 @@ func buildRowFromBuild(b Build) buildRow {
 	}
 
 	for _, job := range b.Jobs {
-		child := buildRowFromJob(b.Repository.Provider, b.Sha, ref, b.ID, 0, *job)
+		child := taskFromJob(b.Repository.Provider, b.SHA, ref, b.ID, 0, *job)
 		row.children = append(row.children, &child)
 	}
 
@@ -181,7 +173,7 @@ func buildRowFromBuild(b Build) buildRow {
 		}
 		sort.Ints(stageIDs)
 		for _, stageID := range stageIDs {
-			child := buildRowFromStage(b.Repository.Provider, b.Sha, ref, b.ID, b.WebURL, *b.Stages[stageID])
+			child := taskFromStage(b.Repository.Provider, b.SHA, ref, b.ID, b.WebURL, *b.Stages[stageID])
 			row.children = append(row.children, &child)
 		}
 	}
@@ -189,11 +181,11 @@ func buildRowFromBuild(b Build) buildRow {
 	return row
 }
 
-func buildRowFromStage(provider Provider, sha string, ref string, buildID string, webURL string, s Stage) buildRow {
-	row := buildRow{
-		key: buildRowKey{
+func taskFromStage(provider Provider, SHA string, ref string, buildID string, webURL string, s Stage) task {
+	row := task{
+		key: taskKey{
 			ref:       ref,
-			sha:       sha,
+			SHA:       SHA,
 			accountID: provider.ID,
 			buildID:   buildID,
 			stageID:   s.ID,
@@ -225,22 +217,22 @@ func buildRowFromStage(provider Provider, sha string, ref string, buildID string
 	row.duration = utils.NullSub(row.finishedAt, row.startedAt)
 
 	for _, job := range s.Jobs {
-		child := buildRowFromJob(provider, sha, ref, buildID, s.ID, *job)
+		child := taskFromJob(provider, SHA, ref, buildID, s.ID, *job)
 		row.children = append(row.children, &child)
 	}
 
 	return row
 }
 
-func buildRowFromJob(provider Provider, sha string, ref string, buildID string, stageID int, j Job) buildRow {
+func taskFromJob(provider Provider, SHA string, ref string, buildID string, stageID int, j Job) task {
 	name := j.Name
 	if name == "" {
 		name = j.ID
 	}
-	return buildRow{
-		key: buildRowKey{
+	return task{
+		key: taskKey{
 			ref:       ref,
-			sha:       sha,
+			SHA:       SHA,
 			accountID: provider.ID,
 			buildID:   buildID,
 			stageID:   stageID,
@@ -257,7 +249,7 @@ func buildRowFromJob(provider Provider, sha string, ref string, buildID string, 
 		duration:   j.Duration,
 		provider:   provider.Name,
 	}
-}
+}*/
 
 type BuildsByCommit struct {
 	cache Cache
@@ -291,13 +283,30 @@ func (s BuildsByCommit) Alignment() map[string]text.Alignment {
 
 func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 	rows := make([]HierarchicalTabularSourceRow, 0)
-	for _, build := range s.cache.BuildsByRef(s.ref) {
-		row := buildRowFromBuild(build)
+	//for _, pipeline := range s.cache.PipelinesByRef(s.ref) {
+	for range s.cache.PipelinesByRef(s.ref) {
+		// FIXME convert pipeline to task
+		row := task{
+			key:         PipelineStepKey{},
+			type_:       "",
+			state:       "",
+			name:        "",
+			provider:    "",
+			prefix:      "",
+			createdAt:   utils.NullTime{},
+			startedAt:   utils.NullTime{},
+			finishedAt:  utils.NullTime{},
+			updatedAt:   utils.NullTime{},
+			duration:    utils.NullDuration{},
+			children:    nil,
+			traversable: false,
+			url:         "",
+		}
 		rows = append(rows, &row)
 	}
 
 	sort.Slice(rows, func(i, j int) bool {
-		ri, rj := rows[i].(*buildRow), rows[j].(*buildRow)
+		ri, rj := rows[i].(*task), rows[j].(*task)
 		ti := utils.MinNullTime(
 			ri.createdAt,
 			ri.startedAt,
@@ -320,22 +329,12 @@ var ErrNoLogHere = errors.New("no log is associated to this row")
 
 func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir string) (string, error) {
 	// TODO Allow filtering for errored jobs
-	buildKey, ok := key.(buildRowKey)
+	stepKey, ok := key.(PipelineStepKey)
 	if !ok {
-		return "", fmt.Errorf("key conversion to buildRowKey failed: '%v'", key)
+		return "", fmt.Errorf("key conversion to taskKey failed: '%v'", key)
 	}
 
-	if buildKey.jobID == "" {
-		return "", ErrNoLogHere
-	}
-
-	accountID := buildKey.accountID
-	buildID := buildKey.buildID
-	stageID := buildKey.stageID
-	jobID := buildKey.jobID
-
-	pattern := fmt.Sprintf("job_%s_*.log", jobID)
-	file, err := ioutil.TempFile(dir, pattern)
+	file, err := ioutil.TempFile(dir, "step_*.log")
 	w := utils.NewANSIStripper(file)
 	defer w.Close()
 	if err != nil {
@@ -343,6 +342,6 @@ func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir st
 	}
 	logPath := path.Join(dir, filepath.Base(file.Name()))
 
-	err = s.cache.WriteLog(ctx, accountID, buildID, stageID, jobID, w)
+	err = s.cache.WriteLog(ctx, stepKey, w)
 	return logPath, err
 }

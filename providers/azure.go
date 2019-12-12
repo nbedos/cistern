@@ -79,13 +79,13 @@ func (c AzurePipelinesClient) parseAzureWebURL(s string) (string, string, string
 	return owner, repo, buildID, nil
 }
 
-func (c AzurePipelinesClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
+func (c AzurePipelinesClient) BuildFromURL(ctx context.Context, u string) (cache.Pipeline, error) {
 	owner, repo, buildID, err := c.parseAzureWebURL(u)
 	if err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
 
-	return c.fetchBuild(ctx, owner, repo, buildID)
+	return c.fetchPipeline(ctx, owner, repo, buildID)
 }
 
 func (c AzurePipelinesClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
@@ -146,10 +146,10 @@ type azureBuild struct {
 	} `json:"repository"`
 }
 
-func (b azureBuild) toCacheBuild(p cache.Provider) (cache.Build, error) {
+func (b azureBuild) toCachePipeline(p cache.Provider) (cache.Pipeline, error) {
 	cs := strings.Split(b.Repository.ID, "/")
 	if len(cs) != 2 {
-		return cache.Build{}, fmt.Errorf("invalid repository slug: %s", b.Repository.ID)
+		return cache.Pipeline{}, fmt.Errorf("invalid repository slug: %s", b.Repository.ID)
 	}
 	owner, repo := cs[0], cs[1]
 
@@ -164,7 +164,7 @@ func (b azureBuild) toCacheBuild(p cache.Provider) (cache.Build, error) {
 		isTag = true
 	}
 
-	build := cache.Build{
+	pipeline := cache.Pipeline{
 		Repository: &cache.Repository{
 			Provider: p,
 			ID:       0,
@@ -172,39 +172,45 @@ func (b azureBuild) toCacheBuild(p cache.Provider) (cache.Build, error) {
 			Owner:    owner,
 			Name:     repo,
 		},
-		ID:              strconv.Itoa(b.ID),
-		Sha:             b.SourceVersion,
-		Ref:             ref,
-		IsTag:           isTag,
-		RepoBuildNumber: b.Number,
-		State:           fromAzureState(b.Result, b.Status),
-		Duration:        utils.NullDuration{},
-		WebURL:          b.Links.Web.Href,
-		Stages:          map[int]*cache.Stage{},
+		GitRef: cache.GitRef{
+			SHA:   b.SourceVersion,
+			Ref:   ref,
+			IsTag: isTag,
+		},
+		Step: cache.Step{
+			ID: strconv.Itoa(b.ID),
+
+			State:    fromAzureState(b.Result, b.Status),
+			Duration: utils.NullDuration{},
+			WebURL: utils.NullString{
+				Valid:  b.Links.Web.Href != "",
+				String: b.Links.Web.Href,
+			},
+		},
 	}
 
 	var err error
-	build.CreatedAt, err = utils.NullTimeFromString(b.QueueTime)
+	pipeline.CreatedAt, err = utils.NullTimeFromString(b.QueueTime)
 	if err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
-	build.StartedAt, err = utils.NullTimeFromString(b.StartTime)
+	pipeline.StartedAt, err = utils.NullTimeFromString(b.StartTime)
 	if err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
-	build.FinishedAt, err = utils.NullTimeFromString(b.FinishTime)
+	pipeline.FinishedAt, err = utils.NullTimeFromString(b.FinishTime)
 	if err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
-	if build.UpdatedAt, err = time.Parse(time.RFC3339, b.LastChangedDate); err != nil {
-		return cache.Build{}, err
+	if pipeline.UpdatedAt, err = time.Parse(time.RFC3339, b.LastChangedDate); err != nil {
+		return cache.Pipeline{}, err
 	}
-	build.Duration = utils.NullSub(build.FinishedAt, build.StartedAt)
+	pipeline.Duration = utils.NullSub(pipeline.FinishedAt, pipeline.StartedAt)
 
-	return build, nil
+	return pipeline, nil
 }
 
-func (c AzurePipelinesClient) fetchBuild(ctx context.Context, owner string, repo string, id string) (cache.Build, error) {
+func (c AzurePipelinesClient) fetchPipeline(ctx context.Context, owner string, repo string, id string) (cache.Pipeline, error) {
 	u := c.baseURL
 	u.Path += fmt.Sprintf("/%s/%s/_apis/build/builds", owner, repo)
 	params := u.Query()
@@ -215,31 +221,31 @@ func (c AzurePipelinesClient) fetchBuild(ctx context.Context, owner string, repo
 		Value []azureBuild `json:"value"`
 	}{}
 	if err := c.getJSON(ctx, u, &builds); err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
 	if len(builds.Value) != 1 {
-		return cache.Build{}, errors.New("expected a single build in response")
+		return cache.Pipeline{}, errors.New("expected a single build in response")
 	}
 
 	azureBuild := builds.Value[0]
-	build, err := azureBuild.toCacheBuild(c.provider)
+	pipeline, err := azureBuild.toCachePipeline(c.provider)
 	if err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
 
 	stages, err := c.getTimeline(ctx, azureBuild.Links.Timeline.Href)
 	if err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
 
 	for _, stage := range stages {
-		for _, job := range stage.Jobs {
-			job.CreatedAt = build.CreatedAt
+		for _, job := range stage.Children {
+			job.CreatedAt = pipeline.CreatedAt
 		}
 	}
 
-	// If there is a single stage named "__default" just remove it and populate build.Jobs with
-	// the jobs of the stage
+	// If there is a single stage named "__default" just remove it and populate pipeline.Children
+	// with the jobs of the stage
 	isDefaultStage := false
 	if len(stages) == 1 {
 		for _, stage := range stages {
@@ -248,16 +254,16 @@ func (c AzurePipelinesClient) fetchBuild(ctx context.Context, owner string, repo
 	}
 	if isDefaultStage {
 		for _, stage := range stages {
-			build.Jobs = stage.Jobs
+			pipeline.Children = stage.Children
 		}
 	} else {
-		build.Stages = stages
+		pipeline.Children = stages
 	}
 
-	return build, err
+	return pipeline, err
 }
 
-func (c AzurePipelinesClient) getTimeline(ctx context.Context, u string) (map[int]*cache.Stage, error) {
+func (c AzurePipelinesClient) getTimeline(ctx context.Context, u string) ([]*cache.Step, error) {
 	timelineURL, err := url.Parse(u)
 	if err != nil {
 		return nil, err
@@ -300,27 +306,32 @@ func (c AzurePipelinesClient) getTimeline(ctx context.Context, u string) (map[in
 				return nil, errors.New("ParentID not found")
 			}
 			parent.children = append(parent.children, record)
-			sortByOrder(parent.children) // meh.
 		} else {
 			topLevelRecords = append(topLevelRecords, record)
 		}
 	}
 
-	// At this point we have a tree structure with the following hierarchy of 'record.Type's :
+	for _, record := range recordsByID {
+		sort.Slice(record.children, func(i, j int) bool {
+			return record.children[i].Order < record.children[j].Order
+		})
+	}
+
+	// At this point we have a tree structure with the following hierarchy of record.Type :
 	//    Stage -> Phase -> Job -> Task
 	// For now we ignore Tasks. Phases that contain jobs are redundant with the jobs themselves
 	// so we ignore them too. Phase that have no child are turned into a cache.Job.
 	// (this is consistent with the way jobs are shown on the Azure website)
-	stages := make(map[int]*cache.Stage)
+	steps := make([]*cache.Step, 0, len(topLevelRecords))
 	for _, record := range topLevelRecords {
-		stage, err := record.ToCacheStage()
+		stage, err := record.toStageStep()
 		if err != nil {
 			return nil, err
 		}
-		stages[stage.ID] = &stage
+		steps = append(steps, &stage)
 	}
 
-	return stages, nil
+	return steps, nil
 }
 
 type azureRecord struct {
@@ -340,39 +351,33 @@ type azureRecord struct {
 	children []*azureRecord
 }
 
-func sortByOrder(records []*azureRecord) {
-	sort.Slice(records, func(i, j int) bool {
-		return records[i].Order < records[j].Order
-	})
-}
-
-func (r azureRecord) ToCacheStage() (cache.Stage, error) {
+func (r azureRecord) toStageStep() (cache.Step, error) {
 	if t := strings.ToLower(r.Type); t != "stage" {
-		return cache.Stage{}, fmt.Errorf("expected record of type 'stage' but got %q", t)
+		return cache.Step{}, fmt.Errorf("expected record of type 'stage' but got %q", t)
 	}
 
 	if r.Order == 0 {
-		return cache.Stage{}, errors.New("record order for stage cannot be zero")
+		return cache.Step{}, errors.New("record order for stage cannot be zero")
 	}
 
-	stageJobs := make([]*cache.Job, 0)
+	stageJobs := make([]*cache.Step, 0)
 	for _, record := range r.children {
-		jobs, err := record.ToCacheJobs()
+		jobs, err := record.toJobSteps()
 		if err != nil {
-			return cache.Stage{}, err
+			return cache.Step{}, err
 		}
 		stageJobs = append(stageJobs, jobs...)
 	}
 
-	return cache.Stage{
-		ID:    r.Order,
-		Name:  r.Name,
-		State: fromAzureState(r.Result, r.State),
-		Jobs:  stageJobs,
+	return cache.Step{
+		ID:       strconv.Itoa(r.Order),
+		Name:     r.Name,
+		State:    fromAzureState(r.Result, r.State),
+		Children: stageJobs,
 	}, nil
 }
 
-func (r azureRecord) ToCacheJobs() ([]*cache.Job, error) {
+func (r azureRecord) toJobSteps() ([]*cache.Step, error) {
 	if t := strings.ToLower(r.Type); t != "phase" {
 		return nil, fmt.Errorf("expected record of type 'phase' but got %q", t)
 	}
@@ -387,9 +392,9 @@ func (r azureRecord) ToCacheJobs() ([]*cache.Job, error) {
 		records = r.children
 	}
 
-	jobs := make([]*cache.Job, 0)
+	jobs := make([]*cache.Step, 0)
 	for _, record := range records {
-		job, err := record.ToCacheJob()
+		job, err := record.toJobStep()
 		if err != nil {
 			return nil, err
 		}
@@ -399,24 +404,24 @@ func (r azureRecord) ToCacheJobs() ([]*cache.Job, error) {
 	return jobs, nil
 }
 
-func (r azureRecord) ToCacheJob() (cache.Job, error) {
-	job := cache.Job{
+func (r azureRecord) toJobStep() (cache.Step, error) {
+	job := cache.Step{
 		ID:           r.ID,
 		State:        fromAzureState(r.Result, r.State),
 		Name:         r.Name,
 		Log:          utils.NullString{},
-		WebURL:       "",
+		WebURL:       utils.NullString{},
 		AllowFailure: false,
 	}
 
 	var err error
 	job.StartedAt, err = utils.NullTimeFromString(r.StartTime)
 	if err != nil {
-		return cache.Job{}, err
+		return cache.Step{}, err
 	}
 	job.FinishedAt, err = utils.NullTimeFromString(r.FinishTime)
 	if err != nil {
-		return cache.Job{}, err
+		return cache.Step{}, err
 	}
 	job.Duration = utils.NullSub(job.FinishedAt, job.StartedAt)
 

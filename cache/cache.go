@@ -26,8 +26,9 @@ var ErrUnknownGitReference = errors.New("unknown git reference")
 
 type CIProvider interface {
 	ID() string
-	Log(ctx context.Context, repository Repository, jobID string) (string, error)
-	BuildFromURL(ctx context.Context, u string) (Build, error)
+	// FIXME Replace stepID by stepIDs
+	Log(ctx context.Context, repository Repository, stepID string) (string, error)
+	BuildFromURL(ctx context.Context, u string) (Pipeline, error)
 }
 
 type SourceProvider interface {
@@ -97,6 +98,7 @@ func (s State) IsActive() bool {
 	return s == Pending || s == Running
 }
 
+// TODO Add Failing state for running job with one failure
 const (
 	Unknown  State = ""
 	Pending  State = "pending"
@@ -108,25 +110,20 @@ const (
 	Skipped  State = "skipped"
 )
 
-type Statuser interface {
-	Status() State
-	AllowedFailure() bool
+var statePrecedence = map[State]int{
+	Unknown:  80,
+	Running:  70,
+	Pending:  60,
+	Canceled: 50,
+	Failed:   40,
+	Passed:   30,
+	Skipped:  20,
+	Manual:   10,
 }
 
-func AggregateStatuses(ss []Statuser) State {
+/*func AggregateStatuses(ss []Step) State {
 	if len(ss) == 0 {
 		return Unknown
-	}
-
-	statePrecedence := map[State]int{
-		Unknown:  80,
-		Running:  70,
-		Pending:  60,
-		Canceled: 50,
-		Failed:   40,
-		Passed:   30,
-		Skipped:  20,
-		Manual:   10,
 	}
 
 	state := ss[0].Status()
@@ -139,7 +136,7 @@ func AggregateStatuses(ss []Statuser) State {
 	}
 
 	return state
-}
+}*/
 
 type Provider struct {
 	ID   string
@@ -219,7 +216,7 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 	// /home/user/localrepo will make go-git look for a .git repository in
 	// /home/user/localrepo/github.com/owner/remoterepo which will inevitably lead to
 	// /home/user/localrepo which is not what the user expected since the user was
-	// refering to the online repository https://github.com/owner/remoterepo. So instead
+	// referring to the online repository https://github.com/owner/remoterepo. So instead
 	// we bail out early if the path is invalid, meaning it's not a local path but a URL.
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
@@ -259,8 +256,8 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 			// to test against them.
 
 			// The failure of ResolveRevision may be due to go-git failure to resolve an
-			// abbreviated SHA. This is quite useful so, for now, circumvent the problem by
-			// using the local git binary.
+			// abbreviated SHA. Abbreviated SHAs are quite useful so, for now, circumvent the
+			// problem by using the local git binary.
 			cmd := exec.Command("git", "show", sha, "--pretty=format:%H")
 			bs, err := cmd.Output()
 			if err != nil {
@@ -316,84 +313,59 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 	return origin, c, nil
 }
 
-type Build struct {
-	Repository      *Repository
-	ID              string
-	Sha             string
-	Ref             string
-	IsTag           bool
-	RepoBuildNumber string
-	State           State
-	CreatedAt       utils.NullTime
-	StartedAt       utils.NullTime
-	FinishedAt      utils.NullTime
-	UpdatedAt       time.Time
-	Duration        utils.NullDuration
-	WebURL          string
-	Stages          map[int]*Stage
-	Jobs            []*Job
-}
-
-func (b Build) Status() State        { return b.State }
-func (b Build) AllowedFailure() bool { return false }
-
-func (b Build) Get(stageID int, jobID string) (Job, bool) {
-	var jobs []*Job
-	if stageID == 0 {
-		jobs = b.Jobs
-	} else {
-		if b.Stages == nil {
-			return Job{}, false
-		}
-		stage, exists := b.Stages[stageID]
-		if !exists {
-			return Job{}, false
-		}
-		jobs = stage.Jobs
-	}
-
-	// meh.
-	for _, job := range jobs {
-		if job.ID == jobID {
-			return *job, true
-		}
-	}
-
-	return Job{}, false
-}
-
-type Stage struct {
-	ID    int
-	Name  string
-	State State
-	Jobs  []*Job
-}
-
-type Job struct {
+type Step struct {
 	ID           string
-	State        State
 	Name         string
+	Type         string
+	State        State
+	AllowFailure bool
 	CreatedAt    utils.NullTime
 	StartedAt    utils.NullTime
 	FinishedAt   utils.NullTime
+	UpdatedAt    time.Time
 	Duration     utils.NullDuration
+	WebURL       utils.NullString
 	Log          utils.NullString
-	WebURL       string
-	AllowFailure bool
+	Children     []*Step
 }
 
-func (j Job) Status() State        { return j.State }
-func (j Job) AllowedFailure() bool { return j.AllowFailure }
+func (s Step) Status() State        { return s.State }
+func (s Step) AllowedFailure() bool { return s.AllowFailure }
 
-type buildKey struct {
-	AccountID string
-	BuildID   string
+type GitRef struct {
+	SHA   string
+	Ref   string
+	IsTag bool
+}
+
+type Pipeline struct {
+	ProviderID string
+	Repository *Repository
+	GitRef
+	Step
+}
+
+type PipelineKey struct {
+	ProviderID string
+	ID         string
+}
+
+type PipelineStepKey struct {
+	PipelineKey
+	stepIDs []string
+}
+
+func (p Pipeline) Key() PipelineKey {
+	return PipelineKey{
+		ProviderID: p.ProviderID,
+		ID:         p.Step.ID,
+	}
 }
 
 type Cache struct {
 	commitsByRef    map[string]Commit
-	buildsByKey     map[buildKey]*Build
-	buildsByRef     map[string]map[buildKey]*Build
+	pipelineByKey   map[PipelineKey]*Pipeline
+	pipelineByRef   map[string]map[PipelineKey]*Pipeline
 	mutex           *sync.Mutex
 	ciProvidersById map[string]CIProvider
 	sourceProviders []SourceProvider
@@ -407,8 +379,8 @@ func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache 
 
 	return Cache{
 		commitsByRef:    make(map[string]Commit),
-		buildsByKey:     make(map[buildKey]*Build),
-		buildsByRef:     make(map[string]map[buildKey]*Build),
+		pipelineByKey:   make(map[PipelineKey]*Pipeline),
+		pipelineByRef:   make(map[string]map[PipelineKey]*Pipeline),
 		mutex:           &sync.Mutex{},
 		ciProvidersById: providersByAccountID,
 		sourceProviders: sourceProviders,
@@ -420,41 +392,35 @@ var ErrObsoleteBuild = errors.New("build to save is older than current build in 
 // Store build in cache. If a build from the same provider and with the same ID is
 // already stored in cache, it will be overwritten if the build to save is more recent
 // than the build in cache. If the build to save is older than the build in cache,
-// SaveBuild will return ErrObsoleteBuild.
-func (c *Cache) SaveBuild(ref string, build Build) error {
-	if build.Repository == nil {
-		return errors.New("build.repository must not be nil")
+// SavePipeline will return ErrObsoleteBuild.
+func (c *Cache) SavePipeline(ref string, p Pipeline) error {
+	if p.Repository == nil {
+		return errors.New("Pipeline.Repository must not be nil")
 	}
-
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	key := buildKey{
-		AccountID: build.Repository.Provider.ID,
-		BuildID:   build.ID,
-	}
-
-	existingBuild, exists := c.buildsByKey[key]
+	existingBuild, exists := c.pipelineByKey[p.Key()]
 	// UpdatedAt refers to the last update of the build and does not reflect an eventual
 	// update of a job so default to always updating an active build
-	if exists && !build.State.IsActive() && !build.UpdatedAt.After(existingBuild.UpdatedAt) {
+	if exists && !p.State.IsActive() && !p.UpdatedAt.After(existingBuild.UpdatedAt) {
 		// Point ref to existingBuild
-		if _, exists := c.buildsByRef[ref]; !exists {
-			c.buildsByRef[ref] = make(map[buildKey]*Build)
+		if _, exists := c.pipelineByRef[ref]; !exists {
+			c.pipelineByRef[ref] = make(map[PipelineKey]*Pipeline)
 		}
-		if c.buildsByRef[ref][key] == existingBuild {
+		if c.pipelineByRef[ref][p.Key()] == existingBuild {
 			return ErrObsoleteBuild
 		}
-		c.buildsByRef[ref][key] = existingBuild
+		c.pipelineByRef[ref][p.Key()] = existingBuild
 		return nil
 	}
 
-	c.buildsByKey[key] = &build
+	c.pipelineByKey[p.Key()] = &p
 	// Point ref to new build
-	if _, exists := c.buildsByRef[ref]; !exists {
-		c.buildsByRef[ref] = make(map[buildKey]*Build)
+	if _, exists := c.pipelineByRef[ref]; !exists {
+		c.pipelineByRef[ref] = make(map[PipelineKey]*Pipeline)
 	}
-	c.buildsByRef[ref][key] = &build
+	c.pipelineByRef[ref][p.Key()] = &p
 
 	return nil
 }
@@ -467,7 +433,7 @@ func (c *Cache) SaveCommit(ref string, commit Commit) {
 
 	if previousCommit, exists := c.commitsByRef[ref]; exists {
 		if previousCommit.Sha != commit.Sha {
-			delete(c.buildsByRef, ref)
+			delete(c.pipelineByRef, ref)
 		}
 
 		previousBranches := make(map[string]struct{})
@@ -503,66 +469,26 @@ func (c Cache) Commit(ref string) (Commit, bool) {
 	return commit, exists
 }
 
-// Store a job in cache. Parent build and stage must already exist.
-func (c *Cache) SaveJob(accountID string, buildID string, stageID int, job Job) error {
+func (c Cache) Pipelines() []Pipeline {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	key := buildKey{
-		AccountID: accountID,
-		BuildID:   buildID,
-	}
-	build, exists := c.buildsByKey[key]
-	if !exists {
-		return fmt.Errorf("no matching build found in cache for key %v", key)
-	}
-	if stageID == 0 {
-		for i := range build.Jobs {
-			if build.Jobs[i].ID == job.ID {
-				build.Jobs[i] = &job
-				return nil
-			}
-		}
-		build.Jobs = append(build.Jobs, &job)
-	} else {
-		if build.Stages == nil {
-			return fmt.Errorf("build has no stage %d", stageID)
-		}
-		stage, exists := build.Stages[stageID]
-		if !exists {
-			return fmt.Errorf("build has no stage %d", stageID)
-		}
-		for i := range stage.Jobs {
-			if stage.Jobs[i].ID == job.ID {
-				stage.Jobs[i] = &job
-				return nil
-			}
-		}
-		stage.Jobs = append(stage.Jobs, &job)
+	pipelines := make([]Pipeline, 0, len(c.pipelineByKey))
+	for _, build := range c.pipelineByKey {
+		pipelines = append(pipelines, *build)
 	}
 
-	return nil
+	return pipelines
 }
 
-func (c Cache) Builds() []Build {
+func (c Cache) PipelinesByRef(ref string) []Pipeline {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	builds := make([]Build, 0, len(c.buildsByKey))
-	for _, build := range c.buildsByKey {
-		builds = append(builds, *build)
+	pipelines := make([]Pipeline, 0, len(c.pipelineByRef[ref]))
+	for _, p := range c.pipelineByRef[ref] {
+		pipelines = append(pipelines, *p)
 	}
 
-	return builds
-}
-
-func (c Cache) BuildsByRef(ref string) []Build {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	builds := make([]Build, 0, len(c.buildsByRef[ref]))
-	for _, build := range c.buildsByRef[ref] {
-		builds = append(builds, *build)
-	}
-
-	return builds
+	return pipelines
 }
 
 // Poll provider at increasing interval for information about the CI pipeline identified by the URL
@@ -587,12 +513,12 @@ func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref
 			return ctx.Err()
 		}
 
-		build, err := p.BuildFromURL(ctx, u)
+		pipeline, err := p.BuildFromURL(ctx, u)
 		if err != nil {
 			return err
 		}
 
-		switch err := c.SaveBuild(ref, build); err {
+		switch err := c.SavePipeline(ref, pipeline); err {
 		case nil:
 			go func() {
 				select {
@@ -600,14 +526,14 @@ func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref
 				case <-ctx.Done():
 				}
 			}()
-			// If SaveBuild() does not return an error then the build object we just saved
+			// If SavePipeline() does not return an error then the build object we just saved
 			// differs from the previous one. This most likely means the pipeline is
 			// currently running so reset the backoff object.
 			b.Reset()
 		case ErrObsoleteBuild:
 			// This error means that the build object we wanted to save was last updated by
 			// the CI provider at the same time or before the one already saved in cache with the
-			// same ID, so cache.SaveBuild rejected or request to store our build.
+			// same ID, so cache.SavePipeline rejected or request to store our build.
 			// It's OK. In particular, since builds returned by BuildFromURL never contain
 			// logs, it prevents us from overwriting a build that may have logs (these would have
 			// been committed to the cache by a call to cache.SaveJob() after the user asks to
@@ -817,65 +743,83 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repo string, ref string, u
 	return err
 }
 
-func (c *Cache) fetchBuild(accountID string, buildID string) (Build, bool) {
+func (c *Cache) Pipeline(key PipelineKey) (Pipeline, bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	build, exists := c.buildsByKey[buildKey{
-		AccountID: accountID,
-		BuildID:   buildID,
-	}]
-	if exists {
-		return *build, exists
+	p, exists := c.pipelineByKey[key]
+	if !exists || p == nil {
+		return Pipeline{}, false
 	}
 
-	return Build{}, false
+	return *p, true
 }
 
-func (c *Cache) fetchJob(accountID string, buildID string, stageID int, jobID string) (Job, bool) {
-	build, exists := c.fetchBuild(accountID, buildID)
+func (c *Cache) Step(key PipelineKey, stepIDs []string) (Step, bool) {
+	p, exists := c.Pipeline(key)
 	if !exists {
-		return Job{}, false
+		return Step{}, false
 	}
 
-	return build.Get(stageID, jobID)
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	step := p.Step
+	for ids := stepIDs; len(ids) > 0; ids = ids[:len(ids)-1] {
+		exists := false
+		for _, childStep := range step.Children {
+			if childStep.ID == ids[0] {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			return Step{}, false
+		}
+	}
+
+	return step, true
 }
 
 var ErrIncompleteLog = errors.New("log not complete")
 
-func (c *Cache) WriteLog(ctx context.Context, accountID string, buildID string, stageID int, jobID string, writer io.Writer) error {
-	build, exists := c.fetchBuild(accountID, buildID)
+func (c *Cache) WriteLog(ctx context.Context, key PipelineStepKey, writer io.Writer) error {
+	var err error
+	p, exists := c.Pipeline(key.PipelineKey)
 	if !exists {
-		return fmt.Errorf("no matching build for %v %v", accountID, buildID)
-	}
-	job, exists := c.fetchJob(accountID, buildID, stageID, jobID)
-	if !exists {
-		return fmt.Errorf("no matching job for %v %v %v %v", accountID, buildID, stageID, jobID)
+		return fmt.Errorf("no matching pipelibe for %v", key)
 	}
 
-	if !job.Log.Valid {
-		provider, exists := c.ciProvidersById[accountID]
+	step, exists := c.Step(key.PipelineKey, key.stepIDs)
+	if !exists {
+		return fmt.Errorf("no matching step for %v %v", key, key.stepIDs)
+	}
+
+	log := step.Log.String
+	if !step.Log.Valid {
+		provider, exists := c.ciProvidersById[key.ProviderID]
 		if !exists {
-			return fmt.Errorf("no matching provider found in cache for account ID %q", accountID)
+			return fmt.Errorf("no matching provider found in cache for account ID %q", key.ProviderID)
 		}
-		log, err := provider.Log(ctx, *build.Repository, job.ID)
+
+		log, err = provider.Log(ctx, *p.Repository, step.ID)
 		if err != nil {
 			return err
 		}
 
-		job.Log = utils.NullString{String: log, Valid: true}
+		/* TODO Reenable this
 		if !job.State.IsActive() {
 			if err = c.SaveJob(accountID, buildID, stageID, job); err != nil {
 				return err
 			}
 		}
+		*/
 	}
 
-	log := job.Log.String
 	if !strings.HasSuffix(log, "\n") {
 		log = log + "\n"
 	}
 	processedLog := utils.PostProcess(log)
-	_, err := writer.Write([]byte(processedLog))
+	_, err = writer.Write([]byte(processedLog))
+
 	return err
 }

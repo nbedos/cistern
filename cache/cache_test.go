@@ -1,41 +1,37 @@
 package cache
 
 import (
-	"bytes"
-	"context"
-	"fmt"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/nbedos/citop/utils"
 )
 
 func TestAggregateStatuses(t *testing.T) {
 	testCases := []struct {
-		name      string
-		statusers []Statuser
-		result    State
+		name   string
+		steps  []Step
+		result State
 	}{
 		{
-			name:      "Empty list",
-			statusers: []Statuser{},
-			result:    Unknown,
+			name:   "Empty list",
+			steps:  []Step{},
+			result: Unknown,
 		},
 		{
 			name: "Jobs: No allowed failure",
-			statusers: []Statuser{
-				Job{
+			steps: []Step{
+				{
 					AllowFailure: false,
 					State:        Passed,
 				},
-				Job{
+				{
 					AllowFailure: false,
 					State:        Failed,
 				},
-				Job{
+				{
 					AllowFailure: false,
 					State:        Passed,
 				},
@@ -44,16 +40,16 @@ func TestAggregateStatuses(t *testing.T) {
 		},
 		{
 			name: "Jobs: Allowed failure",
-			statusers: []Statuser{
-				Job{
+			steps: []Step{
+				{
 					AllowFailure: false,
 					State:        Passed,
 				},
-				Job{
+				{
 					AllowFailure: true,
 					State:        Failed,
 				},
-				Job{
+				{
 					AllowFailure: false,
 					State:        Passed,
 				},
@@ -62,14 +58,14 @@ func TestAggregateStatuses(t *testing.T) {
 		},
 		{
 			name: "Builds",
-			statusers: []Statuser{
-				Build{
+			steps: []Step{
+				{
 					State: Passed,
 				},
-				Build{
+				{
 					State: Failed,
 				},
-				Build{
+				{
 					State: Passed,
 				},
 			},
@@ -79,85 +75,8 @@ func TestAggregateStatuses(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if state := AggregateStatuses(testCase.statusers); state != testCase.result {
+			if state := AggregateStatuses(testCase.steps); state != testCase.result {
 				t.Fatalf("expected %q but got %q", testCase.result, state)
-			}
-		})
-	}
-}
-
-func TestBuild_Get(t *testing.T) {
-	build := Build{
-		Stages: map[int]*Stage{
-			1: {ID: 1},
-			2: {
-				ID: 2,
-				Jobs: []*Job{
-					{ID: "3"},
-					{ID: "4"},
-				},
-			},
-		},
-		Jobs: []*Job{
-			{ID: "5"},
-			{ID: "6"},
-			{ID: "7"},
-		},
-	}
-
-	successTestCases := []struct {
-		stageID int
-		jobID   string
-	}{
-		{
-			stageID: 2,
-			jobID:   "3",
-		},
-		{
-			stageID: 2,
-			jobID:   "4",
-		},
-		{
-			stageID: 0,
-			jobID:   "5",
-		},
-	}
-
-	for _, testCase := range successTestCases {
-		t.Run(fmt.Sprintf("Case %+v", testCase), func(t *testing.T) {
-			job, exists := build.Get(testCase.stageID, testCase.jobID)
-			if !exists {
-				t.Fail()
-			}
-			if job.ID != testCase.jobID {
-				t.Fatalf("expected jobID %s but got %s", testCase.jobID, job.ID)
-			}
-		})
-	}
-
-	failureTestCases := []struct {
-		stageID int
-		jobID   string
-	}{
-		{
-			stageID: 0,
-			jobID:   "0",
-		},
-		{
-			stageID: 2,
-			jobID:   "0",
-		},
-		{
-			stageID: -1,
-			jobID:   "-1",
-		},
-	}
-
-	for _, testCase := range failureTestCases {
-		t.Run(fmt.Sprintf("Case %+v", testCase), func(t *testing.T) {
-			_, exists := build.Get(testCase.stageID, testCase.jobID)
-			if exists {
-				t.Fatalf("expected to not find job %+v", testCase)
 			}
 		})
 	}
@@ -170,131 +89,85 @@ func TestCache_Save(t *testing.T) {
 		},
 	}
 
-	t.Run("Saved build must be returned by fetchBuild()", func(t *testing.T) {
+	t.Run("Saved build must be returned by Pipeline()", func(t *testing.T) {
 		c := NewCache(nil, nil)
-		build := Build{Repository: &repository, ID: "42", State: Failed}
-		if err := c.SaveBuild("", build); err != nil {
+		p := Pipeline{
+			Repository: &repository,
+			Step: Step{
+				ID:    "42",
+				State: Failed,
+			},
+		}
+		if err := c.SavePipeline("", p); err != nil {
 			t.Fatal(err)
 		}
-		savedBuild, exists := c.fetchBuild(build.Repository.Provider.ID, build.ID)
+		savedPipeline, exists := c.Pipeline(p.Key())
 		if !exists {
-			t.Fatal("build was not saved")
+			t.Fatal("pipeline was not saved")
 		}
-		if savedBuild.State != build.State {
-			t.Fatal("build state differ")
+
+		if diff := cmp.Diff(savedPipeline, p); len(diff) > 0 {
+			t.Fatal(diff)
 		}
 	})
 
-	buildOld := Build{
+	oldPipeline := Pipeline{
 		Repository: &repository,
-		ID:         "42", State: Failed,
-		UpdatedAt: time.Date(2019, 11, 24, 14, 52, 0, 0, time.UTC),
+		Step: Step{
+			ID:        "42",
+			State:     Failed,
+			UpdatedAt: time.Date(2019, 11, 24, 14, 52, 0, 0, time.UTC),
+		},
 	}
-	buildNew := Build{
+	newPipeline := Pipeline{
 		Repository: &repository,
-		ID:         "42",
-		State:      Passed,
-		UpdatedAt:  buildOld.UpdatedAt.Add(time.Second),
+		Step: Step{
+			ID:        "42",
+			State:     Passed,
+			UpdatedAt: oldPipeline.UpdatedAt.Add(time.Second),
+		},
 	}
 
 	t.Run("existing build must be overwritten if it's older than the current build", func(t *testing.T) {
 		c := NewCache(nil, nil)
 
-		if err := c.SaveBuild("", buildOld); err != nil {
+		if err := c.SavePipeline("", oldPipeline); err != nil {
 			t.Fatal(err)
 		}
-		if err := c.SaveBuild("", buildNew); err != nil {
+		if err := c.SavePipeline("", newPipeline); err != nil {
 			t.Fatal(err)
 		}
-		savedBuild, exists := c.fetchBuild(buildOld.Repository.Provider.ID, buildNew.ID)
+		savedBuild, exists := c.Pipeline(oldPipeline.Key())
 		if !exists {
 			t.Fatal("build was not saved")
 		}
-		if savedBuild.State != buildNew.State {
-			t.Fatal("build state must be equal")
+
+		if diff := cmp.Diff(savedBuild, newPipeline); len(diff) > 0 {
+			t.Fatal(diff)
 		}
 	})
 
-	t.Run("cache.SaveBuild must return ErrObsoleteBuild if the build to save is older than the one in cache", func(t *testing.T) {
+	t.Run("cache.SavePipeline must return ErrObsoleteBuild if the build to save is older than the one in cache", func(t *testing.T) {
 		c := NewCache(nil, nil)
 
-		if err := c.SaveBuild("", buildNew); err != nil {
+		if err := c.SavePipeline("", newPipeline); err != nil {
 			t.Fatal(err)
 		}
-		if err := c.SaveBuild("", buildOld); err != ErrObsoleteBuild {
+		if err := c.SavePipeline("", oldPipeline); err != ErrObsoleteBuild {
 			t.Fatalf("expected %v but got %v", ErrObsoleteBuild, err)
 		}
 	})
 
 	t.Run("Pointer to repository must not be nil", func(t *testing.T) {
 		c := NewCache(nil, nil)
-		build := Build{Repository: nil, ID: "42", State: Passed}
-		if err := c.SaveBuild("", build); err == nil {
-			t.Fatal("expected error but got nil")
-		}
-	})
-}
-
-func TestCache_SaveJob(t *testing.T) {
-	repository := Repository{
-		Provider: Provider{
-			ID: "testAccount",
-		},
-	}
-
-	build := Build{
-		Repository: &repository,
-		ID:         "42",
-		State:      Failed,
-		Stages: map[int]*Stage{
-			43: {
-				ID: 43,
+		pipeline := Pipeline{
+			Repository: nil,
+			Step: Step{
+				ID:    "42",
+				State: Passed,
 			},
-		},
-	}
-
-	t.Run("Save job without stage", func(t *testing.T) {
-		c := NewCache(nil, nil)
-		if err := c.SaveBuild("", build); err != nil {
-			t.Fatal(err)
 		}
-
-		job := Job{ID: "43"}
-		if err := c.SaveJob(repository.Provider.ID, build.ID, 0, job); err != nil {
-			t.Fatal(err)
-		}
-		savedJob, _ := c.fetchJob(repository.Provider.ID, build.ID, 0, "43")
-		if diff := cmp.Diff(savedJob, job); len(diff) > 0 {
-			t.Fatal(diff)
-		}
-	})
-
-	t.Run("Save job with stage", func(t *testing.T) {
-		c := NewCache(nil, nil)
-		if err := c.SaveBuild("", build); err != nil {
-			t.Fatal(err)
-		}
-
-		job := Job{ID: "45"}
-		if err := c.SaveJob(repository.Provider.ID, build.ID, 43, job); err != nil {
-			t.Fatal(err)
-		}
-		savedJob, exists := c.fetchJob(repository.Provider.ID, build.ID, 43, "45")
-		if !exists {
-			t.Fatal("job not found")
-		}
-		if diff := cmp.Diff(savedJob, job); len(diff) > 0 {
-			t.Fatal(diff)
-		}
-	})
-
-	t.Run("Saving job to non-existent stage must fail", func(t *testing.T) {
-		c := NewCache(nil, nil)
-		if err := c.SaveBuild("", build); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := c.SaveJob(repository.Provider.ID, build.ID, 404, Job{ID: "45"}); err == nil {
+		if err := c.SavePipeline("", pipeline); err == nil {
 			t.Fatal("expected error but got nil")
 		}
 	})
@@ -310,19 +183,31 @@ func TestCache_Builds(t *testing.T) {
 	ids := []string{"1", "2", "3", "4"}
 	c := NewCache(nil, nil)
 	for _, id := range ids {
-		if err := c.SaveBuild("", Build{Repository: &repository, ID: id}); err != nil {
+		p := Pipeline{
+			ProviderID: "testAccount",
+			Repository: &repository,
+			Step: Step{
+				ID: id,
+			},
+		}
+		if err := c.SavePipeline("", p); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	for _, id := range ids {
-		_, exists := c.fetchBuild(repository.Provider.ID, id)
+		key := PipelineKey{
+			ProviderID: "testAccount",
+			ID:         id,
+		}
+		_, exists := c.Pipeline(key)
 		if !exists {
-			t.Fatal("build not found")
+			t.Fatalf("build not found: %+v", key)
 		}
 	}
 }
 
+/*
 type mockProvider struct {
 	id     string
 	builds []Build
@@ -332,8 +217,8 @@ func (p mockProvider) ID() string { return p.id }
 func (p mockProvider) Log(ctx context.Context, repository Repository, jobID string) (string, error) {
 	return "log\n", nil
 }
-func (p mockProvider) BuildFromURL(ctx context.Context, u string) (Build, error) {
-	return Build{}, nil
+func (p mockProvider) BuildFromURL(ctx context.Context, u string) (Pipeline, error) {
+	return Pipeline{}, nil
 }
 
 func TestCache_WriteLog(t *testing.T) {
@@ -347,20 +232,22 @@ func TestCache_WriteLog(t *testing.T) {
 			},
 		}, nil)
 
-		builds := []Build{
+		pipelines := []Pipeline{
 			{
 				Repository: &Repository{
 					Provider: Provider{
 						ID: "provider1",
 					},
 				},
-				ID: "1",
-				Jobs: []*Job{
-					{
-						ID:    "1",
-						State: Passed,
-						Log: utils.NullString{
-							Valid: false,
+				Step: Step{
+					ID: "1",
+					Children: []Step{
+						{
+							ID:    "1",
+							State: Passed,
+							Log: utils.NullString{
+								Valid: false,
+							},
 						},
 					},
 				},
@@ -371,7 +258,9 @@ func TestCache_WriteLog(t *testing.T) {
 						ID: "provider1",
 					},
 				},
-				ID: "2",
+				Step: Step{
+					ID: "2",
+				},
 			},
 			{
 				Repository: &Repository{
@@ -379,7 +268,9 @@ func TestCache_WriteLog(t *testing.T) {
 						ID: "provider1",
 					},
 				},
-				ID: "3",
+				Step: Step{
+					ID: "3",
+				},
 			},
 			{
 				Repository: &Repository{
@@ -387,18 +278,24 @@ func TestCache_WriteLog(t *testing.T) {
 						ID: "provider1",
 					},
 				},
-				ID: "4",
+				Step: Step{
+					ID: "4",
+				},
 			},
 		}
 
-		for _, build := range builds {
-			if err := c.SaveBuild("", build); err != nil {
+		for _, p := range pipelines {
+			if err := c.SavePipeline("", p); err != nil {
 				t.Fatal(err)
 			}
 		}
 
 		buf := bytes.Buffer{}
-		if err := c.WriteLog(context.Background(), "provider1", "1", 0, "1", &buf); err != nil {
+		key := PipelineKey{
+			ProviderID: "provider1",
+			ID:         "1",
+		}
+		if err := c.WriteLog(context.Background(), key, []string{"0", "1"}, &buf); err != nil {
 			t.Fatal(err)
 		}
 
@@ -412,21 +309,23 @@ func TestCache_WriteLog(t *testing.T) {
 
 	t.Run("log saved in cache must be returned as is", func(t *testing.T) {
 		c := NewCache([]CIProvider{mockProvider{id: "provider1"}}, nil)
-		builds := []Build{
+		pipelines := []Pipeline{
 			{
 				Repository: &Repository{
 					Provider: Provider{
 						ID: "provider1",
 					},
 				},
-				ID: "1",
-				Jobs: []*Job{
-					{
-						ID:    "1",
-						State: Passed,
-						Log: utils.NullString{
-							Valid:  true,
-							String: "log1\n",
+				Step: Step{
+					ID: "1",
+					Children: []Step{
+						{
+							ID:    "1",
+							State: Passed,
+							Log: utils.NullString{
+								Valid:  true,
+								String: "log1\n",
+							},
 						},
 					},
 				},
@@ -437,14 +336,9 @@ func TestCache_WriteLog(t *testing.T) {
 						ID: "provider1",
 					},
 				},
-				ID: "2",
-			},
-			{
-				Repository: &Repository{
-					Provider: Provider{
-						ID: "provider1",
-					},
-				}, ID: "3",
+				Step: Step{
+					ID: "2",
+				},
 			},
 			{
 				Repository: &Repository{
@@ -452,12 +346,24 @@ func TestCache_WriteLog(t *testing.T) {
 						ID: "provider1",
 					},
 				},
-				ID: "4",
+				Step: Step{
+					ID: "3",
+				},
+			},
+			{
+				Repository: &Repository{
+					Provider: Provider{
+						ID: "provider1",
+					},
+				},
+				Step: Step{
+					ID: "4",
+				},
 			},
 		}
 
-		for _, build := range builds {
-			if err := c.SaveBuild("", build); err != nil {
+		for _, p := range pipelines {
+			if err := c.SavePipeline("", p); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -494,7 +400,7 @@ func TestCache_WriteLog(t *testing.T) {
 				},
 			},
 		}
-		if err := c.SaveBuild("", build); err != nil {
+		if err := c.SavePipeline("", build); err != nil {
 			t.Fatal(err)
 		}
 
@@ -540,7 +446,7 @@ func TestCache_WriteLog(t *testing.T) {
 			}
 		}
 	})
-}
+}*/
 
 func TestCache_BuildsByRef(t *testing.T) {
 	repo := Repository{
@@ -550,53 +456,66 @@ func TestCache_BuildsByRef(t *testing.T) {
 	}
 	c := NewCache(nil, nil)
 
-	builds := []Build{
+	pipelines := []Pipeline{
 		{
 			Repository: &repo,
-			ID:         "1",
-			Ref:        "ref1",
-			IsTag:      false,
-			UpdatedAt:  time.Date(2019, 12, 7, 0, 0, 0, 0, time.UTC),
+			GitRef: GitRef{
+				Ref:   "ref1",
+				IsTag: false,
+			},
+			Step: Step{
+				ID: "1",
+
+				UpdatedAt: time.Date(2019, 12, 7, 0, 0, 0, 0, time.UTC),
+			},
 		},
 		{
 			Repository: &repo,
-			ID:         "1",
-			Ref:        "ref2",
-			IsTag:      false,
-			UpdatedAt:  time.Date(2019, 12, 8, 0, 0, 0, 0, time.UTC),
+			GitRef: GitRef{
+				Ref:   "ref2",
+				IsTag: false,
+			},
+			Step: Step{
+				ID:        "1",
+				UpdatedAt: time.Date(2019, 12, 8, 0, 0, 0, 0, time.UTC),
+			},
 		},
 		{
 			Repository: &repo,
-			ID:         "2",
-			Ref:        "ref2",
-			IsTag:      false,
-			UpdatedAt:  time.Date(2019, 12, 9, 0, 0, 0, 0, time.UTC),
+			GitRef: GitRef{
+				Ref:   "ref2",
+				IsTag: false,
+			},
+			Step: Step{
+				ID:        "2",
+				UpdatedAt: time.Date(2019, 12, 9, 0, 0, 0, 0, time.UTC),
+			},
 		},
 	}
-	for _, build := range builds {
-		if err := c.SaveBuild("", build); err != nil {
+	for _, p := range pipelines {
+		if err := c.SavePipeline("", p); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	expected := []Build{builds[1], builds[2]}
-	buildRef2 := c.Builds()
-	sortBuilds(expected)
-	sortBuilds(buildRef2)
+	expected := []Pipeline{pipelines[1], pipelines[2]}
+	buildRef2 := c.Pipelines()
+	sortPipelines(expected)
+	sortPipelines(buildRef2)
 
 	if diff := cmp.Diff(expected, buildRef2); len(diff) > 0 {
 		t.Fatal(diff)
 	}
 
 	// Build with ID 1 must have moved from ref1 to ref2
-	if len(c.BuildsByRef("ref1")) != 0 {
-		t.Fatalf("expected empty list but got %+v", c.BuildsByRef("ref1"))
+	if len(c.PipelinesByRef("ref1")) != 0 {
+		t.Fatalf("expected empty list but got %+v", c.PipelinesByRef("ref1"))
 	}
 }
 
-func sortBuilds(builds []Build) {
-	sort.Slice(builds, func(i, j int) bool {
-		return builds[i].ID < builds[j].ID
+func sortPipelines(pipelines []Pipeline) {
+	sort.Slice(pipelines, func(i, j int) bool {
+		return pipelines[i].ID < pipelines[j].ID
 	})
 }
 
