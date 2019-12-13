@@ -19,7 +19,7 @@ import (
 const maxStepIDs = 10
 
 type taskKey struct {
-	PipelineKey
+	providerID string
 	// We need an array instead of a slice so that taskKey is hashable
 	stepIDs [maxStepIDs]utils.NullString
 }
@@ -89,9 +89,12 @@ func (t task) Tabular(loc *time.Location) map[string]text.StyledString {
 		name.Append(t.name)
 	}
 
-	pipeline := t.key.ID
-	if _, err := strconv.Atoi(t.key.ID); err == nil {
-		pipeline = "#" + pipeline
+	pipeline := ""
+	if t.key.stepIDs[0].Valid {
+		pipeline = t.key.stepIDs[0].String
+		if _, err := strconv.Atoi(pipeline); err == nil {
+			pipeline = "#" + pipeline
+		}
 	}
 
 	refClass := text.GitBranch
@@ -136,8 +139,8 @@ func (t *task) SetPrefix(s string) {
 
 func taskFromPipeline(p Pipeline, providerByID map[string]CIProvider) task {
 	key := taskKey{
-		PipelineKey: p.Key(),
-		stepIDs:     [maxStepIDs]utils.NullString{},
+		providerID: p.providerID,
+		stepIDs:    [maxStepIDs]utils.NullString{},
 	}
 
 	providerName := "unknown"
@@ -275,8 +278,9 @@ func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir st
 	if err != nil {
 		return "", err
 	}
-	logPath := path.Join(dir, filepath.Base(file.Name()))
 
 	err = s.cache.WriteLog(ctx, stepKey, w)
+	logPath := path.Join(dir, filepath.Base(file.Name()))
+
 	return logPath, err
 }

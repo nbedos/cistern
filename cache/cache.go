@@ -29,7 +29,7 @@ type CIProvider interface {
 	ID() string
 	Name() string
 	// FIXME Replace stepID by stepIDs
-	Log(ctx context.Context, repository Repository, stepID string) (string, error)
+	Log(ctx context.Context, repository Repository, step Step) (string, error)
 	BuildFromURL(ctx context.Context, u string) (Pipeline, error)
 }
 
@@ -779,11 +779,12 @@ func (c *Cache) Step(key PipelineKey, stepIDs []string) (Step, bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	step := p.Step
-	for ids := stepIDs; len(ids) > 0; ids = ids[:len(ids)-1] {
+	for _, ID := range stepIDs {
 		exists := false
 		for _, childStep := range step.Children {
-			if childStep.ID == ids[0] {
+			if childStep.ID == ID {
 				exists = true
+				step = childStep
 				break
 			}
 		}
@@ -799,31 +800,37 @@ var ErrIncompleteLog = errors.New("log not complete")
 
 func (c *Cache) WriteLog(ctx context.Context, key taskKey, writer io.Writer) error {
 	var err error
-	p, exists := c.Pipeline(key.PipelineKey)
+	pKey := PipelineKey{
+		ProviderID: key.providerID,
+		ID:         key.stepIDs[0].String,
+	}
+	p, exists := c.Pipeline(pKey)
 	if !exists {
-		return fmt.Errorf("no matching pipelibe for %v", key)
+		return fmt.Errorf("no matching pipeline for %+v", pKey)
 	}
 
 	stepIDs := make([]string, 0)
-	for _, ID := range key.stepIDs {
+	for _, ID := range key.stepIDs[1:] {
 		if ID.Valid {
 			stepIDs = append(stepIDs, ID.String)
+		} else {
+			break
 		}
 	}
 
-	step, exists := c.Step(key.PipelineKey, stepIDs)
+	step, exists := c.Step(pKey, stepIDs)
 	if !exists {
 		return fmt.Errorf("no matching step for %v %v", key, key.stepIDs)
 	}
 
 	log := step.Log.String
 	if !step.Log.Valid {
-		provider, exists := c.ciProvidersById[key.ProviderID]
+		provider, exists := c.ciProvidersById[key.providerID]
 		if !exists {
-			return fmt.Errorf("no matching provider found in cache for account ID %q", key.ProviderID)
+			return fmt.Errorf("no matching provider found in cache for account ID %q", key.providerID)
 		}
 
-		log, err = provider.Log(ctx, *p.Repository, step.ID)
+		log, err = provider.Log(ctx, *p.Repository, step)
 		if err != nil {
 			return err
 		}

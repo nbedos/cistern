@@ -53,10 +53,14 @@ func (c AppVeyorClient) Name() string {
 	return c.provider.Name
 }
 
-func (c AppVeyorClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
+func (c AppVeyorClient) Log(ctx context.Context, repository cache.Repository, step cache.Step) (string, error) {
+	if step.Type != cache.StepJob {
+		return "", cache.ErrNoLogHere
+	}
+
 	endpoint := c.url
-	endpoint.Path += fmt.Sprintf("/buildjobs/%s/log", jobID)
-	endpoint.RawPath += fmt.Sprintf("/buildjobs/%s/log", url.PathEscape(jobID))
+	endpoint.Path += fmt.Sprintf("/buildjobs/%s/log", step.ID)
+	endpoint.RawPath += fmt.Sprintf("/buildjobs/%s/log", url.PathEscape(step.ID))
 
 	body, err := c.get(ctx, endpoint)
 	if err != nil {

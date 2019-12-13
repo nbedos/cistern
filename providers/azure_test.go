@@ -273,7 +273,11 @@ func TestAzurePipelinesClient_Log(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	log, err := client.Log(ctx, cache.Repository{}, "1234")
+	job := cache.Step{
+		ID:   "1234",
+		Type: cache.StepJob,
+	}
+	log, err := client.Log(ctx, cache.Repository{}, job)
 	if err != nil {
 		t.Fatal(err)
 	}

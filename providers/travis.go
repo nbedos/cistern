@@ -447,9 +447,13 @@ func (c TravisClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 	return cacheBuild, nil
 }
 
-func (c TravisClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
+func (c TravisClient) Log(ctx context.Context, repository cache.Repository, step cache.Step) (string, error) {
+	if step.Type != cache.StepJob {
+		return "", cache.ErrNoLogHere
+	}
+
 	var reqURL = c.baseURL
-	reqURL.Path += fmt.Sprintf("/job/%s/log", jobID)
+	reqURL.Path += fmt.Sprintf("/job/%s/log", step.ID)
 
 	body, err := c.get(ctx, "GET", reqURL)
 	if err != nil {

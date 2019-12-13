@@ -92,9 +92,13 @@ func (c AzurePipelinesClient) BuildFromURL(ctx context.Context, u string) (cache
 	return c.fetchPipeline(ctx, owner, repo, buildID)
 }
 
-func (c AzurePipelinesClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
+func (c AzurePipelinesClient) Log(ctx context.Context, repository cache.Repository, step cache.Step) (string, error) {
+	if step.Type != cache.StepJob {
+		return "", cache.ErrNoLogHere
+	}
+
 	c.mux.Lock()
-	logURL, exists := c.logURLByJobID[jobID]
+	logURL, exists := c.logURLByJobID[step.ID]
 	c.mux.Unlock()
 	if !exists {
 		return "", cache.ErrNoLogHere

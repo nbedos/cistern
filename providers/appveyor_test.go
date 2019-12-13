@@ -227,7 +227,11 @@ func TestCircleCIClient_Log(t *testing.T) {
 		},
 	}
 
-	log, err := client.Log(context.Background(), cache.Repository{}, "jobId")
+	job := cache.Step{
+		ID:   "jobId",
+		Type: cache.StepJob,
+	}
+	log, err := client.Log(context.Background(), cache.Repository{}, job)
 	if err != nil {
 		t.Fatal(err)
 	}

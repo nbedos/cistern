@@ -303,8 +303,11 @@ func (c GitLabClient) GetJob(ctx context.Context, repositoryID int, jobID int) (
 	return c.remote.Jobs.GetJob(repositoryID, jobID, gitlab.WithContext(ctx))
 }
 
-func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
-	id, err := strconv.Atoi(jobID)
+func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, step cache.Step) (string, error) {
+	if step.Type != cache.StepJob {
+		return "", cache.ErrNoLogHere
+	}
+	id, err := strconv.Atoi(step.ID)
 	if err != nil {
 		return "", err
 	}

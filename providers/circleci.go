@@ -206,7 +206,7 @@ func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, int, error
 	return owner, repo, id, nil
 }
 
-func (c CircleCIClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
+func (c CircleCIClient) Log(ctx context.Context, repository cache.Repository, step cache.Step) (string, error) {
 	return "", nil
 }
 
