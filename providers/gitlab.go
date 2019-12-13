@@ -179,18 +179,22 @@ func (c GitLabClient) ID() string {
 	return c.provider.ID
 }
 
-func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
+func (c GitLabClient) Name() string {
+	return c.provider.Name
+}
+
+func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (cache.Pipeline, error) {
 	slug, id, err := c.parsePipelineURL(u)
 	if err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
 
 	repository, err := c.Repository(ctx, slug)
 	if err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
 
-	return c.fetchBuild(ctx, &repository, id)
+	return c.fetchPipeline(ctx, &repository, id)
 }
 
 func (c GitLabClient) parseRepositoryURL(u string) (string, error) {
@@ -227,14 +231,14 @@ func (c GitLabClient) parsePipelineURL(u string) (string, int, error) {
 	return slug, id, nil
 }
 
-func (c *GitLabClient) GetTraceFile(ctx context.Context, repositoryID int, jobID int) (bytes.Buffer, error) {
+func (c *GitLabClient) GetTraceFile(ctx context.Context, repositorySlug string, jobID int) (bytes.Buffer, error) {
 	buf := bytes.Buffer{}
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
 		return buf, ctx.Err()
 	}
-	trace, _, err := c.remote.Jobs.GetTraceFile(repositoryID, jobID, nil, gitlab.WithContext(ctx))
+	trace, _, err := c.remote.Jobs.GetTraceFile(repositorySlug, jobID, nil, gitlab.WithContext(ctx))
 	if err != nil {
 		return buf, err
 	}
@@ -263,11 +267,9 @@ func (c GitLabClient) Repository(ctx context.Context, slug string) (cache.Reposi
 	}
 
 	return cache.Repository{
-		ID:       project.ID,
-		Owner:    splitPath[0],
-		Name:     splitPath[1],
-		URL:      project.WebURL,
-		Provider: c.provider,
+		Owner: splitPath[0],
+		Name:  splitPath[1],
+		URL:   project.WebURL,
 	}, nil
 }
 
@@ -306,7 +308,8 @@ func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobI
 	if err != nil {
 		return "", err
 	}
-	buf, err := c.GetTraceFile(ctx, repository.ID, id)
+
+	buf, err := c.GetTraceFile(ctx, repository.Slug(), id)
 	if err != nil {
 		return "", err
 	}
@@ -314,39 +317,44 @@ func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, jobI
 	return buf.String(), nil
 }
 
-func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Repository, pipelineID int) (build cache.Build, err error) {
+func (c GitLabClient) fetchPipeline(ctx context.Context, repository *cache.Repository, pipelineID int) (pipeline cache.Pipeline, err error) {
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
-		return build, ctx.Err()
+		return pipeline, ctx.Err()
 	}
-	pipeline, _, err := c.remote.Pipelines.GetPipeline(repository.ID, pipelineID, gitlab.WithContext(ctx))
+	gitlabPipeline, _, err := c.remote.Pipelines.GetPipeline(repository.Slug(), pipelineID, gitlab.WithContext(ctx))
 	if err != nil {
-		return build, err
+		return pipeline, err
 	}
 
-	if pipeline.UpdatedAt == nil {
-		return build, fmt.Errorf("missing UpdatedAt data for pipeline #%d", pipeline.ID)
+	if gitlabPipeline.UpdatedAt == nil {
+		return pipeline, fmt.Errorf("missing UpdatedAt data for pipeline #%d", gitlabPipeline.ID)
 	}
-	build = cache.Build{
-		Repository:      repository,
-		ID:              strconv.Itoa(pipeline.ID),
-		Sha:             pipeline.SHA,
-		Ref:             pipeline.Ref,
-		IsTag:           pipeline.Tag,
-		RepoBuildNumber: strconv.Itoa(pipeline.ID),
-		State:           FromGitLabState(pipeline.Status),
-		CreatedAt:       utils.NullTimeFromTime(pipeline.CreatedAt),
-		StartedAt:       utils.NullTimeFromTime(pipeline.StartedAt),
-		FinishedAt:      utils.NullTimeFromTime(pipeline.FinishedAt),
-		UpdatedAt:       *pipeline.UpdatedAt,
-		Duration: utils.NullDuration{
-			Duration: time.Duration(pipeline.Duration) * time.Second,
-			Valid:    pipeline.Duration > 0,
+	pipeline = cache.Pipeline{
+		Repository: repository,
+		GitReference: cache.GitReference{
+			SHA:   gitlabPipeline.SHA,
+			Ref:   gitlabPipeline.Ref,
+			IsTag: gitlabPipeline.Tag,
 		},
-		WebURL: pipeline.WebURL,
-		Stages: make(map[int]*cache.Stage),
-		Jobs:   make([]*cache.Job, 0),
+		Step: cache.Step{
+			ID:         strconv.Itoa(gitlabPipeline.ID),
+			Type:       cache.StepPipeline,
+			State:      FromGitLabState(gitlabPipeline.Status),
+			CreatedAt:  utils.NullTimeFromTime(gitlabPipeline.CreatedAt),
+			StartedAt:  utils.NullTimeFromTime(gitlabPipeline.StartedAt),
+			FinishedAt: utils.NullTimeFromTime(gitlabPipeline.FinishedAt),
+			UpdatedAt:  *gitlabPipeline.UpdatedAt,
+			Duration: utils.NullDuration{
+				Duration: time.Duration(gitlabPipeline.Duration) * time.Second,
+				Valid:    gitlabPipeline.Duration > 0,
+			},
+			WebURL: utils.NullString{
+				String: gitlabPipeline.WebURL,
+				Valid:  true,
+			},
+		},
 	}
 
 	jobs := make([]*gitlab.Job, 0)
@@ -355,11 +363,11 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 		select {
 		case <-c.rateLimiter:
 		case <-ctx.Done():
-			return build, ctx.Err()
+			return pipeline, ctx.Err()
 		}
-		pageJobs, resp, err := c.remote.Jobs.ListPipelineJobs(repository.ID, pipeline.ID, &options, gitlab.WithContext(ctx))
+		pageJobs, resp, err := c.remote.Jobs.ListPipelineJobs(repository.Slug(), gitlabPipeline.ID, &options, gitlab.WithContext(ctx))
 		if err != nil {
-			return build, nil
+			return pipeline, nil
 		}
 		jobs = append(jobs, pageJobs...)
 
@@ -369,23 +377,23 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 		options.Page = resp.NextPage
 	}
 
-	stagesByName := make(map[string]*cache.Stage)
-	build.Stages = make(map[int]*cache.Stage)
+	stagesIndexByName := make(map[string]int)
 	for _, job := range jobs {
-		if _, exists := stagesByName[job.Stage]; !exists {
-			stage := cache.Stage{
-				ID:   len(stagesByName) + 1,
+		if _, exists := stagesIndexByName[job.Stage]; !exists {
+			stage := cache.Step{
+				ID:   strconv.Itoa(len(stagesIndexByName) + 1),
+				Type: cache.StepStage,
 				Name: job.Stage,
-				Jobs: make([]*cache.Job, 0),
 			}
-			stagesByName[job.Stage] = &stage
-			build.Stages[stage.ID] = &stage
+			stagesIndexByName[job.Stage] = len(pipeline.Children)
+			pipeline.Children = append(pipeline.Children, &stage)
 		}
 	}
 
 	for _, gitlabJob := range jobs {
-		job := cache.Job{
+		job := cache.Step{
 			ID:         strconv.Itoa(gitlabJob.ID),
+			Type:       cache.StepJob,
 			State:      FromGitLabState(gitlabJob.Status),
 			Name:       gitlabJob.Name,
 			Log:        utils.NullString{},
@@ -396,33 +404,37 @@ func (c GitLabClient) fetchBuild(ctx context.Context, repository *cache.Reposito
 				Duration: time.Duration(gitlabJob.Duration) * time.Second,
 				Valid:    int64(gitlabJob.Duration) > 0,
 			},
-			WebURL:       gitlabJob.WebURL,
+			WebURL: utils.NullString{
+				String: gitlabJob.WebURL,
+				Valid:  true,
+			},
 			AllowFailure: gitlabJob.AllowFailure,
 		}
-		stagesByName[gitlabJob.Stage].Jobs = append(stagesByName[gitlabJob.Stage].Jobs, &job)
+		index := stagesIndexByName[gitlabJob.Stage]
+		pipeline.Children[index].Children = append(pipeline.Children[index].Children, &job)
 	}
 
 	// Compute stage state
-	for _, stage := range build.Stages {
+	for _, stage := range pipeline.Children {
 		// Each stage contains all job runs. Select only the last run of each job
 		// Earliest runs should not influence the current state of the stage
-		jobsByName := make(map[string]*cache.Job)
-		for _, job := range stage.Jobs {
+		jobsByName := make(map[string]*cache.Step)
+		for _, job := range stage.Children {
 			previousJob, exists := jobsByName[job.Name]
 			// Dates may be NULL so we have to rely on IDs to find out which job is older. meh.
 			if !exists || previousJob.ID < job.ID {
 				jobsByName[job.Name] = job
 			}
 		}
-		jobs := make([]cache.Statuser, 0, len(jobsByName))
+		jobs := make([]*cache.Step, 0, len(jobsByName))
 		for _, job := range jobsByName {
-			jobs = append(jobs, *job)
+			jobs = append(jobs, job)
 		}
 		stage.State = cache.AggregateStatuses(jobs)
 	}
 
 	c.mux.Lock()
-	c.updateTimePerBuildID[build.ID] = build.UpdatedAt
+	c.updateTimePerBuildID[pipeline.ID] = pipeline.UpdatedAt
 	c.mux.Unlock()
-	return build, nil
+	return pipeline, nil
 }

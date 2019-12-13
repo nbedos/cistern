@@ -243,8 +243,8 @@ func (t *Table) Text() []text.LocalizedStyledString {
 
 func (t Table) OpenInBrowser(browser string) error {
 	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
-		if url := t.rows[t.activeLine].URL(); url != "" {
-			argv := []string{path.Base(browser), url}
+		if url := t.rows[t.activeLine].URL(); url.Valid {
+			argv := []string{path.Base(browser), url.String}
 			process, err := os.StartProcess(browser, argv, &os.ProcAttr{})
 			if err != nil {
 				return err

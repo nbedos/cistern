@@ -161,19 +161,23 @@ func (c CircleCIClient) ID() string {
 	return c.provider.ID
 }
 
-func (c CircleCIClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
+func (c CircleCIClient) Name() string {
+	return c.provider.Name
+}
+
+func (c CircleCIClient) BuildFromURL(ctx context.Context, u string) (cache.Pipeline, error) {
 	owner, repo, id, err := parseCircleCIWebURL(&c.baseURL, u)
 	if err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
 
 	repository, err := c.repository(ctx, owner, repo)
 	if err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
 
 	endPoint := c.projectEndpoint(repository.Owner, repository.Name)
-	return c.fetchBuild(ctx, endPoint, &repository, id, false)
+	return c.fetchPipeline(ctx, endPoint, &repository, id, false)
 }
 
 // Extract owner, repository and build ID from web URL of build
@@ -224,31 +228,30 @@ func (c *CircleCIClient) repository(ctx context.Context, owner string, repo stri
 
 	// FIXME What about repository.ID?
 	return cache.Repository{
-		Provider: c.provider,
-		URL:      fmt.Sprintf("https://github.com/%s/%s", owner, repo),
-		Owner:    owner,
-		Name:     repo,
+		URL:   fmt.Sprintf("https://github.com/%s/%s", owner, repo),
+		Owner: owner,
+		Name:  repo,
 	}, nil
 }
 
-func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL, repo *cache.Repository, buildID int, log bool) (cache.Build, error) {
+func (c CircleCIClient) fetchPipeline(ctx context.Context, projectEndpoint url.URL, repo *cache.Repository, buildID int, log bool) (cache.Pipeline, error) {
 	var err error
-	var build cache.Build
+	var pipeline cache.Pipeline
 
 	projectEndpoint.Path += fmt.Sprintf("/%d", buildID)
 	body, err := c.get(ctx, projectEndpoint)
 	if err != nil {
-		return build, err
+		return pipeline, err
 	}
 
 	var circleCIBuild circleCIBuild
 	if err := json.Unmarshal(body.Bytes(), &circleCIBuild); err != nil {
-		return build, err
+		return pipeline, err
 	}
 
-	build, err = circleCIBuild.ToCacheBuild(repo)
+	pipeline, err = circleCIBuild.ToCacheBuild(repo)
 	if err != nil {
-		return build, err
+		return pipeline, err
 	}
 
 	/*s := utils.NullString{}
@@ -267,7 +270,7 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 				if action.LogURL != "" {
 					log, err := c.fetchLog(ctx, action.LogURL)
 					if err != nil {
-						return build, err
+						return pipeline, err
 					}
 
 					fullLog.WriteString(utils.Prefix(log, prefix))
@@ -277,7 +280,7 @@ func (c CircleCIClient) fetchBuild(ctx context.Context, projectEndpoint url.URL,
 		s = utils.NullString{String: fullLog.String(), Valid: true}
 	}*/
 
-	return build, nil
+	return pipeline, nil
 }
 
 type circleCIBuild struct {
@@ -308,14 +311,23 @@ type circleCIBuild struct {
 	} `json:"steps"`
 }
 
-func (b circleCIBuild) ToCacheBuild(repository *cache.Repository) (cache.Build, error) {
-	build := cache.Build{
-		Repository:      repository,
-		Sha:             b.Sha,
-		ID:              strconv.Itoa(b.ID),
-		RepoBuildNumber: strconv.Itoa(b.ID),
-		State:           fromCircleCIStatus(b.Lifecycle, b.Outcome),
-		WebURL:          b.WebURL,
+func (b circleCIBuild) ToCacheBuild(repository *cache.Repository) (cache.Pipeline, error) {
+	build := cache.Pipeline{
+		Repository: repository,
+		GitReference: cache.GitReference{
+			SHA:   b.Sha,
+			Ref:   "",
+			IsTag: false,
+		},
+		Step: cache.Step{
+			ID:    strconv.Itoa(b.ID),
+			Type:  cache.StepPipeline,
+			State: fromCircleCIStatus(b.Lifecycle, b.Outcome),
+			WebURL: utils.NullString{
+				String: b.WebURL,
+				Valid:  true,
+			},
+		},
 	}
 
 	if b.DurationMilliseconds > 0 {

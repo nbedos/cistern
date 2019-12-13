@@ -12,17 +12,17 @@ import (
 func TestAggregateStatuses(t *testing.T) {
 	testCases := []struct {
 		name   string
-		steps  []Step
+		steps  []*Step
 		result State
 	}{
 		{
 			name:   "Empty list",
-			steps:  []Step{},
+			steps:  []*Step{},
 			result: Unknown,
 		},
 		{
 			name: "Jobs: No allowed failure",
-			steps: []Step{
+			steps: []*Step{
 				{
 					AllowFailure: false,
 					State:        Passed,
@@ -40,7 +40,7 @@ func TestAggregateStatuses(t *testing.T) {
 		},
 		{
 			name: "Jobs: Allowed failure",
-			steps: []Step{
+			steps: []*Step{
 				{
 					AllowFailure: false,
 					State:        Passed,
@@ -58,7 +58,7 @@ func TestAggregateStatuses(t *testing.T) {
 		},
 		{
 			name: "Builds",
-			steps: []Step{
+			steps: []*Step{
 				{
 					State: Passed,
 				},
@@ -83,11 +83,7 @@ func TestAggregateStatuses(t *testing.T) {
 }
 
 func TestCache_Save(t *testing.T) {
-	repository := Repository{
-		Provider: Provider{
-			ID: "testAccount",
-		},
-	}
+	repository := Repository{}
 
 	t.Run("Saved build must be returned by Pipeline()", func(t *testing.T) {
 		c := NewCache(nil, nil)
@@ -106,7 +102,7 @@ func TestCache_Save(t *testing.T) {
 			t.Fatal("pipeline was not saved")
 		}
 
-		if diff := cmp.Diff(savedPipeline, p); len(diff) > 0 {
+		if diff := savedPipeline.Diff(p); len(diff) > 0 {
 			t.Fatal(diff)
 		}
 	})
@@ -137,12 +133,12 @@ func TestCache_Save(t *testing.T) {
 		if err := c.SavePipeline("", newPipeline); err != nil {
 			t.Fatal(err)
 		}
-		savedBuild, exists := c.Pipeline(oldPipeline.Key())
+		savedPipeline, exists := c.Pipeline(oldPipeline.Key())
 		if !exists {
 			t.Fatal("build was not saved")
 		}
 
-		if diff := cmp.Diff(savedBuild, newPipeline); len(diff) > 0 {
+		if diff := savedPipeline.Diff(newPipeline); len(diff) > 0 {
 			t.Fatal(diff)
 		}
 	})
@@ -174,17 +170,13 @@ func TestCache_Save(t *testing.T) {
 }
 
 func TestCache_Builds(t *testing.T) {
-	repository := Repository{
-		Provider: Provider{
-			ID: "testAccount",
-		},
-	}
+	repository := Repository{}
 
 	ids := []string{"1", "2", "3", "4"}
 	c := NewCache(nil, nil)
 	for _, id := range ids {
 		p := Pipeline{
-			ProviderID: "testAccount",
+			providerID: "testAccount",
 			Repository: &repository,
 			Step: Step{
 				ID: id,
@@ -292,7 +284,7 @@ func TestCache_WriteLog(t *testing.T) {
 
 		buf := bytes.Buffer{}
 		key := PipelineKey{
-			ProviderID: "provider1",
+			providerID: "provider1",
 			ID:         "1",
 		}
 		if err := c.WriteLog(context.Background(), key, []string{"0", "1"}, &buf); err != nil {
@@ -449,17 +441,13 @@ func TestCache_WriteLog(t *testing.T) {
 }*/
 
 func TestCache_BuildsByRef(t *testing.T) {
-	repo := Repository{
-		Provider: Provider{
-			ID: "provider1",
-		},
-	}
+	repo := Repository{}
 	c := NewCache(nil, nil)
 
 	pipelines := []Pipeline{
 		{
 			Repository: &repo,
-			GitRef: GitRef{
+			GitReference: GitReference{
 				Ref:   "ref1",
 				IsTag: false,
 			},
@@ -471,7 +459,7 @@ func TestCache_BuildsByRef(t *testing.T) {
 		},
 		{
 			Repository: &repo,
-			GitRef: GitRef{
+			GitReference: GitReference{
 				Ref:   "ref2",
 				IsTag: false,
 			},
@@ -482,7 +470,7 @@ func TestCache_BuildsByRef(t *testing.T) {
 		},
 		{
 			Repository: &repo,
-			GitRef: GitRef{
+			GitReference: GitReference{
 				Ref:   "ref2",
 				IsTag: false,
 			},
@@ -503,7 +491,7 @@ func TestCache_BuildsByRef(t *testing.T) {
 	sortPipelines(expected)
 	sortPipelines(buildRef2)
 
-	if diff := cmp.Diff(expected, buildRef2); len(diff) > 0 {
+	if diff := cmp.Diff(expected, buildRef2, cmp.AllowUnexported(Pipeline{})); len(diff) > 0 {
 		t.Fatal(diff)
 	}
 

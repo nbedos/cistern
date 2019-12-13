@@ -16,9 +16,17 @@ import (
 	"github.com/nbedos/citop/utils"
 )
 
+const maxStepIDs = 10
+
+type taskKey struct {
+	PipelineKey
+	// We need an array instead of a slice so that taskKey is hashable
+	stepIDs [maxStepIDs]utils.NullString
+}
+
 type task struct {
-	key         PipelineStepKey
-	ref         GitRef
+	key         taskKey
+	ref         GitReference
 	type_       string
 	state       State
 	name        string
@@ -31,11 +39,11 @@ type task struct {
 	duration    utils.NullDuration
 	children    []*task
 	traversable bool
-	url         string
+	url         utils.NullString
 }
 
 func (t task) Diff(other task) string {
-	options := cmp.AllowUnexported(PipelineStepKey{}, task{})
+	options := cmp.AllowUnexported(taskKey{}, task{})
 	return cmp.Diff(t, other, options)
 }
 
@@ -76,7 +84,7 @@ func (t task) Tabular(loc *time.Location) map[string]text.StyledString {
 
 	name := text.NewStyledString(t.prefix)
 	if t.type_ == "P" {
-		name.Append(t.provider, text.Provider)
+		name.Append(t.name, text.Provider)
 	} else {
 		name.Append(t.name)
 	}
@@ -109,7 +117,7 @@ func (t task) Key() interface{} {
 	return t.key
 }
 
-func (t task) URL() string {
+func (t task) URL() utils.NullString {
 	return t.url
 }
 
@@ -126,130 +134,75 @@ func (t *task) SetPrefix(s string) {
 	t.prefix = s
 }
 
-/*
-func ref(ref string, tag bool) string {
-	if tag {
-		return fmt.Sprintf("tag: %s", ref)
+func taskFromPipeline(p Pipeline, name string) task {
+	key := taskKey{
+		PipelineKey: p.Key(),
+		stepIDs:     [maxStepIDs]utils.NullString{},
 	}
-	return ref
+
+	t := taskFromStep(p.GitReference, key, p.Step)
+	t.name = name
+
+	return t
 }
 
-func taskFromBuild(b Build) task {
-	ref := ref(b.Ref, b.IsTag)
-	row := task{
-		key: taskKey{
-			ref:       ref,
-			SHA:       b.SHA,
-			accountID: b.Repository.Provider.ID,
-			buildID:   b.ID,
+func taskFromStep(ref GitReference, key taskKey, s Step) task {
+	keySet := false
+	for i, ID := range key.stepIDs {
+		if !ID.Valid {
+			key.stepIDs[i] = utils.NullString{
+				String: s.ID,
+				Valid:  true,
+			}
+			keySet = true
+			break
+		}
+	}
+	// TODO Get rid off this after changing task.Key() so that it returns a hashable value
+	//  while still allowing taskKey.StepIDs to be a slice (non hashable) instead of an array
+	//  (hashable, but requires special handling to avoid overflow)
+	if !keySet {
+		panic("exceeded maximum nesting depth for type task")
+	}
+
+	t := task{
+		key:        key,
+		ref:        ref,
+		state:      s.State,
+		name:       s.Name,
+		provider:   key.ProviderID,
+		prefix:     "",
+		createdAt:  s.CreatedAt,
+		startedAt:  s.StartedAt,
+		finishedAt: s.FinishedAt,
+		updatedAt: utils.NullTime{
+			Time:  s.UpdatedAt,
+			Valid: true,
 		},
-		type_:      "P",
-		state:      b.State,
-		createdAt:  b.CreatedAt,
-		startedAt:  b.StartedAt,
-		finishedAt: b.FinishedAt,
-		updatedAt:  utils.NullTime{Time: b.UpdatedAt, Valid: true},
-		url:        b.WebURL,
-		duration:   b.Duration,
-		provider:   b.Repository.Provider.Name,
+		duration:    s.Duration,
+		children:    nil,
+		traversable: false,
+		url:         s.WebURL,
 	}
 
-	// Prefix only numeric IDs with hash
-	if _, err := strconv.Atoi(b.ID); err == nil {
-		row.name = fmt.Sprintf("#%s", b.ID)
-	} else {
-		row.name = b.ID
+	switch s.Type {
+	case StepPipeline:
+		t.type_ = "P"
+	case StepStage:
+		t.type_ = "S"
+	case StepJob:
+		t.type_ = "J"
+	case StepTask:
+		t.type_ = "T"
 	}
 
-	for _, job := range b.Jobs {
-		child := taskFromJob(b.Repository.Provider, b.SHA, ref, b.ID, 0, *job)
-		row.children = append(row.children, &child)
+	for _, childStep := range s.Children {
+		childTask := taskFromStep(ref, t.key, *childStep)
+		t.children = append(t.children, &childTask)
 	}
 
-	if b.Stages != nil {
-		stageIDs := make([]int, 0, len(b.Stages))
-		for stageID := range b.Stages {
-			stageIDs = append(stageIDs, stageID)
-		}
-		sort.Ints(stageIDs)
-		for _, stageID := range stageIDs {
-			child := taskFromStage(b.Repository.Provider, b.SHA, ref, b.ID, b.WebURL, *b.Stages[stageID])
-			row.children = append(row.children, &child)
-		}
-	}
-
-	return row
+	return t
 }
-
-func taskFromStage(provider Provider, SHA string, ref string, buildID string, webURL string, s Stage) task {
-	row := task{
-		key: taskKey{
-			ref:       ref,
-			SHA:       SHA,
-			accountID: provider.ID,
-			buildID:   buildID,
-			stageID:   s.ID,
-		},
-		type_:    "S",
-		state:    s.State,
-		name:     s.Name,
-		url:      webURL,
-		provider: provider.Name,
-	}
-
-	// We aggregate jobs by name and only keep the most recent to weed out previous runs of the job.
-	// This is mainly for GitLab which keeps jobs after they are restarted.
-	jobByName := make(map[string]*Job, len(s.Jobs))
-	for _, job := range s.Jobs {
-		namedJob, exists := jobByName[job.Name]
-		if !exists || job.CreatedAt.Valid && job.CreatedAt.Time.After(namedJob.CreatedAt.Time) {
-			jobByName[job.Name] = job
-		}
-	}
-
-	for _, job := range jobByName {
-		row.createdAt = utils.MinNullTime(row.createdAt, job.CreatedAt)
-		row.startedAt = utils.MinNullTime(row.startedAt, job.StartedAt)
-		row.finishedAt = utils.MaxNullTime(row.finishedAt, job.FinishedAt)
-		row.updatedAt = utils.MaxNullTime(row.updatedAt, job.FinishedAt, job.StartedAt, job.CreatedAt)
-	}
-
-	row.duration = utils.NullSub(row.finishedAt, row.startedAt)
-
-	for _, job := range s.Jobs {
-		child := taskFromJob(provider, SHA, ref, buildID, s.ID, *job)
-		row.children = append(row.children, &child)
-	}
-
-	return row
-}
-
-func taskFromJob(provider Provider, SHA string, ref string, buildID string, stageID int, j Job) task {
-	name := j.Name
-	if name == "" {
-		name = j.ID
-	}
-	return task{
-		key: taskKey{
-			ref:       ref,
-			SHA:       SHA,
-			accountID: provider.ID,
-			buildID:   buildID,
-			stageID:   stageID,
-			jobID:     j.ID,
-		},
-		type_:      "J",
-		state:      j.State,
-		name:       name,
-		createdAt:  j.CreatedAt,
-		startedAt:  j.StartedAt,
-		finishedAt: j.FinishedAt,
-		updatedAt:  utils.MaxNullTime(j.FinishedAt, j.StartedAt, j.CreatedAt),
-		url:        j.WebURL,
-		duration:   j.Duration,
-		provider:   provider.Name,
-	}
-}*/
 
 type BuildsByCommit struct {
 	cache Cache
@@ -283,26 +236,13 @@ func (s BuildsByCommit) Alignment() map[string]text.Alignment {
 
 func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 	rows := make([]HierarchicalTabularSourceRow, 0)
-	//for _, pipeline := range s.cache.PipelinesByRef(s.ref) {
-	for range s.cache.PipelinesByRef(s.ref) {
-		// FIXME convert pipeline to task
-		row := task{
-			key:         PipelineStepKey{},
-			type_:       "",
-			state:       "",
-			name:        "",
-			provider:    "",
-			prefix:      "",
-			createdAt:   utils.NullTime{},
-			startedAt:   utils.NullTime{},
-			finishedAt:  utils.NullTime{},
-			updatedAt:   utils.NullTime{},
-			duration:    utils.NullDuration{},
-			children:    nil,
-			traversable: false,
-			url:         "",
+	for _, p := range s.cache.PipelinesByRef(s.ref) {
+		name := "unknown"
+		if provider := s.cache.ciProvidersById[p.providerID]; provider != nil {
+			name = provider.Name()
 		}
-		rows = append(rows, &row)
+		t := taskFromPipeline(p, name)
+		rows = append(rows, &t)
 	}
 
 	sort.Slice(rows, func(i, j int) bool {
@@ -329,7 +269,7 @@ var ErrNoLogHere = errors.New("no log is associated to this row")
 
 func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir string) (string, error) {
 	// TODO Allow filtering for errored jobs
-	stepKey, ok := key.(PipelineStepKey)
+	stepKey, ok := key.(taskKey)
 	if !ok {
 		return "", fmt.Errorf("key conversion to taskKey failed: '%v'", key)
 	}

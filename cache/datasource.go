@@ -13,7 +13,7 @@ import (
 type HierarchicalTabularSourceRow interface {
 	Tabular(*time.Location) map[string]text.StyledString
 	Key() interface{}
-	URL() string
+	URL() utils.NullString
 	SetPrefix(s string)
 	utils.TreeNode
 }

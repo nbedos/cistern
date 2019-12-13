@@ -55,6 +55,10 @@ func (c AzurePipelinesClient) ID() string {
 	return c.provider.ID
 }
 
+func (c AzurePipelinesClient) Name() string {
+	return c.provider.Name
+}
+
 func (c AzurePipelinesClient) parseAzureWebURL(s string) (string, string, string, error) {
 	// https://dev.azure.com/nicolasbedos/5190ee7b-d826-445e-b19e-6dc098be0436/_build/results?buildId=16
 	u, err := url.Parse(s)
@@ -146,7 +150,7 @@ type azureBuild struct {
 	} `json:"repository"`
 }
 
-func (b azureBuild) toCachePipeline(p cache.Provider) (cache.Pipeline, error) {
+func (b azureBuild) toCachePipeline() (cache.Pipeline, error) {
 	cs := strings.Split(b.Repository.ID, "/")
 	if len(cs) != 2 {
 		return cache.Pipeline{}, fmt.Errorf("invalid repository slug: %s", b.Repository.ID)
@@ -166,20 +170,18 @@ func (b azureBuild) toCachePipeline(p cache.Provider) (cache.Pipeline, error) {
 
 	pipeline := cache.Pipeline{
 		Repository: &cache.Repository{
-			Provider: p,
-			ID:       0,
-			URL:      "",
-			Owner:    owner,
-			Name:     repo,
+			URL:   "",
+			Owner: owner,
+			Name:  repo,
 		},
-		GitRef: cache.GitRef{
+		GitReference: cache.GitReference{
 			SHA:   b.SourceVersion,
 			Ref:   ref,
 			IsTag: isTag,
 		},
 		Step: cache.Step{
-			ID: strconv.Itoa(b.ID),
-
+			ID:       strconv.Itoa(b.ID),
+			Type:     cache.StepPipeline,
 			State:    fromAzureState(b.Result, b.Status),
 			Duration: utils.NullDuration{},
 			WebURL: utils.NullString{
@@ -228,7 +230,7 @@ func (c AzurePipelinesClient) fetchPipeline(ctx context.Context, owner string, r
 	}
 
 	azureBuild := builds.Value[0]
-	pipeline, err := azureBuild.toCachePipeline(c.provider)
+	pipeline, err := azureBuild.toCachePipeline()
 	if err != nil {
 		return cache.Pipeline{}, err
 	}
@@ -371,6 +373,7 @@ func (r azureRecord) toStageStep() (cache.Step, error) {
 
 	return cache.Step{
 		ID:       strconv.Itoa(r.Order),
+		Type:     cache.StepStage,
 		Name:     r.Name,
 		State:    fromAzureState(r.Result, r.State),
 		Children: stageJobs,
@@ -407,6 +410,7 @@ func (r azureRecord) toJobSteps() ([]*cache.Step, error) {
 func (r azureRecord) toJobStep() (cache.Step, error) {
 	job := cache.Step{
 		ID:           r.ID,
+		Type:         cache.StepJob,
 		State:        fromAzureState(r.Result, r.State),
 		Name:         r.Name,
 		Log:          utils.NullString{},

@@ -15,7 +15,7 @@ import (
 	"github.com/nbedos/citop/utils"
 )
 
-func TestTravisClientfetchBuild(t *testing.T) {
+func TestTravisClientfetchPipeline(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && r.URL.Path == "/build/609256446" {
 			bs, err := ioutil.ReadFile("test_data/travis_build_609256446.json")
@@ -47,61 +47,70 @@ func TestTravisClientfetchBuild(t *testing.T) {
 	}
 
 	repository := cache.Repository{
-		Provider: cache.Provider{
-			ID:   "id",
-			Name: "name",
-		},
-		ID:    42,
 		URL:   "github.com/nbedos/citop",
 		Owner: "nbedos",
 		Name:  "citop",
 	}
 
-	build, err := client.fetchBuild(context.Background(), &repository, "609256446")
-	if err != nil {
-		t.Fatal(err)
+	expectedPipeline := cache.Pipeline{
+		Repository: &repository,
+		GitReference: cache.GitReference{
+			SHA:   "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
+			Ref:   "feature/travis_improvements",
+			IsTag: false,
+		},
+		Step: cache.Step{
+			ID:    "609256446",
+			Type:  cache.StepPipeline,
+			State: cache.Failed,
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
+			},
+			StartedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 20, 53, 52, 0, time.UTC),
+			},
+			FinishedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 20, 54, 18, 0, time.UTC),
+			},
+			UpdatedAt: time.Date(2019, 11, 8, 20, 54, 19, 108000000, time.UTC),
+			Duration: utils.NullDuration{
+				Valid:    true,
+				Duration: 114 * time.Second,
+			},
+			WebURL: utils.NullString{
+				String: fmt.Sprintf("%s/nbedos/citop/builds/609256446", ts.URL),
+				Valid:  true,
+			},
+		},
 	}
 
-	expectedBuild := cache.Build{
-		Repository:      &repository,
-		ID:              "609256446",
-		Sha:             "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
-		Ref:             "feature/travis_improvements",
-		IsTag:           false,
-		RepoBuildNumber: "72",
-		State:           cache.Failed,
-		CreatedAt: utils.NullTime{
-			Valid: true,
-			Time:  time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
-		},
-		StartedAt: utils.NullTime{
-			Valid: true,
-			Time:  time.Date(2019, 11, 8, 20, 53, 52, 0, time.UTC),
-		},
-		FinishedAt: utils.NullTime{
-			Valid: true,
-			Time:  time.Date(2019, 11, 8, 20, 54, 18, 0, time.UTC),
-		},
-		UpdatedAt: time.Date(2019, 11, 8, 20, 54, 19, 108000000, time.UTC),
-		Duration: utils.NullDuration{
-			Valid:    true,
-			Duration: 114 * time.Second,
-		},
-		WebURL: fmt.Sprintf("%s/nbedos/citop/builds/609256446", ts.URL),
-		Jobs:   []*cache.Job{},
-	}
-
-	expectedBuild.Stages = map[int]*cache.Stage{
-		11290169: {
-			ID:    11290169,
+	expectedPipeline.Children = []*cache.Step{
+		{
+			ID:    "11290169",
+			Type:  cache.StepStage,
 			Name:  "Tests",
 			State: cache.Failed,
-			Jobs:  nil,
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
+			},
+			StartedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 20, 53, 52, 0, time.UTC),
+			},
+			FinishedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 20, 54, 18, 0, time.UTC),
+			},
 		},
 	}
-	expectedBuild.Stages[11290169].Jobs = []*cache.Job{
+	expectedPipeline.Children[0].Children = []*cache.Step{
 		{
 			ID:    "609256447",
+			Type:  cache.StepJob,
 			State: cache.Failed,
 			Name:  "GoLang 1.13 on Ubuntu Bionic",
 			CreatedAt: utils.NullTime{
@@ -120,12 +129,16 @@ func TestTravisClientfetchBuild(t *testing.T) {
 				Valid:    true,
 				Duration: 26 * time.Second,
 			},
-			Log:          utils.NullString{},
-			WebURL:       fmt.Sprintf("%s/nbedos/citop/jobs/609256447", ts.URL),
+			Log: utils.NullString{},
+			WebURL: utils.NullString{
+				String: fmt.Sprintf("%s/nbedos/citop/jobs/609256447", ts.URL),
+				Valid:  true,
+			},
 			AllowFailure: false,
 		},
 		{
 			ID:    "609256448",
+			Type:  cache.StepJob,
 			State: cache.Failed,
 			Name:  "GoLang 1.12 on Ubuntu Trusty",
 			CreatedAt: utils.NullTime{
@@ -144,12 +157,16 @@ func TestTravisClientfetchBuild(t *testing.T) {
 				Valid:    true,
 				Duration: 30 * time.Second,
 			},
-			Log:          utils.NullString{},
-			WebURL:       fmt.Sprintf("%s/nbedos/citop/jobs/609256448", ts.URL),
+			Log: utils.NullString{},
+			WebURL: utils.NullString{
+				String: fmt.Sprintf("%s/nbedos/citop/jobs/609256448", ts.URL),
+				Valid:  true,
+			},
 			AllowFailure: false,
 		},
 		{
 			ID:    "609256449",
+			Type:  cache.StepJob,
 			State: cache.Failed,
 			Name:  "GoLang 1.13 on macOS 10.14",
 			CreatedAt: utils.NullTime{
@@ -168,12 +185,16 @@ func TestTravisClientfetchBuild(t *testing.T) {
 				Valid:    true,
 				Duration: 31 * time.Second,
 			},
-			Log:          utils.NullString{},
-			WebURL:       fmt.Sprintf("%s/nbedos/citop/jobs/609256449", ts.URL),
+			Log: utils.NullString{},
+			WebURL: utils.NullString{
+				String: fmt.Sprintf("%s/nbedos/citop/jobs/609256449", ts.URL),
+				Valid:  true,
+			},
 			AllowFailure: false,
 		},
 		{
 			ID:    "609256450",
+			Type:  cache.StepJob,
 			State: cache.Failed,
 			Name:  "GoLang 1.12 on macOS 10.13",
 			CreatedAt: utils.NullTime{
@@ -192,15 +213,23 @@ func TestTravisClientfetchBuild(t *testing.T) {
 				Valid:    true,
 				Duration: 27 * time.Second,
 			},
-			Log:          utils.NullString{},
-			WebURL:       fmt.Sprintf("%s/nbedos/citop/jobs/609256450", ts.URL),
+			Log: utils.NullString{},
+			WebURL: utils.NullString{
+				String: fmt.Sprintf("%s/nbedos/citop/jobs/609256450", ts.URL),
+				Valid:  true,
+			},
 			AllowFailure: false,
 		},
 	}
 
-	if diff := cmp.Diff(expectedBuild, build); diff != "" {
+	pipeline, err := client.fetchPipeline(context.Background(), &repository, "609256446")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := expectedPipeline.Diff(pipeline); diff != "" {
 		t.Log(diff)
-		t.Fatal("invalid build")
+		t.Fatal("invalid pipeline")
 	}
 }
 
@@ -244,11 +273,6 @@ func TestTravisClientRepository(t *testing.T) {
 		}
 
 		expected := cache.Repository{
-			Provider: cache.Provider{
-				ID:   "id",
-				Name: "name",
-			},
-			ID:    25564643,
 			URL:   "https://github.com/nbedos/citop",
 			Owner: "nbedos",
 			Name:  "citop",

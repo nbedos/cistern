@@ -139,8 +139,8 @@ func (p mockProvider) AccountID() string { return p.id }
 func (p mockProvider) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
 	return "", false, nil
 }
-func (p mockProvider) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
-	return cache.Build{}, nil
+func (p mockProvider) BuildFromURL(ctx context.Context, u string) (cache.Pipeline, error) {
+	return cache.Pipeline{}, nil
 }
 
 func TestRunApplication(t *testing.T) {

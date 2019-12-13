@@ -57,8 +57,11 @@ func (r testRow) Key() interface{} {
 	return r.value
 }
 
-func (r testRow) URL() string {
-	return r.value
+func (r testRow) URL() utils.NullString {
+	return utils.NullString{
+		String: r.value,
+		Valid:  true,
+	}
 }
 
 type testSource struct {

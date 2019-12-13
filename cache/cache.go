@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"sort"
@@ -26,6 +27,7 @@ var ErrUnknownGitReference = errors.New("unknown git reference")
 
 type CIProvider interface {
 	ID() string
+	Name() string
 	// FIXME Replace stepID by stepIDs
 	Log(ctx context.Context, repository Repository, stepID string) (string, error)
 	BuildFromURL(ctx context.Context, u string) (Pipeline, error)
@@ -121,7 +123,7 @@ var statePrecedence = map[State]int{
 	Manual:   10,
 }
 
-/*func AggregateStatuses(ss []Step) State {
+func AggregateStatuses(ss []*Step) State {
 	if len(ss) == 0 {
 		return Unknown
 	}
@@ -136,7 +138,7 @@ var statePrecedence = map[State]int{
 	}
 
 	return state
-}*/
+}
 
 type Provider struct {
 	ID   string
@@ -144,15 +146,13 @@ type Provider struct {
 }
 
 type Repository struct {
-	Provider Provider
-	ID       int
-	URL      string
-	Owner    string
-	Name     string
+	URL   string
+	Owner string
+	Name  string
 }
 
 func (r Repository) Slug() string {
-	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
+	return fmt.Sprintf("%s/%s", url.PathEscape(r.Owner), url.PathEscape(r.Name))
 }
 
 type Commit struct {
@@ -313,10 +313,19 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 	return origin, c, nil
 }
 
+type StepType int
+
+const (
+	StepPipeline = iota
+	StepStage
+	StepJob
+	StepTask
+)
+
 type Step struct {
 	ID           string
 	Name         string
-	Type         string
+	Type         StepType
 	State        State
 	AllowFailure bool
 	CreatedAt    utils.NullTime
@@ -329,20 +338,29 @@ type Step struct {
 	Children     []*Step
 }
 
+func (s Step) Diff(other Step) string {
+	return cmp.Diff(s, other)
+}
+
 func (s Step) Status() State        { return s.State }
 func (s Step) AllowedFailure() bool { return s.AllowFailure }
 
-type GitRef struct {
+type GitReference struct {
 	SHA   string
 	Ref   string
 	IsTag bool
 }
 
 type Pipeline struct {
-	ProviderID string
+	providerID string
 	Repository *Repository
-	GitRef
+	GitReference
 	Step
+}
+
+func (p Pipeline) Diff(other Pipeline) string {
+	options := cmp.AllowUnexported(Pipeline{})
+	return cmp.Diff(p, other, options)
 }
 
 type PipelineKey struct {
@@ -350,14 +368,9 @@ type PipelineKey struct {
 	ID         string
 }
 
-type PipelineStepKey struct {
-	PipelineKey
-	stepIDs []string
-}
-
 func (p Pipeline) Key() PipelineKey {
 	return PipelineKey{
-		ProviderID: p.ProviderID,
+		ProviderID: p.providerID,
 		ID:         p.Step.ID,
 	}
 }
@@ -397,6 +410,7 @@ func (c *Cache) SavePipeline(ref string, p Pipeline) error {
 	if p.Repository == nil {
 		return errors.New("Pipeline.Repository must not be nil")
 	}
+
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -517,6 +531,7 @@ func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref
 		if err != nil {
 			return err
 		}
+		pipeline.providerID = p.ID()
 
 		switch err := c.SavePipeline(ref, pipeline); err {
 		case nil:
@@ -782,14 +797,21 @@ func (c *Cache) Step(key PipelineKey, stepIDs []string) (Step, bool) {
 
 var ErrIncompleteLog = errors.New("log not complete")
 
-func (c *Cache) WriteLog(ctx context.Context, key PipelineStepKey, writer io.Writer) error {
+func (c *Cache) WriteLog(ctx context.Context, key taskKey, writer io.Writer) error {
 	var err error
 	p, exists := c.Pipeline(key.PipelineKey)
 	if !exists {
 		return fmt.Errorf("no matching pipelibe for %v", key)
 	}
 
-	step, exists := c.Step(key.PipelineKey, key.stepIDs)
+	stepIDs := make([]string, 0)
+	for _, ID := range key.stepIDs {
+		if ID.Valid {
+			stepIDs = append(stepIDs, ID.String)
+		}
+	}
+
+	step, exists := c.Step(key.PipelineKey, stepIDs)
 	if !exists {
 		return fmt.Errorf("no matching step for %v %v", key, key.stepIDs)
 	}
