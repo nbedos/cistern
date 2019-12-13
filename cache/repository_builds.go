@@ -83,8 +83,11 @@ func (t task) Tabular(loc *time.Location) map[string]text.StyledString {
 	}
 
 	name := text.NewStyledString(t.prefix)
-	if t.type_ == "P" && t.name == "" {
+	if t.type_ == "P" {
 		name.Append(t.provider, text.Provider)
+		if t.name != "" {
+			name.Append(fmt.Sprintf(" %s", t.name))
+		}
 	} else {
 		name.Append(t.name)
 	}
@@ -219,7 +222,7 @@ func (c Cache) BuildsOfRef(ref string) HierarchicalTabularDataSource {
 }
 
 func (s BuildsByCommit) Headers() []string {
-	return []string{"REF", "PIPELINE", "TYPE", "STATE", "CREATED", "DURATION", "NAME"}
+	return []string{"REF", "PIPELINE", "TYPE", "STATE", "STARTED", "DURATION", "NAME"}
 }
 
 func (s BuildsByCommit) Alignment() map[string]text.Alignment {

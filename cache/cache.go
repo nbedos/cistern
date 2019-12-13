@@ -796,8 +796,6 @@ func (c *Cache) Step(key PipelineKey, stepIDs []string) (Step, bool) {
 	return step, true
 }
 
-var ErrIncompleteLog = errors.New("log not complete")
-
 func (c *Cache) WriteLog(ctx context.Context, key taskKey, writer io.Writer) error {
 	var err error
 	pKey := PipelineKey{

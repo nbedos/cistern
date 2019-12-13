@@ -3,6 +3,8 @@ package providers
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -283,6 +285,48 @@ func (c CircleCIClient) fetchPipeline(ctx context.Context, projectEndpoint url.U
 	return pipeline, nil
 }
 
+type circleCIAction struct {
+	Name                 string `json:"name"`
+	LogURL               string `json:"output_url"`
+	Status               string `json:"status"`
+	EndTime              string `json:"end_time"`
+	Type                 string `json:"type"`
+	StartTime            string `json:"start_time"`
+	DurationMilliseconds int    `json:"run_time_millis"`
+}
+
+func (a circleCIAction) toStep() (cache.Step, error) {
+	// Action do not have any idea so generate one
+	h := sha256.New()
+	s := fmt.Sprintf("%+v", a)
+	ID := base64.StdEncoding.EncodeToString(h.Sum([]byte(s)))
+
+	step := cache.Step{
+		ID:    ID,
+		Type:  cache.StepTask,
+		State: fromCircleCIStatus(a.Status),
+		Name:  a.Name,
+	}
+
+	if a.DurationMilliseconds > 0 {
+		step.Duration = utils.NullDuration{
+			Duration: time.Duration(a.DurationMilliseconds) * time.Millisecond,
+			Valid:    true,
+		}
+	}
+
+	var err error
+
+	if step.StartedAt, err = utils.NullTimeFromString(a.StartTime); err != nil {
+		return step, err
+	}
+	if step.FinishedAt, err = utils.NullTimeFromString(a.EndTime); err != nil {
+		return step, err
+	}
+
+	return step, nil
+}
+
 type circleCIBuild struct {
 	ID        int    `json:"build_num"`
 	WebURL    string `json:"build_url"`
@@ -297,17 +341,13 @@ type circleCIBuild struct {
 	FinishedAt           string `json:"stop_time"`
 	Outcome              string `json:"outcome"`
 	Lifecycle            string `json:"lifecycle"`
+	Status               string `json:"status"`
 	Message              string `json:"subject"`
 	CreatedAt            string `json:"queued_at"`
 	CommittedAt          string `json:"committer_date"`
 	DurationMilliseconds int    `json:"build_time_millis"`
 	Steps                []struct {
-		Name    string `json:"name"`
-		Actions []struct {
-			Name        string `json:"name"`
-			BashCommand string `json:"bash_command"`
-			LogURL      string `json:"output_url"`
-		} `json:"actions"`
+		Actions []circleCIAction `json:"actions"`
 	} `json:"steps"`
 }
 
@@ -321,8 +361,9 @@ func (b circleCIBuild) ToCacheBuild(repository *cache.Repository) (cache.Pipelin
 		},
 		Step: cache.Step{
 			ID:    strconv.Itoa(b.ID),
+			Name:  b.Workflows.JobName,
 			Type:  cache.StepPipeline,
-			State: fromCircleCIStatus(b.Lifecycle, b.Outcome),
+			State: fromCircleCIStatus(b.Status),
 			WebURL: utils.NullString{
 				String: b.WebURL,
 				Valid:  true,
@@ -360,27 +401,37 @@ func (b circleCIBuild) ToCacheBuild(repository *cache.Repository) (cache.Pipelin
 		build.Ref = b.Branch
 	}
 
-	return build, nil
-}
-
-func fromCircleCIStatus(lifecycle string, outcome string) cache.State {
-	switch lifecycle {
-	case "queued", "scheduled":
-		return cache.Pending
-	case "not_run", "not_running":
-		return cache.Skipped
-	case "running":
-		return cache.Running
-	case "finished":
-		switch outcome {
-		case "canceled":
-			return cache.Canceled
-		case "infrastructure_fail", "timedout", "failed", "no_tests":
-			return cache.Failed
-		case "success":
-			return cache.Passed
+	for _, buildStep := range b.Steps {
+		for _, action := range buildStep.Actions {
+			task, err := action.toStep()
+			if err != nil {
+				return build, err
+			}
+			build.Children = append(build.Children, task)
 		}
 	}
 
-	return cache.Unknown
+	return build, nil
+}
+
+func fromCircleCIStatus(status string) cache.State {
+	switch status {
+	case "canceled", "cancelled":
+		return cache.Canceled
+	case "infrastructure_fail", "timedout", "failed":
+		return cache.Failed
+	case "running":
+		return cache.Running
+	case "queued", "scheduled":
+		return cache.Pending
+	case "not_running", "not_run":
+		return cache.Skipped
+	case "success":
+		return cache.Passed
+	case "retried", "no_tests", "fixed":
+		// What do those mean?
+		return cache.Unknown
+	default:
+		return cache.Unknown
+	}
 }
