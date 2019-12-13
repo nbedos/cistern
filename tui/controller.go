@@ -76,6 +76,7 @@ func NewController(tui *TUI, ref string, c cache.Cache, loc *time.Location, temp
 }
 
 func (c *Controller) setRef(ref string) error {
+	// TODO Preserve traversable state across calls to setRef()
 	table, err := NewTable(c.cache.BuildsOfRef(ref), c.table.width, c.table.height, c.table.location)
 	if err != nil {
 		return err
@@ -328,6 +329,14 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 				c.status.ShowInput = true
 				c.status.InputBuffer = ""
 				c.status.inputPrefix = "ref: "
+			case 'u':
+				// TODO Fix controller.setRef to preserve traversable state
+				go func() {
+					select {
+					case refc <- c.ref:
+					case <-ctx.Done():
+					}
+				}()
 			case '?':
 				file, err := ioutil.TempFile(c.tempDir, "citop_")
 				if err != nil {

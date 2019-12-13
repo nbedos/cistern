@@ -402,6 +402,7 @@ func (b circleCIBuild) ToCacheBuild(repository *cache.Repository) (cache.Pipelin
 	}
 
 	for _, buildStep := range b.Steps {
+		// TODO If there is more than one action for the step, the step should be made a Stage
 		for _, action := range buildStep.Actions {
 			task, err := action.toStep()
 			if err != nil {

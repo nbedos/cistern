@@ -556,6 +556,10 @@ func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref
 		default:
 			return err
 		}
+
+		if !pipeline.State.IsActive() {
+			break
+		}
 	}
 
 	return nil
