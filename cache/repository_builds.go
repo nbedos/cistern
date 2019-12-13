@@ -83,8 +83,8 @@ func (t task) Tabular(loc *time.Location) map[string]text.StyledString {
 	}
 
 	name := text.NewStyledString(t.prefix)
-	if t.type_ == "P" {
-		name.Append(t.name, text.Provider)
+	if t.type_ == "P" && t.name == "" {
+		name.Append(t.provider, text.Provider)
 	} else {
 		name.Append(t.name)
 	}
@@ -134,19 +134,21 @@ func (t *task) SetPrefix(s string) {
 	t.prefix = s
 }
 
-func taskFromPipeline(p Pipeline, name string) task {
+func taskFromPipeline(p Pipeline, providerByID map[string]CIProvider) task {
 	key := taskKey{
 		PipelineKey: p.Key(),
 		stepIDs:     [maxStepIDs]utils.NullString{},
 	}
 
-	t := taskFromStep(p.GitReference, key, p.Step)
-	t.name = name
+	providerName := "unknown"
+	if provider, exists := providerByID[p.providerID]; exists {
+		providerName = provider.Name()
+	}
 
-	return t
+	return taskFromStep(p.Step, p.GitReference, key, providerName)
 }
 
-func taskFromStep(ref GitReference, key taskKey, s Step) task {
+func taskFromStep(s Step, ref GitReference, key taskKey, provider string) task {
 	keySet := false
 	for i, ID := range key.stepIDs {
 		if !ID.Valid {
@@ -170,8 +172,7 @@ func taskFromStep(ref GitReference, key taskKey, s Step) task {
 		ref:        ref,
 		state:      s.State,
 		name:       s.Name,
-		provider:   key.ProviderID,
-		prefix:     "",
+		provider:   provider,
 		createdAt:  s.CreatedAt,
 		startedAt:  s.StartedAt,
 		finishedAt: s.FinishedAt,
@@ -179,10 +180,8 @@ func taskFromStep(ref GitReference, key taskKey, s Step) task {
 			Time:  s.UpdatedAt,
 			Valid: true,
 		},
-		duration:    s.Duration,
-		children:    nil,
-		traversable: false,
-		url:         s.WebURL,
+		duration: s.Duration,
+		url:      s.WebURL,
 	}
 
 	switch s.Type {
@@ -197,7 +196,7 @@ func taskFromStep(ref GitReference, key taskKey, s Step) task {
 	}
 
 	for _, childStep := range s.Children {
-		childTask := taskFromStep(ref, t.key, *childStep)
+		childTask := taskFromStep(*childStep, ref, t.key, provider)
 		t.children = append(t.children, &childTask)
 	}
 
@@ -237,11 +236,7 @@ func (s BuildsByCommit) Alignment() map[string]text.Alignment {
 func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 	rows := make([]HierarchicalTabularSourceRow, 0)
 	for _, p := range s.cache.PipelinesByRef(s.ref) {
-		name := "unknown"
-		if provider := s.cache.ciProvidersById[p.providerID]; provider != nil {
-			name = provider.Name()
-		}
-		t := taskFromPipeline(p, name)
+		t := taskFromPipeline(p, s.cache.ciProvidersById)
 		rows = append(rows, &t)
 	}
 
