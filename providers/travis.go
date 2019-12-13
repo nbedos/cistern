@@ -122,32 +122,27 @@ func (b travisBuild) toCacheBuild(repository *cache.Repository, webURL string) (
 		return b.Jobs[i].Stage.ID < b.Jobs[j].Stage.ID || (b.Jobs[i].Stage.ID == b.Jobs[j].Stage.ID && b.Jobs[i].ID < b.Jobs[j].ID)
 	})
 	for _, travisJob := range b.Jobs {
-		var stage *cache.Step
+		job, err := travisJob.toCacheStep(webURL)
+		if err != nil {
+			return pipeline, err
+		}
+		pipeline.CreatedAt = utils.MinNullTime(pipeline.CreatedAt, job.CreatedAt)
+
 		if travisJob.Stage.ID != 0 {
 			s, err := travisJob.Stage.toCacheStep()
 			if err != nil {
 				return pipeline, err
 			}
-			if len(pipeline.Children) == 0 || pipeline.Children[len(pipeline.Children)-1].ID != s.ID {
-				stage = &s
-				pipeline.Children = append(pipeline.Children, stage)
-			} else {
-				stage = pipeline.Children[len(pipeline.Children)-1]
-			}
-		}
-		job, err := travisJob.toCacheStep(webURL)
-		if err != nil {
-			return pipeline, err
-		}
 
-		if job.CreatedAt.Valid {
-			pipeline.CreatedAt = utils.MinNullTime(pipeline.CreatedAt, job.CreatedAt)
-		}
-		if stage != nil {
-			stage.Children = append(stage.Children, &job)
+			if len(pipeline.Children) == 0 || pipeline.Children[len(pipeline.Children)-1].ID != s.ID {
+				pipeline.Children = append(pipeline.Children, s)
+			}
+
+			stage := &pipeline.Children[len(pipeline.Children)-1]
+			stage.Children = append(stage.Children, job)
 			stage.CreatedAt = utils.MinNullTime(stage.CreatedAt, job.CreatedAt)
 		} else {
-			pipeline.Children = append(pipeline.Children, &job)
+			pipeline.Children = append(pipeline.Children, job)
 		}
 	}
 

@@ -196,7 +196,7 @@ func taskFromStep(s Step, ref GitReference, key taskKey, provider string) task {
 	}
 
 	for _, childStep := range s.Children {
-		childTask := taskFromStep(*childStep, ref, t.key, provider)
+		childTask := taskFromStep(childStep, ref, t.key, provider)
 		t.children = append(t.children, &childTask)
 	}
 

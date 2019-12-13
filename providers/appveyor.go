@@ -300,7 +300,7 @@ func (b appVeyorBuild) toCachePipeline(repo *cache.Repository) (cache.Pipeline, 
 		if err != nil {
 			return pipeline, err
 		}
-		pipeline.Children = append(pipeline.Children, &j)
+		pipeline.Children = append(pipeline.Children, j)
 	}
 
 	return pipeline, nil

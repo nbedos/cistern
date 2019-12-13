@@ -87,7 +87,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 		},
 	}
 
-	expectedPipeline.Children = []*cache.Step{
+	expectedPipeline.Children = []cache.Step{
 		{
 			ID:    "11290169",
 			Type:  cache.StepStage,
@@ -107,7 +107,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			},
 		},
 	}
-	expectedPipeline.Children[0].Children = []*cache.Step{
+	expectedPipeline.Children[0].Children = []cache.Step{
 		{
 			ID:    "609256447",
 			Type:  cache.StepJob,

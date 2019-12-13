@@ -123,7 +123,7 @@ var statePrecedence = map[State]int{
 	Manual:   10,
 }
 
-func AggregateStatuses(ss []*Step) State {
+func AggregateStatuses(ss []Step) State {
 	if len(ss) == 0 {
 		return Unknown
 	}
@@ -335,7 +335,7 @@ type Step struct {
 	Duration     utils.NullDuration
 	WebURL       utils.NullString
 	Log          utils.NullString
-	Children     []*Step
+	Children     []Step
 }
 
 func (s Step) Diff(other Step) string {

@@ -108,13 +108,13 @@ var expectedPipeline = cache.Pipeline{
 			String: "http://HOST/owner/repo/_build/results?buildId=16",
 			Valid:  true,
 		},
-		Children: []*cache.Step{
+		Children: []cache.Step{
 			{
 				ID:    "1",
 				Type:  cache.StepStage,
 				Name:  "tests",
 				State: "failed",
-				Children: []*cache.Step{
+				Children: []cache.Step{
 					{
 						ID:    "05f50c00-03d1-5f30-b292-f8c1b53561cb",
 						Type:  cache.StepJob,

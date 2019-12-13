@@ -386,7 +386,7 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 				Name: job.Stage,
 			}
 			stagesIndexByName[job.Stage] = len(pipeline.Children)
-			pipeline.Children = append(pipeline.Children, &stage)
+			pipeline.Children = append(pipeline.Children, stage)
 		}
 	}
 
@@ -411,14 +411,14 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 			AllowFailure: gitlabJob.AllowFailure,
 		}
 		index := stagesIndexByName[gitlabJob.Stage]
-		pipeline.Children[index].Children = append(pipeline.Children[index].Children, &job)
+		pipeline.Children[index].Children = append(pipeline.Children[index].Children, job)
 	}
 
 	// Compute stage state
 	for _, stage := range pipeline.Children {
 		// Each stage contains all job runs. Select only the last run of each job
 		// Earliest runs should not influence the current state of the stage
-		jobsByName := make(map[string]*cache.Step)
+		jobsByName := make(map[string]cache.Step)
 		for _, job := range stage.Children {
 			previousJob, exists := jobsByName[job.Name]
 			// Dates may be NULL so we have to rely on IDs to find out which job is older. meh.
@@ -426,7 +426,7 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 				jobsByName[job.Name] = job
 			}
 		}
-		jobs := make([]*cache.Step, 0, len(jobsByName))
+		jobs := make([]cache.Step, 0, len(jobsByName))
 		for _, job := range jobsByName {
 			jobs = append(jobs, job)
 		}

@@ -12,17 +12,17 @@ import (
 func TestAggregateStatuses(t *testing.T) {
 	testCases := []struct {
 		name   string
-		steps  []*Step
+		steps  []Step
 		result State
 	}{
 		{
 			name:   "Empty list",
-			steps:  []*Step{},
+			steps:  []Step{},
 			result: Unknown,
 		},
 		{
 			name: "Jobs: No allowed failure",
-			steps: []*Step{
+			steps: []Step{
 				{
 					AllowFailure: false,
 					State:        Passed,
@@ -40,7 +40,7 @@ func TestAggregateStatuses(t *testing.T) {
 		},
 		{
 			name: "Jobs: Allowed failure",
-			steps: []*Step{
+			steps: []Step{
 				{
 					AllowFailure: false,
 					State:        Passed,
@@ -58,7 +58,7 @@ func TestAggregateStatuses(t *testing.T) {
 		},
 		{
 			name: "Builds",
-			steps: []*Step{
+			steps: []Step{
 				{
 					State: Passed,
 				},

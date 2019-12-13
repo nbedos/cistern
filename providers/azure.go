@@ -240,9 +240,9 @@ func (c AzurePipelinesClient) fetchPipeline(ctx context.Context, owner string, r
 		return cache.Pipeline{}, err
 	}
 
-	for _, stage := range stages {
-		for _, job := range stage.Children {
-			job.CreatedAt = pipeline.CreatedAt
+	for i := range stages {
+		for j := range stages[i].Children {
+			stages[i].Children[j].CreatedAt = pipeline.CreatedAt
 		}
 	}
 
@@ -265,7 +265,7 @@ func (c AzurePipelinesClient) fetchPipeline(ctx context.Context, owner string, r
 	return pipeline, err
 }
 
-func (c AzurePipelinesClient) getTimeline(ctx context.Context, u string) ([]*cache.Step, error) {
+func (c AzurePipelinesClient) getTimeline(ctx context.Context, u string) ([]cache.Step, error) {
 	timelineURL, err := url.Parse(u)
 	if err != nil {
 		return nil, err
@@ -324,13 +324,13 @@ func (c AzurePipelinesClient) getTimeline(ctx context.Context, u string) ([]*cac
 	// For now we ignore Tasks. Phases that contain jobs are redundant with the jobs themselves
 	// so we ignore them too. Phase that have no child are turned into a cache.Job.
 	// (this is consistent with the way jobs are shown on the Azure website)
-	steps := make([]*cache.Step, 0, len(topLevelRecords))
+	steps := make([]cache.Step, 0, len(topLevelRecords))
 	for _, record := range topLevelRecords {
 		stage, err := record.toStageStep()
 		if err != nil {
 			return nil, err
 		}
-		steps = append(steps, &stage)
+		steps = append(steps, stage)
 	}
 
 	return steps, nil
@@ -362,7 +362,7 @@ func (r azureRecord) toStageStep() (cache.Step, error) {
 		return cache.Step{}, errors.New("record order for stage cannot be zero")
 	}
 
-	stageJobs := make([]*cache.Step, 0)
+	stageJobs := make([]cache.Step, 0)
 	for _, record := range r.children {
 		jobs, err := record.toJobSteps()
 		if err != nil {
@@ -380,7 +380,7 @@ func (r azureRecord) toStageStep() (cache.Step, error) {
 	}, nil
 }
 
-func (r azureRecord) toJobSteps() ([]*cache.Step, error) {
+func (r azureRecord) toJobSteps() ([]cache.Step, error) {
 	if t := strings.ToLower(r.Type); t != "phase" {
 		return nil, fmt.Errorf("expected record of type 'phase' but got %q", t)
 	}
@@ -395,13 +395,13 @@ func (r azureRecord) toJobSteps() ([]*cache.Step, error) {
 		records = r.children
 	}
 
-	jobs := make([]*cache.Step, 0)
+	jobs := make([]cache.Step, 0)
 	for _, record := range records {
 		job, err := record.toJobStep()
 		if err != nil {
 			return nil, err
 		}
-		jobs = append(jobs, &job)
+		jobs = append(jobs, job)
 	}
 
 	return jobs, nil
