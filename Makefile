@@ -23,7 +23,7 @@ usage:
 	echo "    make tests       # Run unit tests"
 
 all: man.go $(BUILD) $(BUILD)/LICENSE
-	MD="$$(sed '1s/<version>/$(VERSION)/' man.md)" && \
+	MD="$$(sed '1s/\\<version\\>/$(VERSION)/' man.md)" && \
 	echo "Building $(BUILD)/man.html..." && \
 	echo "$$MD" | pandoc -s -t html5 --template pandoc_template.html > $(BUILD)/man.html && \
 	echo "Building $(BUILD)/$(EXECUTABLE).man.1..." && \
