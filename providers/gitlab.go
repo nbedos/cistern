@@ -418,7 +418,7 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 	}
 
 	// Compute stage state
-	for _, stage := range pipeline.Children {
+	for i, stage := range pipeline.Children {
 		// Each stage contains all job runs. Select only the last run of each job
 		// Earliest runs should not influence the current state of the stage
 		jobsByName := make(map[string]cache.Step)
@@ -433,7 +433,14 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 		for _, job := range jobsByName {
 			jobs = append(jobs, job)
 		}
-		stage.State = cache.AggregateStatuses(jobs)
+
+		aggregate := cache.Aggregate(jobs)
+		pipeline.Children[i].State = aggregate.State
+		pipeline.Children[i].StartedAt = aggregate.StartedAt
+		pipeline.Children[i].CreatedAt = aggregate.CreatedAt
+		pipeline.Children[i].FinishedAt = aggregate.FinishedAt
+		pipeline.Children[i].UpdatedAt = aggregate.UpdatedAt
+		pipeline.Children[i].Duration = aggregate.Duration
 	}
 
 	c.mux.Lock()

@@ -96,11 +96,6 @@ func monitorRefStatuses(ctx context.Context, p SourceProvider, url string, ref s
 
 type State string
 
-func (s State) IsActive() bool {
-	return s == Pending || s == Running
-}
-
-// TODO Add Failing state for running job with one failure
 const (
 	Unknown  State = ""
 	Pending  State = "pending"
@@ -111,6 +106,10 @@ const (
 	Manual   State = "manual"
 	Skipped  State = "skipped"
 )
+
+func (s State) IsActive() bool {
+	return s == Pending || s == Running
+}
 
 var statePrecedence = map[State]int{
 	Unknown:  80,
@@ -123,21 +122,43 @@ var statePrecedence = map[State]int{
 	Manual:   10,
 }
 
-func AggregateStatuses(ss []Step) State {
-	if len(ss) == 0 {
-		return Unknown
+func (s State) merge(other State) State {
+	if statePrecedence[s] > statePrecedence[other] {
+		return s
+	}
+	return other
+}
+
+func Aggregate(steps []Step) Step {
+	switch len(steps) {
+	case 0:
+		return Step{}
+	case 1:
+		return steps[0]
 	}
 
-	state := ss[0].Status()
-	for _, s := range ss {
-		if !s.AllowedFailure() || (s.Status() != Canceled && s.Status() != Failed) {
-			if statePrecedence[s.Status()] > statePrecedence[state] {
-				state = s.Status()
-			}
+	first, last := steps[0], Aggregate(steps[1:])
+	for _, p := range []*Step{&first, &last} {
+		if p.AllowedFailure() && (p.State == Canceled || p.State == Failed) {
+			p.State = Passed
 		}
 	}
 
-	return state
+	s := Step{
+		State:      first.State.merge(last.State),
+		CreatedAt:  utils.MinNullTime(first.CreatedAt, last.CreatedAt),
+		StartedAt:  utils.MinNullTime(first.StartedAt, last.StartedAt),
+		FinishedAt: utils.MaxNullTime(first.FinishedAt, last.FinishedAt),
+		Children:   steps,
+	}
+
+	s.Duration = utils.NullSub(s.FinishedAt, s.StartedAt)
+	s.UpdatedAt = first.UpdatedAt
+	if last.UpdatedAt.After(s.UpdatedAt) {
+		s.UpdatedAt = last.UpdatedAt
+	}
+
+	return s
 }
 
 type Provider struct {

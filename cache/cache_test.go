@@ -75,8 +75,8 @@ func TestAggregateStatuses(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if state := AggregateStatuses(testCase.steps); state != testCase.result {
-				t.Fatalf("expected %q but got %q", testCase.result, state)
+			if agg := Aggregate(testCase.steps); agg.State != testCase.result {
+				t.Fatalf("expected %q but got %q", testCase.result, agg.State)
 			}
 		})
 	}
