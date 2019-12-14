@@ -26,8 +26,11 @@ var ErrUnknownPipelineURL = errors.New("unknown pipeline URL")
 var ErrUnknownGitReference = errors.New("unknown git reference")
 
 type CIProvider interface {
+	// Unique identifier of the provider instance among all other instances
 	ID() string
+	// Host part of the URL of the provider
 	Host() string
+	// Display name of the provider
 	Name() string
 	// FIXME Replace stepID by stepIDs
 	Log(ctx context.Context, repository Repository, step Step) (string, error)
@@ -35,6 +38,7 @@ type CIProvider interface {
 }
 
 type SourceProvider interface {
+	// Unique identifier of the provider instance among all other instances
 	ID() string
 	RefStatuses(ctx context.Context, url string, ref string, sha string) ([]string, error)
 	Commit(ctx context.Context, repo string, sha string) (Commit, error)
@@ -234,11 +238,11 @@ func (c Commit) Strings() []text.StyledString {
 func GitOriginURL(path string, sha string) (string, Commit, error) {
 	// If a path does not refer to an existing file or directory, go-git will continue
 	// running and will walk its way up the directory structure looking for a .git repository.
-	// This is not ideal for us since running 'citop -r github.com/owner/remoterepo' from
+	// This is not ideal for us since running 'citop -r github.com/owner/repo' from
 	// /home/user/localrepo will make go-git look for a .git repository in
-	// /home/user/localrepo/github.com/owner/remoterepo which will inevitably lead to
+	// /home/user/localrepo/github.com/owner/repo which will inevitably lead to
 	// /home/user/localrepo which is not what the user expected since the user was
-	// referring to the online repository https://github.com/owner/remoterepo. So instead
+	// referring to the online repository https://github.com/owner/repo. So instead
 	// we bail out early if the path is invalid, meaning it's not a local path but a URL.
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {

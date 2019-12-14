@@ -18,11 +18,13 @@ import (
 
 const maxStepIDs = 10
 
+// We need an array instead of a slice so that this type (and thus taskKey) is hashable
+type StepPath [maxStepIDs]utils.NullString
+
 type taskKey struct {
 	providerID   string
 	providerHost string
-	// We need an array instead of a slice so that taskKey is hashable
-	stepIDs [maxStepIDs]utils.NullString
+	stepIDs      StepPath
 }
 
 type task struct {
@@ -286,8 +288,8 @@ func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir st
 		return "", err
 	}
 
-	err = s.cache.WriteLog(ctx, stepKey, w)
 	logPath := path.Join(dir, filepath.Base(file.Name()))
+	err = s.cache.WriteLog(ctx, stepKey, w)
 
 	return logPath, err
 }

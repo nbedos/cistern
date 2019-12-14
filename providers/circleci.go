@@ -3,8 +3,6 @@ package providers
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -290,6 +288,7 @@ func (c CircleCIClient) fetchPipeline(ctx context.Context, projectEndpoint url.U
 }
 
 type circleCIAction struct {
+	Index                int    `json:"index"`
 	Name                 string `json:"name"`
 	LogURL               string `json:"output_url"`
 	Status               string `json:"status"`
@@ -300,13 +299,8 @@ type circleCIAction struct {
 }
 
 func (a circleCIAction) toStep() (cache.Step, error) {
-	// Action do not have any idea so generate one
-	h := sha256.New()
-	s := fmt.Sprintf("%+v", a)
-	ID := base64.StdEncoding.EncodeToString(h.Sum([]byte(s)))
-
 	step := cache.Step{
-		ID:    ID,
+		ID:    strconv.Itoa(a.Index),
 		Type:  cache.StepTask,
 		State: fromCircleCIStatus(a.Status),
 		Name:  a.Name,
@@ -320,7 +314,6 @@ func (a circleCIAction) toStep() (cache.Step, error) {
 	}
 
 	var err error
-
 	if step.StartedAt, err = utils.NullTimeFromString(a.StartTime); err != nil {
 		return step, err
 	}
@@ -405,13 +398,14 @@ func (b circleCIBuild) ToCacheBuild(repository *cache.Repository) (cache.Pipelin
 		build.Ref = b.Branch
 	}
 
-	for _, buildStep := range b.Steps {
+	for i, buildStep := range b.Steps {
 		// TODO If there is more than one action for the step, the step should be made a Stage
-		for _, action := range buildStep.Actions {
+		for j, action := range buildStep.Actions {
 			task, err := action.toStep()
 			if err != nil {
 				return build, err
 			}
+			task.ID = fmt.Sprintf("%d.%d", i, j)
 			build.Children = append(build.Children, task)
 		}
 	}
