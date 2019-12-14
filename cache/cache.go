@@ -143,7 +143,7 @@ func Aggregate(steps []Step) Step {
 
 	first, last := steps[0], Aggregate(steps[1:])
 	for _, p := range []*Step{&first, &last} {
-		if p.AllowedFailure() && (p.State == Canceled || p.State == Failed) {
+		if p.AllowFailure && (p.State == Canceled || p.State == Failed) {
 			p.State = Passed
 		}
 	}
@@ -362,8 +362,15 @@ func (s Step) Diff(other Step) string {
 	return cmp.Diff(s, other)
 }
 
-func (s Step) Status() State        { return s.State }
-func (s Step) AllowedFailure() bool { return s.AllowFailure }
+func (s Step) Map(f func(Step) Step) Step {
+	s = f(s)
+
+	for i, child := range s.Children {
+		s.Children[i] = child.Map(f)
+	}
+
+	return s
+}
 
 type GitReference struct {
 	SHA   string
@@ -375,7 +382,7 @@ type Pipeline struct {
 	Number       string
 	providerID   string
 	providerHost string
-	GitReference
+	GitReference // FIXME Remove?
 	Step
 }
 

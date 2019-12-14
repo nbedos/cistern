@@ -189,7 +189,7 @@ func (c AppVeyorClient) fetchPipeline(ctx context.Context, owner string, repoNam
 		return cache.Pipeline{}, err
 	}
 
-	return bVersion.Build.toCachePipeline(b.Project.Name, b.Project.Name)
+	return bVersion.Build.toCachePipeline(b.Project.Owner, b.Project.Name)
 }
 
 // Extract owner, repository and build ID from web URL of build

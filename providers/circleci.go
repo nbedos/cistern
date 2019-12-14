@@ -236,7 +236,7 @@ type circleCIAction struct {
 	DurationMilliseconds int    `json:"run_time_millis"`
 }
 
-func (a circleCIAction) toStep() (cache.Step, error) {
+func (a circleCIAction) toStep(webURL utils.NullString) (cache.Step, error) {
 	step := cache.Step{
 		ID:    strconv.Itoa(a.Index),
 		Type:  cache.StepTask,
@@ -245,6 +245,7 @@ func (a circleCIAction) toStep() (cache.Step, error) {
 		Log: cache.Log{
 			Key: a.LogURL,
 		},
+		WebURL: webURL,
 	}
 
 	if a.DurationMilliseconds > 0 {
@@ -290,7 +291,7 @@ type circleCIBuild struct {
 }
 
 func (b circleCIBuild) toPipeline() (cache.Pipeline, error) {
-	build := cache.Pipeline{
+	pipeline := cache.Pipeline{
 		GitReference: cache.GitReference{
 			SHA:   b.Sha,
 			Ref:   "",
@@ -309,48 +310,48 @@ func (b circleCIBuild) toPipeline() (cache.Pipeline, error) {
 	}
 
 	if b.DurationMilliseconds > 0 {
-		build.Duration = utils.NullDuration{
+		pipeline.Duration = utils.NullDuration{
 			Duration: time.Duration(b.DurationMilliseconds) * time.Millisecond,
 			Valid:    true,
 		}
 	}
 
 	var err error
-	if build.CreatedAt, err = utils.NullTimeFromString(b.CreatedAt); err != nil {
-		return build, err
+	if pipeline.CreatedAt, err = utils.NullTimeFromString(b.CreatedAt); err != nil {
+		return pipeline, err
 	}
-	if build.StartedAt, err = utils.NullTimeFromString(b.StartedAt); err != nil {
-		return build, err
+	if pipeline.StartedAt, err = utils.NullTimeFromString(b.StartedAt); err != nil {
+		return pipeline, err
 	}
-	if build.FinishedAt, err = utils.NullTimeFromString(b.FinishedAt); err != nil {
-		return build, err
+	if pipeline.FinishedAt, err = utils.NullTimeFromString(b.FinishedAt); err != nil {
+		return pipeline, err
 	}
 
-	updatedAt := utils.MaxNullTime(build.FinishedAt, build.StartedAt, build.CreatedAt)
+	updatedAt := utils.MaxNullTime(pipeline.FinishedAt, pipeline.StartedAt, pipeline.CreatedAt)
 	if !updatedAt.Valid {
-		return build, errors.New("updatedAt attribute cannot be null")
+		return pipeline, errors.New("updatedAt attribute cannot be null")
 	}
-	build.UpdatedAt = updatedAt.Time
+	pipeline.UpdatedAt = updatedAt.Time
 
-	if build.IsTag = b.Tag != ""; build.IsTag {
-		build.Ref = b.Tag
+	if pipeline.IsTag = b.Tag != ""; pipeline.IsTag {
+		pipeline.Ref = b.Tag
 	} else {
-		build.Ref = b.Branch
+		pipeline.Ref = b.Branch
 	}
 
 	for i, buildStep := range b.Steps {
 		// TODO If there is more than one action for the step, the step should be made a Stage
 		for j, action := range buildStep.Actions {
-			task, err := action.toStep()
+			task, err := action.toStep(pipeline.WebURL)
 			if err != nil {
-				return build, err
+				return pipeline, err
 			}
 			task.ID = fmt.Sprintf("%d.%d", i, j)
-			build.Children = append(build.Children, task)
+			pipeline.Children = append(pipeline.Children, task)
 		}
 	}
 
-	return build, nil
+	return pipeline, nil
 }
 
 func fromCircleCIStatus(status string) cache.State {

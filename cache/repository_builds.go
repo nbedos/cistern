@@ -90,7 +90,7 @@ func (t task) Tabular(loc *time.Location) map[string]text.StyledString {
 	if t.type_ == "P" {
 		name.Append(t.provider, text.Provider)
 		if t.name != "" {
-			name.Append(fmt.Sprintf(" %s", t.name))
+			name.Append(fmt.Sprintf(": %s", t.name))
 		}
 	} else {
 		name.Append(t.name)

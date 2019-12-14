@@ -132,7 +132,10 @@ type azureBuild struct {
 	QueueTime     string `json:"queuetime"`
 	StartTime     string `json:"startTime"`
 	FinishTime    string `json:"finishTime"`
-	Links         struct {
+	Definition    struct {
+		Name string `json:"name"`
+	} `json:"definition"`
+	Links struct {
 		Timeline struct {
 			Href string `json:"href"`
 		} `json:"timeline"`
@@ -174,6 +177,7 @@ func (b azureBuild) toPipeline() (cache.Pipeline, error) {
 		},
 		Step: cache.Step{
 			ID:    strconv.Itoa(b.ID),
+			Name:  b.Definition.Name,
 			Type:  cache.StepPipeline,
 			State: fromAzureState(b.Result, b.Status),
 			WebURL: utils.NullString{
@@ -227,7 +231,7 @@ func (c AzurePipelinesClient) fetchPipeline(ctx context.Context, owner string, r
 		return cache.Pipeline{}, err
 	}
 
-	stages, err := c.fetchStages(ctx, azureBuild.Links.Timeline.Href)
+	stages, err := c.fetchStages(ctx, azureBuild.Links.Timeline.Href, pipeline.WebURL)
 	if err != nil {
 		return cache.Pipeline{}, err
 	}
@@ -257,7 +261,7 @@ func (c AzurePipelinesClient) fetchPipeline(ctx context.Context, owner string, r
 	return pipeline, err
 }
 
-func (c AzurePipelinesClient) fetchStages(ctx context.Context, u string) ([]cache.Step, error) {
+func (c AzurePipelinesClient) fetchStages(ctx context.Context, u string, webURL utils.NullString) ([]cache.Step, error) {
 	timelineURL, err := url.Parse(u)
 	if err != nil {
 		return nil, err
@@ -308,7 +312,7 @@ func (c AzurePipelinesClient) fetchStages(ctx context.Context, u string) ([]cach
 	// (this is consistent with the way jobs are shown on the Azure website)
 	steps := make([]cache.Step, 0, len(topLevelRecords))
 	for _, record := range topLevelRecords {
-		stages, err := record.toSteps()
+		stages, err := record.toSteps(webURL)
 		if err != nil {
 			return nil, err
 		}
@@ -335,7 +339,7 @@ type azureRecord struct {
 	children []*azureRecord
 }
 
-func (r azureRecord) toSteps() ([]cache.Step, error) {
+func (r azureRecord) toSteps(webURL utils.NullString) ([]cache.Step, error) {
 	// A phase is a special case since it may or may not have children
 	// A phase without any children is treated as if it were a job
 	// A phase with children is ignored, but its children, which are jobs, are returned
@@ -352,7 +356,7 @@ func (r azureRecord) toSteps() ([]cache.Step, error) {
 
 		allJobs := make([]cache.Step, 0)
 		for _, record := range records {
-			jobs, err := record.toSteps()
+			jobs, err := record.toSteps(webURL)
 			if err != nil {
 				return nil, err
 			}
@@ -369,7 +373,7 @@ func (r azureRecord) toSteps() ([]cache.Step, error) {
 		Log: cache.Log{
 			Key: r.Log.URL,
 		},
-		WebURL:       utils.NullString{},
+		WebURL:       webURL,
 		AllowFailure: false,
 	}
 
@@ -396,7 +400,7 @@ func (r azureRecord) toSteps() ([]cache.Step, error) {
 	step.Duration = utils.NullSub(step.FinishedAt, step.StartedAt)
 
 	for _, childRecord := range r.children {
-		tasks, err := childRecord.toSteps()
+		tasks, err := childRecord.toSteps(webURL)
 		if err != nil {
 			return nil, err
 		}
