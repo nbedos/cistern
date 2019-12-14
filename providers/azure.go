@@ -476,6 +476,11 @@ func (c AzurePipelinesClient) get(ctx context.Context, u url.URL) (io.ReadCloser
 		return nil, err
 	}
 
+	// 401 Unauthorized
+	if resp.StatusCode == 401 {
+		return nil, cache.ErrUnknownPipelineURL
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		message, err := ioutil.ReadAll(resp.Body)
 		if err != nil {

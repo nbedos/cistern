@@ -122,6 +122,9 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 	errc := make(chan error)
 	refc := make(chan string)
 
+	c.refresh()
+	c.draw()
+
 	// Trigger pipeline monitoring for git reference c.ref
 	go func() {
 		select {

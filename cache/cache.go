@@ -35,7 +35,7 @@ type CIProvider interface {
 
 type SourceProvider interface {
 	ID() string
-	RefStatuses(ctx context.Context, url string, sha string) ([]string, error)
+	RefStatuses(ctx context.Context, url string, ref string, sha string) ([]string, error)
 	Commit(ctx context.Context, repo string, sha string) (Commit, error)
 }
 
@@ -70,7 +70,7 @@ func monitorRefStatuses(ctx context.Context, p SourceProvider, url string, ref s
 			return ctx.Err()
 		}
 
-		statuses, err := p.RefStatuses(ctx, url, ref)
+		statuses, err := p.RefStatuses(ctx, url, ref, commit.Sha)
 		if err != nil {
 			if err != ErrUnknownRepositoryURL && err != context.Canceled {
 				err = fmt.Errorf("provider %s: %v (%s@%s)", p.ID(), err, ref, url)

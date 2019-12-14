@@ -122,7 +122,7 @@ func (c GitLabClient) buildURLsStatuses(ctx context.Context, slug string, sha st
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
-		statuses, resp, err := c.remote.Commits.GetCommitStatuses(slug, url.PathEscape(sha), &options)
+		statuses, resp, err := c.remote.Commits.GetCommitStatuses(slug, sha, &options)
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +142,7 @@ func (c GitLabClient) buildURLsStatuses(ctx context.Context, slug string, sha st
 	return urls, nil
 }
 
-func (c GitLabClient) RefStatuses(ctx context.Context, url string, ref string) ([]string, error) {
+func (c GitLabClient) RefStatuses(ctx context.Context, url string, ref string, sha string) ([]string, error) {
 	slug, err := c.parseRepositoryURL(url)
 	if err != nil {
 		return nil, err
@@ -153,14 +153,14 @@ func (c GitLabClient) RefStatuses(ctx context.Context, url string, ref string) (
 	var statusURLs []string
 	go func() {
 		var err error
-		statusURLs, err = c.buildURLsStatuses(ctx, slug, ref)
+		statusURLs, err = c.buildURLsStatuses(ctx, slug, sha)
 		errc <- err
 	}()
 
 	var pipelineURLs []string
 	go func() {
 		var err error
-		pipelineURLs, err = c.buildURLsPipelines(ctx, slug, ref)
+		pipelineURLs, err = c.buildURLsPipelines(ctx, slug, sha)
 		errc <- err
 	}()
 
@@ -334,6 +334,7 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 	if gitlabPipeline.UpdatedAt == nil {
 		return pipeline, fmt.Errorf("missing UpdatedAt data for pipeline #%d", gitlabPipeline.ID)
 	}
+
 	pipeline = cache.Pipeline{
 		Repository: repository,
 		GitReference: cache.GitReference{
