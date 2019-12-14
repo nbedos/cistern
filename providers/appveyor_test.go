@@ -100,6 +100,7 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 	}
 
 	expectedBuild := cache.Pipeline{
+		Number:     "42",
 		Repository: &repo,
 		GitReference: cache.GitReference{
 			SHA:   "fd4c4ae5a4005e38c66566e2480087072620e9de",

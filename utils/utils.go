@@ -231,6 +231,9 @@ func (d NullDuration) String() string {
 	seconds := (d.Duration - minutes*time.Minute) / time.Second
 
 	if minutes == 0 {
+		if seconds == 0 {
+			return "<1s"
+		}
 		return fmt.Sprintf("%ds", seconds)
 	}
 	return fmt.Sprintf("%dm%02ds", minutes, seconds)

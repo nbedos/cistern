@@ -74,6 +74,7 @@ func Setup() (AzurePipelinesClient, func(), error) {
 }
 
 var expectedPipeline = cache.Pipeline{
+	Number: "20191204.3",
 	Repository: &cache.Repository{
 		Owner: "owner",
 		Name:  "repo",

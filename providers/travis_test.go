@@ -53,6 +53,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 	}
 
 	expectedPipeline := cache.Pipeline{
+		Number:     "72",
 		Repository: &repository,
 		GitReference: cache.GitReference{
 			SHA:   "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
@@ -104,6 +105,14 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			FinishedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 54, 18, 0, time.UTC),
+			},
+			Duration: utils.NullDuration{
+				Valid:    true,
+				Duration: 26 * time.Second,
+			},
+			WebURL: utils.NullString{
+				Valid:  true,
+				String: fmt.Sprintf("%s/nbedos/citop/builds/609256446", ts.URL),
 			},
 		},
 	}

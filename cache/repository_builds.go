@@ -27,6 +27,7 @@ type taskKey struct {
 type task struct {
 	key         taskKey
 	ref         GitReference
+	number      string
 	type_       string
 	state       State
 	name        string
@@ -92,14 +93,6 @@ func (t task) Tabular(loc *time.Location) map[string]text.StyledString {
 		name.Append(t.name)
 	}
 
-	pipeline := ""
-	if t.key.stepIDs[0].Valid {
-		pipeline = t.key.stepIDs[0].String
-		if _, err := strconv.Atoi(pipeline); err == nil {
-			pipeline = "#" + pipeline
-		}
-	}
-
 	refClass := text.GitBranch
 	if t.ref.IsTag {
 		refClass = text.GitTag
@@ -107,7 +100,7 @@ func (t task) Tabular(loc *time.Location) map[string]text.StyledString {
 
 	return map[string]text.StyledString{
 		"REF":      text.NewStyledString(t.ref.Ref, refClass),
-		"PIPELINE": text.NewStyledString(pipeline),
+		"PIPELINE": text.NewStyledString(t.number),
 		"TYPE":     text.NewStyledString(t.type_),
 		"STATE":    state,
 		"NAME":     name,
@@ -151,10 +144,18 @@ func taskFromPipeline(p Pipeline, providerByID map[string]CIProvider) task {
 		providerName = provider.Name()
 	}
 
-	return taskFromStep(p.Step, p.GitReference, key, providerName)
+	number := p.Number
+	if number == "" {
+		number = p.ID
+	}
+	if _, err := strconv.Atoi(number); err == nil {
+		number = "#" + number
+	}
+
+	return taskFromStep(p.Step, p.GitReference, key, providerName, number)
 }
 
-func taskFromStep(s Step, ref GitReference, key taskKey, provider string) task {
+func taskFromStep(s Step, ref GitReference, key taskKey, provider string, number string) task {
 	keySet := false
 	for i, ID := range key.stepIDs {
 		if !ID.Valid {
@@ -176,6 +177,7 @@ func taskFromStep(s Step, ref GitReference, key taskKey, provider string) task {
 	t := task{
 		key:        key,
 		ref:        ref,
+		number:     number,
 		state:      s.State,
 		name:       s.Name,
 		provider:   provider,
@@ -202,7 +204,7 @@ func taskFromStep(s Step, ref GitReference, key taskKey, provider string) task {
 	}
 
 	for _, childStep := range s.Children {
-		childTask := taskFromStep(childStep, ref, t.key, provider)
+		childTask := taskFromStep(childStep, ref, t.key, provider, number)
 		t.children = append(t.children, &childTask)
 	}
 

@@ -78,8 +78,9 @@ type travisBuild struct {
 	Jobs []travisJob
 }
 
-func (b travisBuild) toCacheBuild(repository *cache.Repository, webURL string) (pipeline cache.Pipeline, err error) {
+func (b travisBuild) toPipeline(repository *cache.Repository, webURL string) (pipeline cache.Pipeline, err error) {
 	pipeline = cache.Pipeline{
+		Number:     b.Number,
 		Repository: repository,
 		GitReference: cache.GitReference{
 			SHA:   b.Commit.Sha,
@@ -122,14 +123,14 @@ func (b travisBuild) toCacheBuild(repository *cache.Repository, webURL string) (
 		return b.Jobs[i].Stage.ID < b.Jobs[j].Stage.ID || (b.Jobs[i].Stage.ID == b.Jobs[j].Stage.ID && b.Jobs[i].ID < b.Jobs[j].ID)
 	})
 	for _, travisJob := range b.Jobs {
-		job, err := travisJob.toCacheStep(webURL)
+		job, err := travisJob.toStep(webURL)
 		if err != nil {
 			return pipeline, err
 		}
 		pipeline.CreatedAt = utils.MinNullTime(pipeline.CreatedAt, job.CreatedAt)
 
 		if travisJob.Stage.ID != 0 {
-			s, err := travisJob.Stage.toCacheStep()
+			s, err := travisJob.Stage.toStep(pipeline.WebURL.String)
 			if err != nil {
 				return pipeline, err
 			}
@@ -198,7 +199,7 @@ func (c travisJobConfig) String() string {
 	return strings.Join(nonEmptyValues, ", ")
 }
 
-func (j travisJob) toCacheStep(webURL string) (cache.Step, error) {
+func (j travisJob) toStep(webURL string) (cache.Step, error) {
 	var err error
 
 	name, _ := j.Config["name"].(string)
@@ -246,12 +247,16 @@ type travisStage struct {
 	FinishedAt string `json:"finished_at"`
 }
 
-func (s travisStage) toCacheStep() (cache.Step, error) {
+func (s travisStage) toStep(webURL string) (cache.Step, error) {
 	stage := cache.Step{
 		ID:    strconv.Itoa(s.ID),
 		Type:  cache.StepStage,
 		Name:  s.Name,
 		State: fromTravisState(s.State),
+		WebURL: utils.NullString{
+			Valid:  true,
+			String: webURL,
+		},
 	}
 
 	var err error
@@ -262,6 +267,8 @@ func (s travisStage) toCacheStep() (cache.Step, error) {
 	if stage.FinishedAt, err = utils.NullTimeFromString(s.FinishedAt); err != nil {
 		return stage, err
 	}
+
+	stage.Duration = utils.NullSub(stage.FinishedAt, stage.StartedAt)
 
 	return stage, nil
 }
@@ -439,12 +446,12 @@ func (c TravisClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 	if err != nil {
 		return cache.Pipeline{}, err
 	}
-	cacheBuild, err := build.toCacheBuild(repository, webURL.String())
+	pipeline, err := build.toPipeline(repository, webURL.String())
 	if err != nil {
 		return cache.Pipeline{}, err
 	}
 
-	return cacheBuild, nil
+	return pipeline, nil
 }
 
 func (c TravisClient) Log(ctx context.Context, repository cache.Repository, step cache.Step) (string, error) {

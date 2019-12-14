@@ -352,6 +352,7 @@ type GitReference struct {
 }
 
 type Pipeline struct {
+	Number     string
 	providerID string
 	Repository *Repository
 	GitReference

@@ -174,6 +174,7 @@ func (b azureBuild) toPipeline() (cache.Pipeline, error) {
 	}
 
 	pipeline := cache.Pipeline{
+		Number: b.Number,
 		Repository: &cache.Repository{
 			URL:   "",
 			Owner: owner,

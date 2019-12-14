@@ -257,6 +257,7 @@ type appVeyorBuild struct {
 
 func (b appVeyorBuild) toCachePipeline(repo *cache.Repository) (cache.Pipeline, error) {
 	pipeline := cache.Pipeline{
+		Number:     strconv.Itoa(b.Number),
 		Repository: repo,
 		GitReference: cache.GitReference{
 			SHA:   b.Sha,
