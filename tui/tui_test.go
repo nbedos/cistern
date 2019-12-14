@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell"
-	"github.com/nbedos/citop/cache"
 	"github.com/nbedos/citop/text"
 )
 
@@ -129,18 +128,6 @@ func TestTUI_Exec(t *testing.T) {
 				elapsed, d)
 		}
 	})
-}
-
-type mockProvider struct {
-	id string
-}
-
-func (p mockProvider) AccountID() string { return p.id }
-func (p mockProvider) Log(ctx context.Context, repository cache.Repository, jobID int) (string, bool, error) {
-	return "", false, nil
-}
-func (p mockProvider) BuildFromURL(ctx context.Context, u string) (cache.Pipeline, error) {
-	return cache.Pipeline{}, nil
 }
 
 func TestRunApplication(t *testing.T) {

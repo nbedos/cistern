@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"os/exec"
 	"sort"
@@ -33,7 +32,7 @@ type CIProvider interface {
 	// Display name of the provider
 	Name() string
 	// FIXME Replace stepID by stepIDs
-	Log(ctx context.Context, repository Repository, step Step) (string, error)
+	Log(ctx context.Context, step Step) (string, error)
 	BuildFromURL(ctx context.Context, u string) (Pipeline, error)
 }
 
@@ -169,16 +168,6 @@ func Aggregate(steps []Step) Step {
 type Provider struct {
 	ID   string
 	Name string
-}
-
-type Repository struct {
-	URL   string
-	Owner string
-	Name  string
-}
-
-func (r Repository) Slug() string {
-	return fmt.Sprintf("%s/%s", url.PathEscape(r.Owner), url.PathEscape(r.Name))
 }
 
 type Commit struct {
@@ -348,6 +337,11 @@ const (
 	StepTask
 )
 
+type Log struct {
+	Key     string
+	Content utils.NullString
+}
+
 type Step struct {
 	ID           string
 	Name         string
@@ -360,7 +354,7 @@ type Step struct {
 	UpdatedAt    time.Time
 	Duration     utils.NullDuration
 	WebURL       utils.NullString
-	Log          utils.NullString
+	Log          Log
 	Children     []Step
 }
 
@@ -381,7 +375,6 @@ type Pipeline struct {
 	Number       string
 	providerID   string
 	providerHost string
-	Repository   *Repository
 	GitReference
 	Step
 }
@@ -435,10 +428,6 @@ var ErrObsoleteBuild = errors.New("build to save is older than current build in 
 // than the build in cache. If the build to save is older than the build in cache,
 // SavePipeline will return ErrObsoleteBuild.
 func (c *Cache) SavePipeline(ref string, p Pipeline) error {
-	if p.Repository == nil {
-		return errors.New("Pipeline.Repository must not be nil")
-	}
-
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -835,11 +824,8 @@ func (c *Cache) WriteLog(ctx context.Context, key taskKey, writer io.Writer) err
 		ProviderHost: key.providerHost,
 		ID:           key.stepIDs[0].String,
 	}
-	p, exists := c.Pipeline(pKey)
-	if !exists {
-		return fmt.Errorf("no matching pipeline for %+v", pKey)
-	}
 
+	// TODO Simplify all this
 	stepIDs := make([]string, 0)
 	for _, ID := range key.stepIDs[1:] {
 		if ID.Valid {
@@ -854,25 +840,24 @@ func (c *Cache) WriteLog(ctx context.Context, key taskKey, writer io.Writer) err
 		return fmt.Errorf("no matching step for %v %v", key, key.stepIDs)
 	}
 
-	log := step.Log.String
-	if !step.Log.Valid {
+	log := step.Log.Content.String
+	if !step.Log.Content.Valid {
 		provider, exists := c.ciProvidersById[key.providerID]
 		if !exists {
 			return fmt.Errorf("no matching provider found in cache for account ID %q", key.providerID)
 		}
 
-		log, err = provider.Log(ctx, *p.Repository, step)
+		log, err = provider.Log(ctx, step)
 		if err != nil {
 			return err
 		}
 
-		/* TODO Reenable this
-		if !job.State.IsActive() {
-			if err = c.SaveJob(accountID, buildID, stageID, job); err != nil {
-				return err
-			}
-		}
-		*/
+		/*
+			if !step.State.IsActive() {
+				if err = c.SaveStep(pKey, stepIDs,accountID, buildID, stageID, job); err != nil {
+					return err
+				}
+			}*/
 	}
 
 	if !strings.HasSuffix(log, "\n") {

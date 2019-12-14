@@ -57,14 +57,13 @@ func (c AppVeyorClient) Name() string {
 	return c.provider.Name
 }
 
-func (c AppVeyorClient) Log(ctx context.Context, repository cache.Repository, step cache.Step) (string, error) {
+func (c AppVeyorClient) Log(ctx context.Context, step cache.Step) (string, error) {
 	if step.Type != cache.StepJob {
 		return "", cache.ErrNoLogHere
 	}
 
 	endpoint := c.url
-	endpoint.Path += fmt.Sprintf("/buildjobs/%s/log", step.ID)
-	endpoint.RawPath += fmt.Sprintf("/buildjobs/%s/log", url.PathEscape(step.ID))
+	endpoint.Path += fmt.Sprintf("/buildjobs/%s/log", url.PathEscape(step.ID))
 
 	body, err := c.get(ctx, endpoint)
 	if err != nil {
@@ -178,12 +177,6 @@ func (c AppVeyorClient) fetchPipeline(ctx context.Context, owner string, repoNam
 	}
 	version := b.Builds[0].Version
 
-	repository := cache.Repository{
-		URL:   "",
-		Owner: b.Project.Owner,
-		Name:  b.Project.Name,
-	}
-
 	endpoint := c.url
 	pathFormat := "/projects/%s/%s/build/%s"
 	endpoint.Path += fmt.Sprintf(pathFormat, owner, repoName, version)
@@ -196,7 +189,7 @@ func (c AppVeyorClient) fetchPipeline(ctx context.Context, owner string, repoNam
 		return cache.Pipeline{}, err
 	}
 
-	return bVersion.Build.toCachePipeline(&repository)
+	return bVersion.Build.toCachePipeline(b.Project.Name, b.Project.Name)
 }
 
 // Extract owner, repository and build ID from web URL of build
@@ -259,10 +252,9 @@ type appVeyorBuild struct {
 	UpdatedAt   string        `json:"updated"`
 }
 
-func (b appVeyorBuild) toCachePipeline(repo *cache.Repository) (cache.Pipeline, error) {
+func (b appVeyorBuild) toCachePipeline(owner string, repository string) (cache.Pipeline, error) {
 	pipeline := cache.Pipeline{
-		Number:     strconv.Itoa(b.Number),
-		Repository: repo,
+		Number: strconv.Itoa(b.Number),
 		GitReference: cache.GitReference{
 			SHA:   b.Sha,
 			Ref:   b.Branch,
@@ -300,7 +292,7 @@ func (b appVeyorBuild) toCachePipeline(repo *cache.Repository) (cache.Pipeline, 
 	pipeline.Duration = utils.NullSub(pipeline.FinishedAt, pipeline.StartedAt)
 	pipeline.WebURL = utils.NullString{
 		String: fmt.Sprintf("https://ci.appveyor.com/project/%s/%s/builds/%d",
-			url.PathEscape(repo.Owner), url.PathEscape(repo.Name), b.ID),
+			url.PathEscape(owner), url.PathEscape(repository), b.ID),
 		Valid: true,
 	}
 

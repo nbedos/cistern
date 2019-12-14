@@ -21,11 +21,7 @@
       "errorCount": 0,
       "warningCount": 0,
       "url": null,
-      "log": {
-        "id": 13,
-        "type": "Container",
-        "url": "https://example.com/owner/repo/_apis/build/builds/16/logs/13"
-      },
+      "log": null,
       "task": {
         "id": "d9bafed4-0b18-4f58-968d-86655b4d2ce9",
         "name": "CmdLine",
@@ -55,11 +51,7 @@
       "errorCount": 0,
       "warningCount": 0,
       "url": null,
-      "log": {
-        "id": 5,
-        "type": "Container",
-        "url": "https://example.com/owner/repo/_apis/build/builds/16/logs/5"
-      },
+      "log": null,
       "task": null,
       "attempt": 1,
       "identifier": "tests.macoOS_10_14"
@@ -85,11 +77,7 @@
       "errorCount": 0,
       "warningCount": 0,
       "url": null,
-      "log": {
-        "id": 4,
-        "type": "Container",
-        "url": "https://example.com/owner/repo/_apis/build/builds/16/logs/4"
-      },
+      "log": null,
       "task": null,
       "attempt": 1,
       "identifier": "tests.Ubuntu_16_04"
@@ -140,11 +128,7 @@
       "errorCount": 0,
       "warningCount": 0,
       "url": null,
-      "log": {
-        "id": 17,
-        "type": "Container",
-        "url": "https://example.com/owner/repo/_apis/build/builds/16/logs/17"
-      },
+      "log": null,
       "task": null,
       "attempt": 1,
       "identifier": "tests.macoOS_10_14.__default"
@@ -170,11 +154,7 @@
       "errorCount": 1,
       "warningCount": 0,
       "url": null,
-      "log": {
-        "id": 14,
-        "type": "Container",
-        "url": "https://example.com/owner/repo/_apis/build/builds/16/logs/14"
-      },
+      "log": null,
       "task": {
         "id": "d9bafed4-0b18-4f58-968d-86655b4d2ce9",
         "name": "CmdLine",
@@ -240,11 +220,7 @@
       "errorCount": 0,
       "warningCount": 0,
       "url": null,
-      "log": {
-        "id": 3,
-        "type": "Container",
-        "url": "https://example.com/owner/repo/_apis/build/builds/16/logs/3"
-      },
+      "log": null,
       "task": null,
       "attempt": 1,
       "identifier": "tests.Ubuntu_18_04"

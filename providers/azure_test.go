@@ -62,9 +62,8 @@ func Setup() (AzurePipelinesClient, func(), error) {
 			ID:   "azure",
 			Name: "azure",
 		},
-		version:          "5.1",
-		logURLByRecordID: map[string]url.URL{},
-		mux:              &sync.Mutex{},
+		version: "5.1",
+		mux:     &sync.Mutex{},
 	}
 
 	teardown := func() {
@@ -75,10 +74,6 @@ func Setup() (AzurePipelinesClient, func(), error) {
 
 var expectedPipeline = cache.Pipeline{
 	Number: "20191204.3",
-	Repository: &cache.Repository{
-		Owner: "owner",
-		Name:  "repo",
-	},
 	GitReference: cache.GitReference{
 		SHA:   "5e4d496d63086609cb3c03aa0ee4e032e4b6b08b",
 		Ref:   "azure-pipelines",
@@ -295,18 +290,20 @@ func TestAzurePipelinesClient_Log(t *testing.T) {
 	}
 	defer teardown()
 
-	client.logURLByRecordID["1234"] = url.URL{
+	logURL := url.URL{
 		Scheme: client.baseURL.Scheme,
 		Host:   client.baseURL.Host,
 		Path:   "/owner/repo/_apis/build/builds/16/logs/1234",
 	}
-
 	ctx := context.Background()
 	job := cache.Step{
 		ID:   "1234",
 		Type: cache.StepJob,
+		Log: cache.Log{
+			Key: logURL.String(),
+		},
 	}
-	log, err := client.Log(ctx, cache.Repository{}, job)
+	log, err := client.Log(ctx, job)
 	if err != nil {
 		t.Fatal(err)
 	}

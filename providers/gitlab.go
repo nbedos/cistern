@@ -193,12 +193,7 @@ func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (cache.Pipelin
 		return cache.Pipeline{}, err
 	}
 
-	repository, err := c.Repository(ctx, slug)
-	if err != nil {
-		return cache.Pipeline{}, err
-	}
-
-	return c.fetchPipeline(ctx, &repository, id)
+	return c.fetchPipeline(ctx, slug, id)
 }
 
 func (c GitLabClient) parseRepositoryURL(u string) (string, error) {
@@ -251,32 +246,6 @@ func (c *GitLabClient) GetTraceFile(ctx context.Context, repositorySlug string, 
 	return buf, err
 }
 
-func (c GitLabClient) Repository(ctx context.Context, slug string) (cache.Repository, error) {
-	select {
-	case <-c.rateLimiter:
-	case <-ctx.Done():
-		return cache.Repository{}, ctx.Err()
-	}
-	project, _, err := c.remote.Projects.GetProject(slug, nil, gitlab.WithContext(ctx))
-	if err != nil {
-		if err, ok := err.(*gitlab.ErrorResponse); ok && err.Response.StatusCode == 404 {
-			return cache.Repository{}, cache.ErrUnknownRepositoryURL
-		}
-		return cache.Repository{}, err
-	}
-
-	splitPath := strings.SplitN(project.PathWithNamespace, "/", 2)
-	if len(splitPath) != 2 {
-		return cache.Repository{}, fmt.Errorf("invalid repository path: %q", project.PathWithNamespace)
-	}
-
-	return cache.Repository{
-		Owner: splitPath[0],
-		Name:  splitPath[1],
-		URL:   project.WebURL,
-	}, nil
-}
-
 func FromGitLabState(s string) cache.State {
 	switch strings.ToLower(s) {
 	case "created", "pending":
@@ -307,8 +276,8 @@ func (c GitLabClient) GetJob(ctx context.Context, repositoryID int, jobID int) (
 	return c.remote.Jobs.GetJob(repositoryID, jobID, gitlab.WithContext(ctx))
 }
 
-func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, step cache.Step) (string, error) {
-	if step.Type != cache.StepJob {
+func (c GitLabClient) Log(ctx context.Context, step cache.Step) (string, error) {
+	if step.Log.Key == "" {
 		return "", cache.ErrNoLogHere
 	}
 	id, err := strconv.Atoi(step.ID)
@@ -316,7 +285,7 @@ func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, step
 		return "", err
 	}
 
-	buf, err := c.GetTraceFile(ctx, repository.Slug(), id)
+	buf, err := c.GetTraceFile(ctx, step.Log.Key, id)
 	if err != nil {
 		return "", err
 	}
@@ -324,13 +293,13 @@ func (c GitLabClient) Log(ctx context.Context, repository cache.Repository, step
 	return buf.String(), nil
 }
 
-func (c GitLabClient) fetchPipeline(ctx context.Context, repository *cache.Repository, pipelineID int) (pipeline cache.Pipeline, err error) {
+func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID int) (pipeline cache.Pipeline, err error) {
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
 		return pipeline, ctx.Err()
 	}
-	gitlabPipeline, _, err := c.remote.Pipelines.GetPipeline(repository.Slug(), pipelineID, gitlab.WithContext(ctx))
+	gitlabPipeline, _, err := c.remote.Pipelines.GetPipeline(slug, pipelineID, gitlab.WithContext(ctx))
 	if err != nil {
 		return pipeline, err
 	}
@@ -340,7 +309,6 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 	}
 
 	pipeline = cache.Pipeline{
-		Repository: repository,
 		GitReference: cache.GitReference{
 			SHA:   gitlabPipeline.SHA,
 			Ref:   gitlabPipeline.Ref,
@@ -373,7 +341,7 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 		case <-ctx.Done():
 			return pipeline, ctx.Err()
 		}
-		pageJobs, resp, err := c.remote.Jobs.ListPipelineJobs(repository.Slug(), gitlabPipeline.ID, &options, gitlab.WithContext(ctx))
+		pageJobs, resp, err := c.remote.Jobs.ListPipelineJobs(slug, gitlabPipeline.ID, &options, gitlab.WithContext(ctx))
 		if err != nil {
 			return pipeline, nil
 		}
@@ -400,11 +368,13 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 
 	for _, gitlabJob := range jobs {
 		job := cache.Step{
-			ID:         strconv.Itoa(gitlabJob.ID),
-			Type:       cache.StepJob,
-			State:      FromGitLabState(gitlabJob.Status),
-			Name:       gitlabJob.Name,
-			Log:        utils.NullString{},
+			ID:    strconv.Itoa(gitlabJob.ID),
+			Type:  cache.StepJob,
+			State: FromGitLabState(gitlabJob.Status),
+			Name:  gitlabJob.Name,
+			Log: cache.Log{
+				Key: slug,
+			},
 			CreatedAt:  utils.NullTimeFromTime(gitlabJob.CreatedAt),
 			StartedAt:  utils.NullTimeFromTime(gitlabJob.StartedAt),
 			FinishedAt: utils.NullTimeFromTime(gitlabJob.FinishedAt),

@@ -83,12 +83,9 @@ func TestAggregateStatuses(t *testing.T) {
 }
 
 func TestCache_Save(t *testing.T) {
-	repository := Repository{}
-
 	t.Run("Saved build must be returned by Pipeline()", func(t *testing.T) {
 		c := NewCache(nil, nil)
 		p := Pipeline{
-			Repository: &repository,
 			Step: Step{
 				ID:    "42",
 				State: Failed,
@@ -108,7 +105,6 @@ func TestCache_Save(t *testing.T) {
 	})
 
 	oldPipeline := Pipeline{
-		Repository: &repository,
 		Step: Step{
 			ID:        "42",
 			State:     Failed,
@@ -116,7 +112,6 @@ func TestCache_Save(t *testing.T) {
 		},
 	}
 	newPipeline := Pipeline{
-		Repository: &repository,
 		Step: Step{
 			ID:        "42",
 			State:     Passed,
@@ -153,31 +148,14 @@ func TestCache_Save(t *testing.T) {
 			t.Fatalf("expected %v but got %v", ErrObsoleteBuild, err)
 		}
 	})
-
-	t.Run("Pointer to repository must not be nil", func(t *testing.T) {
-		c := NewCache(nil, nil)
-		pipeline := Pipeline{
-			Repository: nil,
-			Step: Step{
-				ID:    "42",
-				State: Passed,
-			},
-		}
-		if err := c.SavePipeline("", pipeline); err == nil {
-			t.Fatal("expected error but got nil")
-		}
-	})
 }
 
 func TestCache_Builds(t *testing.T) {
-	repository := Repository{}
-
 	ids := []string{"1", "2", "3", "4"}
 	c := NewCache(nil, nil)
 	for _, id := range ids {
 		p := Pipeline{
 			providerHost: "host",
-			Repository:   &repository,
 			Step: Step{
 				ID: id,
 			},
@@ -441,12 +419,10 @@ func TestCache_WriteLog(t *testing.T) {
 }*/
 
 func TestCache_BuildsByRef(t *testing.T) {
-	repo := Repository{}
 	c := NewCache(nil, nil)
 
 	pipelines := []Pipeline{
 		{
-			Repository: &repo,
 			GitReference: GitReference{
 				Ref:   "ref1",
 				IsTag: false,
@@ -458,7 +434,6 @@ func TestCache_BuildsByRef(t *testing.T) {
 			},
 		},
 		{
-			Repository: &repo,
 			GitReference: GitReference{
 				Ref:   "ref2",
 				IsTag: false,
@@ -469,7 +444,6 @@ func TestCache_BuildsByRef(t *testing.T) {
 			},
 		},
 		{
-			Repository: &repo,
 			GitReference: GitReference{
 				Ref:   "ref2",
 				IsTag: false,

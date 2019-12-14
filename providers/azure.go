@@ -20,14 +20,13 @@ import (
 )
 
 type AzurePipelinesClient struct {
-	baseURL          url.URL
-	httpClient       *http.Client
-	rateLimiter      <-chan time.Time
-	token            string
-	provider         cache.Provider
-	version          string
-	logURLByRecordID map[string]url.URL
-	mux              *sync.Mutex
+	baseURL     url.URL
+	httpClient  *http.Client
+	rateLimiter <-chan time.Time
+	token       string
+	provider    cache.Provider
+	version     string
+	mux         *sync.Mutex
 }
 
 var azureURL = url.URL{
@@ -45,9 +44,8 @@ func NewAzurePipelinesClient(id string, name string, token string, rateLimit tim
 			ID:   id,
 			Name: name,
 		},
-		version:          "5.1",
-		logURLByRecordID: make(map[string]url.URL),
-		mux:              &sync.Mutex{},
+		version: "5.1",
+		mux:     &sync.Mutex{},
 	}
 }
 
@@ -96,21 +94,17 @@ func (c AzurePipelinesClient) BuildFromURL(ctx context.Context, u string) (cache
 	return c.fetchPipeline(ctx, owner, repo, buildID)
 }
 
-func (c AzurePipelinesClient) Log(ctx context.Context, repository cache.Repository, step cache.Step) (string, error) {
-	if step.Type != cache.StepJob && step.Type != cache.StepTask {
+func (c AzurePipelinesClient) Log(ctx context.Context, step cache.Step) (string, error) {
+	if step.Log.Key == "" {
 		return "", cache.ErrNoLogHere
 	}
 
-	c.mux.Lock()
-	logURL, exists := c.logURLByRecordID[step.ID]
-	c.mux.Unlock()
-
-	if !exists {
-		return "", cache.ErrNoLogHere
+	u, err := url.Parse(step.Log.Key)
+	if err != nil {
+		return "", err
 	}
 
-	var err error
-	r, err := c.get(ctx, logURL)
+	r, err := c.get(ctx, *u)
 	if err != nil {
 		return "", err
 	}
@@ -160,12 +154,6 @@ type azureBuild struct {
 }
 
 func (b azureBuild) toPipeline() (cache.Pipeline, error) {
-	cs := strings.Split(b.Repository.ID, "/")
-	if len(cs) != 2 {
-		return cache.Pipeline{}, fmt.Errorf("invalid repository slug: %s", b.Repository.ID)
-	}
-	owner, repo := cs[0], cs[1]
-
 	var ref string
 	var isTag bool
 	switch {
@@ -179,21 +167,15 @@ func (b azureBuild) toPipeline() (cache.Pipeline, error) {
 
 	pipeline := cache.Pipeline{
 		Number: b.Number,
-		Repository: &cache.Repository{
-			URL:   "",
-			Owner: owner,
-			Name:  repo,
-		},
 		GitReference: cache.GitReference{
 			SHA:   b.SourceVersion,
 			Ref:   ref,
 			IsTag: isTag,
 		},
 		Step: cache.Step{
-			ID:       strconv.Itoa(b.ID),
-			Type:     cache.StepPipeline,
-			State:    fromAzureState(b.Result, b.Status),
-			Duration: utils.NullDuration{},
+			ID:    strconv.Itoa(b.ID),
+			Type:  cache.StepPipeline,
+			State: fromAzureState(b.Result, b.Status),
 			WebURL: utils.NullString{
 				Valid:  b.Links.Web.Href != "",
 				String: b.Links.Web.Href,
@@ -297,19 +279,6 @@ func (c AzurePipelinesClient) fetchStages(ctx context.Context, u string) ([]cach
 			record := record // kill me now
 			recordsByID[record.ID] = &record
 		}
-
-		switch strings.ToLower(record.Type) {
-		case "job", "task":
-			if record.Log.URL != "" {
-				u, err := url.Parse(record.Log.URL)
-				if err != nil {
-					return nil, err
-				}
-				c.mux.Lock()
-				c.logURLByRecordID[record.ID] = *u
-				c.mux.Unlock()
-			}
-		}
 	}
 
 	// Build tree structure from flat list and ID -> parentIDs links
@@ -394,10 +363,12 @@ func (r azureRecord) toSteps() ([]cache.Step, error) {
 	}
 
 	step := cache.Step{
-		ID:           r.ID,
-		State:        fromAzureState(r.Result, r.State),
-		Name:         r.Name,
-		Log:          utils.NullString{},
+		ID:    r.ID,
+		State: fromAzureState(r.Result, r.State),
+		Name:  r.Name,
+		Log: cache.Log{
+			Key: r.Log.URL,
+		},
 		WebURL:       utils.NullString{},
 		AllowFailure: false,
 	}

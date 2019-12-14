@@ -76,11 +76,6 @@ func TestAppVeyorJob_ToCacheJob(t *testing.T) {
 }
 
 func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
-	repo := cache.Repository{
-		URL:   "github.com/owner/repo",
-		Owner: "owner",
-		Name:  "repo",
-	}
 	b := appVeyorBuild{
 		ID:          42,
 		Jobs:        nil,
@@ -100,8 +95,7 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 	}
 
 	expectedBuild := cache.Pipeline{
-		Number:     "42",
-		Repository: &repo,
+		Number: "42",
 		GitReference: cache.GitReference{
 			SHA:   "fd4c4ae5a4005e38c66566e2480087072620e9de",
 			Ref:   "feature/appveyor",
@@ -134,7 +128,7 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 		},
 	}
 
-	build, err := b.toCachePipeline(&repo)
+	build, err := b.toCachePipeline("owner", "repo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +226,7 @@ func TestCircleCIClient_Log(t *testing.T) {
 		ID:   "jobId",
 		Type: cache.StepJob,
 	}
-	log, err := client.Log(context.Background(), cache.Repository{}, job)
+	log, err := client.Log(context.Background(), job)
 	if err != nil {
 		t.Fatal(err)
 	}

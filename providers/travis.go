@@ -16,15 +16,6 @@ import (
 	"github.com/nbedos/citop/utils"
 )
 
-type travisRepository struct {
-	ID    int
-	Slug  string
-	Owner struct {
-		Login string
-	}
-	Name string
-}
-
 func fromTravisState(s string) cache.State {
 	switch strings.ToLower(s) {
 	case "created", "queued", "received":
@@ -41,14 +32,6 @@ func fromTravisState(s string) cache.State {
 		return cache.Skipped
 	default:
 		return cache.Unknown
-	}
-}
-
-func (r travisRepository) toCacheRepository() cache.Repository {
-	return cache.Repository{
-		URL:   fmt.Sprintf("https://github.com/%v", r.Slug), // FIXME
-		Name:  r.Name,
-		Owner: r.Owner.Login,
 	}
 }
 
@@ -71,17 +54,15 @@ type travisBuild struct {
 	Commit struct {
 		Sha string `json:"sha"`
 	}
-	Repository travisRepository
-	CreatedBy  struct {
+	CreatedBy struct {
 		Login string
 	} `json:"created_by"`
 	Jobs []travisJob
 }
 
-func (b travisBuild) toPipeline(repository *cache.Repository, webURL string) (pipeline cache.Pipeline, err error) {
+func (b travisBuild) toPipeline(webURL string) (pipeline cache.Pipeline, err error) {
 	pipeline = cache.Pipeline{
-		Number:     b.Number,
-		Repository: repository,
+		Number: b.Number,
 		GitReference: cache.GitReference{
 			SHA:   b.Commit.Sha,
 			Ref:   "",
@@ -212,7 +193,9 @@ func (j travisJob) toStep(webURL string) (cache.Step, error) {
 		Type:  cache.StepJob,
 		State: fromTravisState(j.State),
 		Name:  name,
-		Log:   utils.NullString{String: j.Log, Valid: j.Log != ""},
+		Log: cache.Log{
+			Content: utils.NullString{String: j.Log, Valid: j.Log != ""},
+		},
 		WebURL: utils.NullString{
 			String: fmt.Sprintf("%s/jobs/%d", webURL, j.ID),
 			Valid:  true,
@@ -319,12 +302,8 @@ func (c TravisClient) BuildFromURL(ctx context.Context, u string) (cache.Pipelin
 		return cache.Pipeline{}, err
 	}
 
-	repository, err := c.repository(ctx, fmt.Sprintf("%s/%s", owner, repo))
-	if err != nil {
-		return cache.Pipeline{}, err
-	}
-
-	return c.fetchPipeline(ctx, &repository, id)
+	slug := fmt.Sprintf("%s/%s", owner, repo)
+	return c.fetchPipeline(ctx, slug, id)
 }
 
 // Extract owner, repository and build ID from web URL of build
@@ -348,33 +327,11 @@ func parseTravisWebURL(baseURL *url.URL, u string) (string, string, string, erro
 	return owner, repo, id, nil
 }
 
-func (c TravisClient) repository(ctx context.Context, slug string) (cache.Repository, error) {
-	var reqURL = c.baseURL
-	buildPathFormat := "/repo/%s"
-	reqURL.Path += fmt.Sprintf(buildPathFormat, slug)
-	reqURL.RawPath += fmt.Sprintf(buildPathFormat, url.PathEscape(slug))
-
-	body, err := c.get(ctx, "GET", reqURL)
-	if err != nil {
-		if err, ok := err.(HTTPError); ok && err.Status == 404 {
-			return cache.Repository{}, cache.ErrUnknownRepositoryURL
-		}
-		return cache.Repository{}, err
-	}
-
-	travisRepo := travisRepository{}
-	if err = json.Unmarshal(body.Bytes(), &travisRepo); err != nil {
-		return cache.Repository{}, err
-	}
-
-	return travisRepo.toCacheRepository(), nil
-}
-
-func (c TravisClient) webURL(repository cache.Repository) (url.URL, error) {
+func (c TravisClient) webURL(slug string) (url.URL, error) {
 	var err error
 	webURL := c.baseURL
 	webURL.Host = strings.TrimPrefix(webURL.Host, "api.")
-	webURL.Path += fmt.Sprintf("/%s", repository.Slug())
+	webURL.Path += fmt.Sprintf("/%s", slug)
 
 	return webURL, err
 }
@@ -431,7 +388,7 @@ func (err HTTPError) Error() string {
 		err.Method, err.URL, err.Status, err.Message)
 }
 
-func (c TravisClient) fetchPipeline(ctx context.Context, repository *cache.Repository, buildID string) (cache.Pipeline, error) {
+func (c TravisClient) fetchPipeline(ctx context.Context, slug string, buildID string) (cache.Pipeline, error) {
 	buildURL := c.baseURL
 	buildURL.Path += fmt.Sprintf("/build/%s", buildID)
 	parameters := buildURL.Query()
@@ -446,11 +403,11 @@ func (c TravisClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 	var build travisBuild
 	err = json.Unmarshal(body.Bytes(), &build)
 
-	webURL, err := c.webURL(*repository)
+	webURL, err := c.webURL(slug)
 	if err != nil {
 		return cache.Pipeline{}, err
 	}
-	pipeline, err := build.toPipeline(repository, webURL.String())
+	pipeline, err := build.toPipeline(webURL.String())
 	if err != nil {
 		return cache.Pipeline{}, err
 	}
@@ -458,13 +415,13 @@ func (c TravisClient) fetchPipeline(ctx context.Context, repository *cache.Repos
 	return pipeline, nil
 }
 
-func (c TravisClient) Log(ctx context.Context, repository cache.Repository, step cache.Step) (string, error) {
+func (c TravisClient) Log(ctx context.Context, step cache.Step) (string, error) {
 	if step.Type != cache.StepJob {
 		return "", cache.ErrNoLogHere
 	}
 
 	var reqURL = c.baseURL
-	reqURL.Path += fmt.Sprintf("/job/%s/log", step.ID)
+	reqURL.Path += fmt.Sprintf("/job/%s/log", url.PathEscape(step.ID))
 
 	body, err := c.get(ctx, "GET", reqURL)
 	if err != nil {
