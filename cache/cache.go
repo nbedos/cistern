@@ -27,6 +27,7 @@ var ErrUnknownGitReference = errors.New("unknown git reference")
 
 type CIProvider interface {
 	ID() string
+	Host() string
 	Name() string
 	// FIXME Replace stepID by stepIDs
 	Log(ctx context.Context, repository Repository, step Step) (string, error)
@@ -373,9 +374,10 @@ type GitReference struct {
 }
 
 type Pipeline struct {
-	Number     string
-	providerID string
-	Repository *Repository
+	Number       string
+	providerID   string
+	providerHost string
+	Repository   *Repository
 	GitReference
 	Step
 }
@@ -386,14 +388,14 @@ func (p Pipeline) Diff(other Pipeline) string {
 }
 
 type PipelineKey struct {
-	ProviderID string
-	ID         string
+	ProviderHost string
+	ID           string
 }
 
 func (p Pipeline) Key() PipelineKey {
 	return PipelineKey{
-		ProviderID: p.providerID,
-		ID:         p.Step.ID,
+		ProviderHost: p.providerHost,
+		ID:           p.Step.ID,
 	}
 }
 
@@ -554,6 +556,7 @@ func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref
 			return err
 		}
 		pipeline.providerID = p.ID()
+		pipeline.providerHost = p.Host()
 
 		switch err := c.SavePipeline(ref, pipeline); err {
 		case nil:
@@ -825,8 +828,8 @@ func (c *Cache) Step(key PipelineKey, stepIDs []string) (Step, bool) {
 func (c *Cache) WriteLog(ctx context.Context, key taskKey, writer io.Writer) error {
 	var err error
 	pKey := PipelineKey{
-		ProviderID: key.providerID,
-		ID:         key.stepIDs[0].String,
+		ProviderHost: key.providerHost,
+		ID:           key.stepIDs[0].String,
 	}
 	p, exists := c.Pipeline(pKey)
 	if !exists {

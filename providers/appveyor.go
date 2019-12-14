@@ -49,6 +49,10 @@ func (c AppVeyorClient) ID() string {
 	return c.provider.ID
 }
 
+func (c AppVeyorClient) Host() string {
+	return c.url.Host
+}
+
 func (c AppVeyorClient) Name() string {
 	return c.provider.Name
 }

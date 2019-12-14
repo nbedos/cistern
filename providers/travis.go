@@ -305,6 +305,10 @@ func (c TravisClient) ID() string {
 	return c.provider.ID
 }
 
+func (c TravisClient) Host() string {
+	return c.baseURL.Host
+}
+
 func (c TravisClient) Name() string {
 	return c.provider.Name
 }

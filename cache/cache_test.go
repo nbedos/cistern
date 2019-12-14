@@ -176,8 +176,8 @@ func TestCache_Builds(t *testing.T) {
 	c := NewCache(nil, nil)
 	for _, id := range ids {
 		p := Pipeline{
-			providerID: "testAccount",
-			Repository: &repository,
+			providerHost: "host",
+			Repository:   &repository,
 			Step: Step{
 				ID: id,
 			},
@@ -189,8 +189,8 @@ func TestCache_Builds(t *testing.T) {
 
 	for _, id := range ids {
 		key := PipelineKey{
-			ProviderID: "testAccount",
-			ID:         id,
+			ProviderHost: "host",
+			ID:           id,
 		}
 		_, exists := c.Pipeline(key)
 		if !exists {
@@ -284,7 +284,7 @@ func TestCache_WriteLog(t *testing.T) {
 
 		buf := bytes.Buffer{}
 		key := PipelineKey{
-			providerID: "provider1",
+			providerHost: "provider1",
 			ID:         "1",
 		}
 		if err := c.WriteLog(context.Background(), key, []string{"0", "1"}, &buf); err != nil {

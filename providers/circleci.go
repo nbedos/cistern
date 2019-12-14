@@ -163,6 +163,10 @@ func (c CircleCIClient) ID() string {
 	return c.provider.ID
 }
 
+func (c CircleCIClient) Host() string {
+	return c.baseURL.Host
+}
+
 func (c CircleCIClient) Name() string {
 	return c.provider.Name
 }

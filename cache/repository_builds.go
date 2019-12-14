@@ -19,7 +19,8 @@ import (
 const maxStepIDs = 10
 
 type taskKey struct {
-	providerID string
+	providerID   string
+	providerHost string
 	// We need an array instead of a slice so that taskKey is hashable
 	stepIDs [maxStepIDs]utils.NullString
 }
@@ -135,8 +136,9 @@ func (t *task) SetPrefix(s string) {
 
 func taskFromPipeline(p Pipeline, providerByID map[string]CIProvider) task {
 	key := taskKey{
-		providerID: p.providerID,
-		stepIDs:    [maxStepIDs]utils.NullString{},
+		providerID:   p.providerID,
+		providerHost: p.providerHost,
+		stepIDs:      [maxStepIDs]utils.NullString{},
 	}
 
 	providerName := "unknown"

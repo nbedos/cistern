@@ -55,6 +55,10 @@ func (c AzurePipelinesClient) ID() string {
 	return c.provider.ID
 }
 
+func (c AzurePipelinesClient) Host() string {
+	return c.baseURL.Host
+}
+
 func (c AzurePipelinesClient) Name() string {
 	return c.provider.Name
 }

@@ -179,6 +179,10 @@ func (c GitLabClient) ID() string {
 	return c.provider.ID
 }
 
+func (c GitLabClient) Host() string {
+	return c.remote.BaseURL().Host
+}
+
 func (c GitLabClient) Name() string {
 	return c.provider.Name
 }
