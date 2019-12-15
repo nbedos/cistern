@@ -328,6 +328,7 @@ token = "gitlab_api_token"
 ## ENVIRONMENT VARIABLES
 
 * `BROWSER` is used to find the path of the default web browser
+* `PAGER` is used to view log files. If the variable is not set, citop will call `less`
 * `HOME`, `XDG_CONFIG_HOME` and `XDG_CONFIG_DIRS` are used to locate the configuration file
 
 ## LOCAL PROGRAMS
@@ -335,7 +336,7 @@ token = "gitlab_api_token"
 citop relies on the following local executables:
 
 * `git` to translate the abbreviated SHA identifier of a commit into a non-abbreviated SHA
-* `less` to show job logs
+* `less` to view log files, unless `PAGER` is set
 * `man` to show the manual page
 
 # EXAMPLES

@@ -572,6 +572,9 @@ token = \[dq]gitlab_api_token\[dq]
 .IP \[bu] 2
 \f[C]BROWSER\f[R] is used to find the path of the default web browser
 .IP \[bu] 2
+\f[C]PAGER\f[R] is used to view log files.
+If the variable is not set, citop will call \f[C]less\f[R]
+.IP \[bu] 2
 \f[C]HOME\f[R], \f[C]XDG_CONFIG_HOME\f[R] and \f[C]XDG_CONFIG_DIRS\f[R]
 are used to locate the configuration file
 .SS LOCAL PROGRAMS
@@ -581,7 +584,7 @@ citop relies on the following local executables:
 \f[C]git\f[R] to translate the abbreviated SHA identifier of a commit
 into a non-abbreviated SHA
 .IP \[bu] 2
-\f[C]less\f[R] to show job logs
+\f[C]less\f[R] to view log files, unless \f[C]PAGER\f[R] is set
 .IP \[bu] 2
 \f[C]man\f[R] to show the manual page
 .SH EXAMPLES
