@@ -265,7 +265,7 @@ func TestCache_WriteLog(t *testing.T) {
 			providerHost: "provider1",
 			ID:         "1",
 		}
-		if err := c.WriteLog(context.Background(), key, []string{"0", "1"}, &buf); err != nil {
+		if err := c.ActiveRowLog(context.Background(), key, []string{"0", "1"}, &buf); err != nil {
 			t.Fatal(err)
 		}
 
@@ -339,7 +339,7 @@ func TestCache_WriteLog(t *testing.T) {
 		}
 
 		buf := bytes.Buffer{}
-		if err := c.WriteLog(context.Background(), "provider1", "1", 0, "1", &buf); err != nil {
+		if err := c.ActiveRowLog(context.Background(), "provider1", "1", 0, "1", &buf); err != nil {
 			t.Fatal(err)
 		}
 
@@ -410,7 +410,7 @@ func TestCache_WriteLog(t *testing.T) {
 		}
 
 		for _, testCase := range testCases {
-			err := c.WriteLog(context.Background(), testCase.accountID, testCase.buildID, testCase.stageID, testCase.jobID, nil)
+			err := c.ActiveRowLog(context.Background(), testCase.accountID, testCase.buildID, testCase.stageID, testCase.jobID, nil)
 			if err == nil {
 				t.Fatal("expected error but got nil")
 			}

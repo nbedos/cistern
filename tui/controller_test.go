@@ -22,7 +22,7 @@ func TestController_resize(t *testing.T) {
 			tui.Finish()
 		}()
 		c := cache.NewCache(nil, nil)
-		controller, err := NewController(&tui, "", c, time.UTC, "", "", "")
+		controller, err := NewController(&tui, "", c, time.UTC, "", "")
 		if err != nil {
 			t.Fatal(err)
 		}

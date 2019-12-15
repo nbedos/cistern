@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"sort"
@@ -825,7 +824,7 @@ func (c *Cache) Step(key PipelineKey, stepIDs []string) (Step, bool) {
 	return step, true
 }
 
-func (c *Cache) WriteLog(ctx context.Context, key taskKey, writer io.Writer) error {
+func (c *Cache) Log(ctx context.Context, key taskKey) (string, error) {
 	var err error
 	pKey := PipelineKey{
 		ProviderHost: key.providerHost,
@@ -844,34 +843,31 @@ func (c *Cache) WriteLog(ctx context.Context, key taskKey, writer io.Writer) err
 
 	step, exists := c.Step(pKey, stepIDs)
 	if !exists {
-		return fmt.Errorf("no matching step for %v %v", key, key.stepIDs)
+		return "", fmt.Errorf("no matching step for %v %v", key, key.stepIDs)
 	}
 
 	log := step.Log.Content.String
 	if !step.Log.Content.Valid {
 		provider, exists := c.ciProvidersById[key.providerID]
 		if !exists {
-			return fmt.Errorf("no matching provider found in cache for account ID %q", key.providerID)
+			return "", fmt.Errorf("no matching provider found in cache for account ID %q", key.providerID)
 		}
 
 		log, err = provider.Log(ctx, step)
 		if err != nil {
-			return err
+			return "", err
 		}
 
-		/*
-			if !step.State.IsActive() {
-				if err = c.SaveStep(pKey, stepIDs,accountID, buildID, stageID, job); err != nil {
-					return err
-				}
-			}*/
+		/*if !step.State.IsActive() {
+			if err = c.SaveStep(pKey, stepIDs,accountID, buildID, stageID, job); err != nil {
+				return err
+			}
+		}*/
 	}
 
 	if !strings.HasSuffix(log, "\n") {
 		log = log + "\n"
 	}
-	processedLog := utils.PostProcess(log)
-	_, err = writer.Write([]byte(processedLog))
 
-	return err
+	return log, err
 }

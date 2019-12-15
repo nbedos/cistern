@@ -60,11 +60,8 @@ func TestTUI_Exec(t *testing.T) {
 			tui.Finish()
 		}()
 
-		err = tui.Exec(context.Background(), ExecCmd{
-			// An empty name will cause a failure when the command is run
-			name: "",
-		})
-		if err == nil {
+		// An empty name will cause a failure when the command is run
+		if err = tui.Exec(context.Background(), "", nil, nil); err == nil {
 			t.Fatal("expected error but got nil")
 		}
 
@@ -85,10 +82,7 @@ func TestTUI_Exec(t *testing.T) {
 			tui.Finish()
 		}()
 
-		err = tui.Exec(context.Background(), ExecCmd{
-			name: "date",
-		})
-		if err != nil {
+		if err = tui.Exec(context.Background(), "date", nil, nil); err != nil {
 			t.Fatalf("expected nil but got %v", err)
 		}
 
@@ -114,14 +108,11 @@ func TestTUI_Exec(t *testing.T) {
 		errc := make(chan error)
 		start := time.Now()
 		go func() {
-			errc <- tui.Exec(ctx, ExecCmd{
-				name: "sleep",
-				args: []string{strconv.Itoa(int(d.Seconds()))},
-			})
+			errc <- tui.Exec(ctx, "sleep", []string{strconv.Itoa(int(d.Seconds()))}, nil)
 		}()
 		cancel()
-		if err := <-errc; err != context.Canceled {
-			t.Fatalf("expected error %v but got %v", context.Canceled, err)
+		if err := <-errc; err == nil {
+			t.Fatalf("expected error != %v but got %v", nil, err)
 		}
 		if elapsed := time.Since(start); elapsed >= d {
 			t.Fatalf("tui.Exec call did not return in time: time elapsed %v exceeds delay %v",

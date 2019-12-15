@@ -1,13 +1,10 @@
 package utils
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"path"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -161,60 +158,6 @@ func MaxNullTime(times ...NullTime) NullTime {
 		}
 	}
 	return result
-}
-
-var deleteEraseInLine = regexp.MustCompile(".*\x1b\\[0K")
-var deleteUntilCarriageReturn = regexp.MustCompile(`.*\r([^\r\n])`)
-
-func PostProcess(line string) string {
-	tmp := deleteEraseInLine.ReplaceAllString(line, "")
-	return deleteUntilCarriageReturn.ReplaceAllString(tmp, "$1")
-}
-
-type ANSIStripper struct {
-	writer io.WriteCloser
-	buffer bytes.Buffer
-}
-
-func NewANSIStripper(w io.WriteCloser) ANSIStripper {
-	return ANSIStripper{writer: w}
-}
-
-func (a ANSIStripper) Write(p []byte) (int, error) {
-	var (
-		line []byte
-		err  error
-	)
-	a.buffer.Write(p)
-	for {
-		line, err = a.buffer.ReadBytes('\n')
-		if err != nil {
-			break
-		}
-
-		s := PostProcess(string(line))
-		if _, err := a.writer.Write([]byte(s)); err != nil {
-			return 0, err
-		}
-	}
-	a.buffer.Write(line)
-
-	return len(p), nil
-}
-
-func (a ANSIStripper) Close() error {
-	s := a.buffer.String()
-	if len(s) > 0 {
-		if !strings.HasSuffix(s, "\n") {
-			s = s + "\n"
-		}
-		processed := PostProcess(s)
-		if _, err := a.writer.Write([]byte(processed)); err != nil {
-			return err
-		}
-	}
-
-	return a.writer.Close()
 }
 
 type NullDuration struct {

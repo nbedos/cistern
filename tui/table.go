@@ -3,8 +3,6 @@ package tui
 import (
 	"context"
 	"errors"
-	"os"
-	"path"
 	"time"
 
 	"github.com/mattn/go-runewidth"
@@ -241,28 +239,18 @@ func (t *Table) Text() []text.LocalizedStyledString {
 	return texts
 }
 
-func (t Table) OpenInBrowser(browser string) error {
+func (t Table) ActiveRowURL() utils.NullString {
 	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
-		if url := t.rows[t.activeLine].URL(); url.Valid {
-			argv := []string{path.Base(browser), url.String}
-			process, err := os.StartProcess(browser, argv, &os.ProcAttr{})
-			if err != nil {
-				return err
-			}
-
-			if err := process.Release(); err != nil {
-				return err
-			}
-		}
+		return t.rows[t.activeLine].URL()
 	}
-
-	return nil
+	return utils.NullString{}
 }
 
-func (t *Table) WriteToDisk(ctx context.Context, dir string) (string, error) {
+func (t *Table) ActiveRowLog(ctx context.Context) (string, error) {
 	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
-
+		key := t.rows[t.activeLine].Key()
+		return t.source.Log(ctx, key)
 	}
-	key := t.rows[t.activeLine].Key()
-	return t.source.WriteToDisk(ctx, key, dir)
+
+	return "", cache.ErrNoLogHere
 }

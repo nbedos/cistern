@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"path"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"time"
@@ -274,22 +271,11 @@ func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 
 var ErrNoLogHere = errors.New("no log is associated to this row")
 
-func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir string) (string, error) {
-	// TODO Allow filtering for errored jobs
+func (s BuildsByCommit) Log(ctx context.Context, key interface{}) (string, error) {
 	stepKey, ok := key.(taskKey)
 	if !ok {
 		return "", fmt.Errorf("key conversion to taskKey failed: '%v'", key)
 	}
 
-	file, err := ioutil.TempFile(dir, "step_*.log")
-	w := utils.NewANSIStripper(file)
-	defer w.Close()
-	if err != nil {
-		return "", err
-	}
-
-	logPath := path.Join(dir, filepath.Base(file.Name()))
-	err = s.cache.WriteLog(ctx, stepKey, w)
-
-	return logPath, err
+	return s.cache.Log(ctx, stepKey)
 }
