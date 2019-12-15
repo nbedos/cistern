@@ -130,6 +130,10 @@ func (t TUI) Events() <-chan tcell.Event {
 	return t.eventc
 }
 
+func (t TUI) Size() (int, int) {
+	return t.screen.Size()
+}
+
 func (t TUI) poll() {
 	// Exits when t.Finish() is called
 	for {

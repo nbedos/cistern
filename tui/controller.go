@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -45,7 +46,7 @@ type SourceFromRef = func(ref string) cache.HierarchicalTabularDataSource
 
 func NewController(tui *TUI, ref string, c cache.Cache, loc *time.Location, defaultStatus string, help string) (Controller, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
-	width, height := 10, 10
+	width, height := tui.Size()
 	header, err := NewTextArea(width, height)
 	if err != nil {
 		return Controller{}, err
@@ -66,6 +67,8 @@ func NewController(tui *TUI, ref string, c cache.Cache, loc *time.Location, defa
 		tui:           tui,
 		ref:           ref,
 		cache:         c,
+		width:         width,
+		height:        height,
 		header:        &header,
 		table:         &table,
 		status:        &status,
@@ -75,44 +78,16 @@ func NewController(tui *TUI, ref string, c cache.Cache, loc *time.Location, defa
 }
 
 func (c *Controller) setRef(ref string) error {
-	// TODO Preserve traversable state across calls to setRef()
-	table, err := NewTable(c.cache.BuildsOfRef(ref), c.table.width, c.table.height, c.table.location)
-	if err != nil {
-		return err
-	}
-	c.table, c.ref = &table, ref
-
-	return nil
-}
-
-func (c *Controller) MonitorPipelines(ctx context.Context, repositoryURL string, ref string) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	errc := make(chan error)
-	updates := make(chan time.Time)
-	go func() {
-		errc <- c.cache.MonitorPipelines(ctx, repositoryURL, ref, updates)
-	}()
-
-	refSet := false
-	for {
-		select {
-		case <-updates:
-			// Update the controller once we receive an update, meaning the reference exists at
-			// least locally or remotely
-			if !refSet {
-				if err := c.setRef(ref); err != nil {
-					return err
-				}
-				refSet = true
-			}
-			c.refresh()
-			c.draw()
-		case err := <-errc:
+	if ref != c.ref {
+		// TODO Preserve traversable state across calls to setRef()
+		table, err := NewTable(c.cache.BuildsOfRef(ref), c.table.width, c.table.height, c.table.location)
+		if err != nil {
 			return err
 		}
+		c.table, c.ref = &table, ref
 	}
+
+	return nil
 }
 
 func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
@@ -120,11 +95,12 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 	defer cancel()
 	errc := make(chan error)
 	refc := make(chan string)
+	updates := make(chan time.Time)
 
 	c.refresh()
 	c.draw()
 
-	// Trigger pipeline monitoring for git reference c.ref
+	// Start pipeline monitoring
 	go func() {
 		select {
 		case refc <- c.ref:
@@ -132,6 +108,8 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 		}
 	}()
 
+	var tmpRef string
+	var mux = &sync.Mutex{}
 	var refCtx context.Context
 	var refCancel = func() {}
 	var err error
@@ -140,11 +118,25 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 		case ref := <-refc:
 			// Each time a new git reference is received, cancel the last function call
 			// and start a new one.
+			mux.Lock()
+			tmpRef = ref
+			mux.Unlock()
 			refCancel()
 			refCtx, refCancel = context.WithCancel(ctx)
 			go func(ctx context.Context, ref string) {
-				errc <- c.MonitorPipelines(refCtx, repositoryURL, ref)
+				errc <- c.cache.MonitorPipelines(ctx, repositoryURL, ref, updates)
 			}(refCtx, ref)
+
+		case <-updates:
+			// Update the controller once we receive an update, meaning the reference exists at
+			// least locally or remotely
+			mux.Lock()
+			if err := c.setRef(tmpRef); err != nil {
+				return err
+			}
+			mux.Unlock()
+			c.refresh()
+			c.draw()
 
 		case e := <-errc:
 			switch e {
@@ -233,7 +225,7 @@ func (c *Controller) resize(width int, height int) {
 var deleteUntilCarriageReturn = regexp.MustCompile(`.*\r([^\r\n])`)
 
 // https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
-var deleteANSIEscapeSequences = regexp.MustCompile(`\x1b[@-_][0-?]*[ -/]*[@-~]`)
+var deleteANSIEscapeSequence = regexp.MustCompile(`\x1b[@-_][0-?]*[ -/]*[@-~]`)
 
 func (c *Controller) viewLog(ctx context.Context) error {
 	c.writeStatus("Fetching logs...")
@@ -252,7 +244,7 @@ func (c *Controller) viewLog(ctx context.Context) error {
 	}
 
 	stdin := bytes.Buffer{}
-	log = deleteANSIEscapeSequences.ReplaceAllString(log, "")
+	log = deleteANSIEscapeSequence.ReplaceAllString(log, "")
 	log = deleteUntilCarriageReturn.ReplaceAllString(log, "$1")
 	stdin.WriteString(log)
 
