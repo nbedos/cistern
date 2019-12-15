@@ -57,8 +57,11 @@ func (r testRow) Key() interface{} {
 	return r.value
 }
 
-func (r testRow) URL() string {
-	return r.value
+func (r testRow) URL() utils.NullString {
+	return utils.NullString{
+		String: r.value,
+		Valid:  true,
+	}
 }
 
 type testSource struct {
@@ -79,7 +82,7 @@ func (s testSource) Alignment() map[string]text.Alignment {
 	return map[string]text.Alignment{"VALUE": text.Left}
 }
 
-func (r testSource) WriteToDisk(ctx context.Context, key interface{}, dir string) (string, error) {
+func (s testSource) Log(context.Context, interface{}) (string, error) {
 	return "", nil
 }
 
@@ -412,7 +415,7 @@ func TestTable_NextMatch(t *testing.T) {
 		})
 	}
 
-	t.Run("NextMatch on an empty table must return false", func(t *testing.T) {
+	t.Run("nextMatch on an empty table must return false", func(t *testing.T) {
 		table, err := NewTable(emptySource, 10, 10, time.UTC)
 		if err != nil {
 			t.Fatal(err)

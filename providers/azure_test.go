@@ -62,9 +62,8 @@ func Setup() (AzurePipelinesClient, func(), error) {
 			ID:   "azure",
 			Name: "azure",
 		},
-		version:       "5.1",
-		logURLByJobID: map[string]url.URL{},
-		mux:           &sync.Mutex{},
+		version: "5.1",
+		mux:     &sync.Mutex{},
 	}
 
 	teardown := func() {
@@ -73,131 +72,199 @@ func Setup() (AzurePipelinesClient, func(), error) {
 	return client, teardown, nil
 }
 
-var expectedBuild = cache.Build{
-	Repository: &cache.Repository{
-		Provider: cache.Provider{
-			ID:   "azure",
-			Name: "azure",
+var expectedPipeline = cache.Pipeline{
+	Number: "20191204.3",
+	GitReference: cache.GitReference{
+		SHA:   "5e4d496d63086609cb3c03aa0ee4e032e4b6b08b",
+		Ref:   "azure-pipelines",
+		IsTag: false,
+	},
+	Step: cache.Step{
+		ID:    "16",
+		Name:  "owner.repo (1)",
+		Type:  cache.StepPipeline,
+		State: cache.Failed,
+		CreatedAt: utils.NullTime{
+			Valid: true,
+			Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 		},
-		Owner: "owner",
-		Name:  "repo",
-	},
-	ID:              "16",
-	Sha:             "5e4d496d63086609cb3c03aa0ee4e032e4b6b08b",
-	Ref:             "azure-pipelines",
-	RepoBuildNumber: "20191204.3",
-	State:           cache.Failed,
-	CreatedAt: utils.NullTime{
-		Valid: true,
-		Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-	},
-	StartedAt: utils.NullTime{
-		Valid: true,
-		Time:  time.Date(2019, 12, 4, 13, 9, 52, 764105000, time.UTC),
-	},
-	FinishedAt: utils.NullTime{
-		Valid: true,
-		Time:  time.Date(2019, 12, 4, 13, 11, 34, 339701300, time.UTC),
-	},
-	UpdatedAt: time.Date(2019, 12, 4, 13, 11, 34, 487000000, time.UTC),
-	Duration: utils.NullDuration{
-		Valid:    true,
-		Duration: time.Minute + 41*time.Second + 575596300*time.Nanosecond,
-	},
-	WebURL: "http://HOST/owner/repo/_build/results?buildId=16",
-	Stages: map[int]*cache.Stage{
-		1: {
-			ID:    1,
-			Name:  "tests",
-			State: "failed",
-			Jobs: []*cache.Job{
-				{
-					ID:    "05f50c00-03d1-5f30-b292-f8c1b53561cb",
-					State: "failed",
-					Name:  "Ubuntu_16_04",
-					CreatedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-					},
-					StartedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 10, 0, 713333300, time.UTC),
-					},
-					FinishedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 11, 30, 296666700, time.UTC),
-					},
-					Duration: utils.NullDuration{
-						Valid:    true,
-						Duration: time.Minute + 29*time.Second + 583333400*time.Nanosecond,
-					},
+		StartedAt: utils.NullTime{
+			Valid: true,
+			Time:  time.Date(2019, 12, 4, 13, 9, 52, 764105000, time.UTC),
+		},
+		FinishedAt: utils.NullTime{
+			Valid: true,
+			Time:  time.Date(2019, 12, 4, 13, 11, 34, 339701300, time.UTC),
+		},
+		UpdatedAt: time.Date(2019, 12, 4, 13, 11, 34, 487000000, time.UTC),
+		Duration: utils.NullDuration{
+			Valid:    true,
+			Duration: time.Minute + 41*time.Second + 575596300*time.Nanosecond,
+		},
+		WebURL: utils.NullString{
+			String: "http://HOST/owner/repo/_build/results?buildId=16",
+			Valid:  true,
+		},
+		Children: []cache.Step{
+			{
+				ID:    "8bfbeaae-4c8e-5f12-f154-edd305817000",
+				Type:  cache.StepStage,
+				Name:  "tests",
+				State: "failed",
+				StartedAt: utils.NullTime{
+					Valid: true,
+					Time:  time.Date(2019, 12, 4, 13, 9, 56, 653333300, time.UTC),
 				},
-				{
-					ID:    "ff10d40d-f057-5007-e152-c3ec22cd43f4",
-					State: "failed",
-					Name:  "Ubuntu_18_04",
-					CreatedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-					},
-					StartedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 9, 56, 653333300, time.UTC),
-					},
-					FinishedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 11, 17, 26666700, time.UTC),
-					},
-					Duration: utils.NullDuration{
-						Valid:    true,
-						Duration: time.Minute + 20*time.Second + 373333400*time.Nanosecond,
-					},
+				FinishedAt: utils.NullTime{
+					Valid: true,
+					Time:  time.Date(2019, 12, 4, 13, 11, 34, 60000000, time.UTC),
 				},
-				{
-					ID:    "3d7e5cc9-b1ff-5c85-9fc2-b7644452fdf5",
-					State: "failed",
-					Name:  "macOS_10_13",
-					CreatedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-					},
-					StartedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 10, 0, 693333300, time.UTC),
-					},
-					FinishedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 10, 27, 10000000, time.UTC),
-					},
-					Duration: utils.NullDuration{
-						Valid:    true,
-						Duration: 26*time.Second + 316666700*time.Nanosecond,
-					},
+				Duration: utils.NullDuration{
+					Valid:    true,
+					Duration: time.Minute + 37*time.Second + 406666700*time.Nanosecond,
 				},
-				{
-					ID:    "aa83c9de-d200-5148-7d44-5e08a0dd6659",
-					State: "failed",
-					Name:  "macoOS_10_14",
-					CreatedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+				WebURL: utils.NullString{
+					String: "http://HOST/owner/repo/_build/results?buildId=16",
+					Valid:  true,
+				},
+				Children: []cache.Step{
+					{
+						ID:    "a1fe9f00-6aac-5c3d-c3c6-290a6d3ec2ef",
+						Type:  cache.StepJob,
+						State: "failed",
+						Name:  "Ubuntu_16_04",
+						CreatedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+						},
+						StartedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 10, 0, 713333300, time.UTC),
+						},
+						FinishedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 11, 33, 790000000, time.UTC),
+						},
+						Duration: utils.NullDuration{
+							Valid:    true,
+							Duration: time.Minute + 33*time.Second + 76666700*time.Nanosecond,
+						},
+						WebURL: utils.NullString{
+							String: "http://HOST/owner/repo/_build/results?buildId=16",
+							Valid:  true,
+						},
 					},
-					StartedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 9, 59, 943333300, time.UTC),
+					{
+						ID:    "e305bc7f-849a-5981-f9f4-d079b0b7f451",
+						Type:  cache.StepJob,
+						State: "failed",
+						Name:  "Ubuntu_18_04",
+						CreatedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+						},
+						StartedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 9, 56, 653333300, time.UTC),
+						},
+						FinishedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 11, 24, 590000000, time.UTC),
+						},
+						Duration: utils.NullDuration{
+							Valid:    true,
+							Duration: time.Minute + 27*time.Second + 936666700*time.Nanosecond,
+						},
+						WebURL: utils.NullString{
+							String: "http://HOST/owner/repo/_build/results?buildId=16",
+							Valid:  true,
+						},
 					},
-					FinishedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 4, 13, 10, 4, 753333300, time.UTC),
-					},
-					Duration: utils.NullDuration{
-						Valid:    true,
-						Duration: 4*time.Second + 810*time.Millisecond,
+					{
+						ID:    "aa83c9de-d200-5148-7d44-5e08a0dd6659",
+						Type:  cache.StepJob,
+						State: "failed",
+						Name:  "macoOS_10_14",
+						CreatedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+						},
+						StartedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 9, 59, 943333300, time.UTC),
+						},
+						FinishedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 10, 4, 753333300, time.UTC),
+						},
+						Duration: utils.NullDuration{
+							Valid:    true,
+							Duration: 4*time.Second + 810*time.Millisecond,
+						},
+						WebURL: utils.NullString{
+							String: "http://HOST/owner/repo/_build/results?buildId=16",
+							Valid:  true,
+						},
+						Children: []cache.Step{
+							{
+								ID:    "fd63e659-60cf-51c7-a63d-0111af4550dd",
+								Name:  "Set up the Go workspace",
+								Type:  cache.StepTask,
+								State: "passed",
+								StartedAt: utils.NullTime{
+									Valid: true,
+									Time:  time.Date(2019, 12, 4, 13, 10, 3, 153333300, time.UTC),
+								},
+								FinishedAt: utils.NullTime{
+									Valid: true,
+									Time:  time.Date(2019, 12, 4, 13, 10, 3, 870000000, time.UTC),
+								},
+								Duration: utils.NullDuration{
+									Valid:    true,
+									Duration: 716*time.Millisecond + 666*time.Microsecond + 700*time.Nanosecond,
+								},
+								WebURL: utils.NullString{
+									String: "http://HOST/owner/repo/_build/results?buildId=16",
+									Valid:  true,
+								},
+							},
+							{
+								ID:    "bebceb1b-138c-57de-594c-688f96e7a793",
+								Name:  "Build",
+								Type:  cache.StepTask,
+								State: "failed",
+								StartedAt: utils.NullTime{
+									Valid: true,
+									Time:  time.Date(2019, 12, 4, 13, 10, 3, 870000000, time.UTC),
+								},
+								FinishedAt: utils.NullTime{
+									Valid: true,
+									Time:  time.Date(2019, 12, 4, 13, 10, 4, 230000000, time.UTC),
+								},
+								Duration: utils.NullDuration{
+									Valid:    true,
+									Duration: 360 * time.Millisecond,
+								},
+								WebURL: utils.NullString{
+									String: "http://HOST/owner/repo/_build/results?buildId=16",
+									Valid:  true,
+								},
+							},
+						},
 					},
 				},
 			},
 		},
 	},
+}
+
+func setWebURLs(p cache.Pipeline, webURL utils.NullString) cache.Pipeline {
+	p.Step = p.Step.Map(func(s cache.Step) cache.Step {
+		s.WebURL = webURL
+		return s
+	})
+
+	return p
 }
 
 func TestAzurePipelinesClient_parseAzureWebURL(t *testing.T) {
@@ -217,14 +284,16 @@ func TestAzurePipelinesClient_fetchBuild(t *testing.T) {
 	defer teardown()
 
 	ctx := context.Background()
-	build, err := client.fetchBuild(ctx, "owner", "repo", "16")
+	pipeline, err := client.fetchPipeline(ctx, "owner", "repo", "16")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expectedBuild := expectedBuild
-	expectedBuild.WebURL = strings.ReplaceAll(expectedBuild.WebURL, "HOST", client.baseURL.Host)
-	if diff := cmp.Diff(expectedBuild, build); len(diff) > 0 {
+	expectedPipeline := setWebURLs(expectedPipeline, utils.NullString{
+		String: "http://" + client.baseURL.Host + "/owner/repo/_build/results?buildId=16",
+		Valid:  true,
+	})
+	if diff := expectedPipeline.Diff(pipeline); len(diff) > 0 {
 		t.Fatal(diff)
 	}
 }
@@ -238,14 +307,16 @@ func TestAzurePipelinesClient_BuildFromURL(t *testing.T) {
 
 	webURL := "http://" + client.baseURL.Host + "/owner/repo/_build/results?buildId=16"
 	ctx := context.Background()
-	build, err := client.BuildFromURL(ctx, webURL)
+	pipeline, err := client.BuildFromURL(ctx, webURL)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expectedBuild := expectedBuild
-	expectedBuild.WebURL = strings.ReplaceAll(expectedBuild.WebURL, "HOST", client.baseURL.Host)
-	if diff := cmp.Diff(expectedBuild, build); len(diff) > 0 {
+	expectedPipeline := setWebURLs(expectedPipeline, utils.NullString{
+		String: webURL,
+		Valid:  true,
+	})
+	if diff := expectedPipeline.Diff(pipeline); len(diff) > 0 {
 		t.Fatal(diff)
 	}
 }
@@ -257,14 +328,20 @@ func TestAzurePipelinesClient_Log(t *testing.T) {
 	}
 	defer teardown()
 
-	client.logURLByJobID["1234"] = url.URL{
+	logURL := url.URL{
 		Scheme: client.baseURL.Scheme,
 		Host:   client.baseURL.Host,
 		Path:   "/owner/repo/_apis/build/builds/16/logs/1234",
 	}
-
 	ctx := context.Background()
-	log, err := client.Log(ctx, cache.Repository{}, "1234")
+	job := cache.Step{
+		ID:   "1234",
+		Type: cache.StepJob,
+		Log: cache.Log{
+			Key: logURL.String(),
+		},
+	}
+	log, err := client.Log(ctx, job)
 	if err != nil {
 		t.Fatal(err)
 	}

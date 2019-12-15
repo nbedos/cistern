@@ -13,7 +13,7 @@ import (
 type HierarchicalTabularSourceRow interface {
 	Tabular(*time.Location) map[string]text.StyledString
 	Key() interface{}
-	URL() string
+	URL() utils.NullString
 	SetPrefix(s string)
 	utils.TreeNode
 }
@@ -22,7 +22,7 @@ type HierarchicalTabularDataSource interface {
 	Rows() []HierarchicalTabularSourceRow
 	Headers() []string
 	Alignment() map[string]text.Alignment
-	WriteToDisk(ctx context.Context, key interface{}, tmpDir string) (string, error)
+	Log(ctx context.Context, key interface{}) (string, error)
 }
 
 func Prefix(row HierarchicalTabularSourceRow, indent string, last bool) {

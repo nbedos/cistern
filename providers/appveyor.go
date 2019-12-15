@@ -49,10 +49,21 @@ func (c AppVeyorClient) ID() string {
 	return c.provider.ID
 }
 
-func (c AppVeyorClient) Log(ctx context.Context, repository cache.Repository, jobID string) (string, error) {
+func (c AppVeyorClient) Host() string {
+	return c.url.Host
+}
+
+func (c AppVeyorClient) Name() string {
+	return c.provider.Name
+}
+
+func (c AppVeyorClient) Log(ctx context.Context, step cache.Step) (string, error) {
+	if step.Type != cache.StepJob {
+		return "", cache.ErrNoLogHere
+	}
+
 	endpoint := c.url
-	endpoint.Path += fmt.Sprintf("/buildjobs/%s/log", jobID)
-	endpoint.RawPath += fmt.Sprintf("/buildjobs/%s/log", url.PathEscape(jobID))
+	endpoint.Path += fmt.Sprintf("/buildjobs/%s/log", url.PathEscape(step.ID))
 
 	body, err := c.get(ctx, endpoint)
 	if err != nil {
@@ -72,13 +83,13 @@ func (c AppVeyorClient) Log(ctx context.Context, repository cache.Repository, jo
 	return string(log), err
 }
 
-func (c AppVeyorClient) BuildFromURL(ctx context.Context, u string) (cache.Build, error) {
+func (c AppVeyorClient) BuildFromURL(ctx context.Context, u string) (cache.Pipeline, error) {
 	owner, repo, id, err := parseAppVeyorURL(u)
 	if err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
 
-	return c.fetchBuild(ctx, owner, repo, id)
+	return c.fetchPipeline(ctx, owner, repo, id)
 }
 
 func (c AppVeyorClient) getJSON(ctx context.Context, u url.URL, v interface{}) error {
@@ -131,7 +142,7 @@ func (c AppVeyorClient) get(ctx context.Context, u url.URL) (io.ReadCloser, erro
 	return resp.Body, err
 }
 
-func (c AppVeyorClient) fetchBuild(ctx context.Context, owner string, repoName string, id int) (cache.Build, error) {
+func (c AppVeyorClient) fetchPipeline(ctx context.Context, owner string, repoName string, id int) (cache.Pipeline, error) {
 	// We only have the build ID and need a build object. We have to query two endpoints:
 	// 		1. /projects/owner/repoName/history with startBuildId = id gives us a build object with
 	//      an empty job list but with a version number
@@ -155,24 +166,16 @@ func (c AppVeyorClient) fetchBuild(ctx context.Context, owner string, repoName s
 		Builds []appVeyorBuild `json:"builds"`
 	}
 	if err := c.getJSON(ctx, history, &b); err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
 
 	if len(b.Builds) != 1 {
-		return cache.Build{}, fmt.Errorf("found no build with id %d", id)
+		return cache.Pipeline{}, fmt.Errorf("found no build with id %d", id)
 	}
 	if b.Builds[0].ID != id {
-		return cache.Build{}, fmt.Errorf("expected build #%d but got %d", id, b.Builds[0].ID)
+		return cache.Pipeline{}, fmt.Errorf("expected build #%d but got %d", id, b.Builds[0].ID)
 	}
 	version := b.Builds[0].Version
-
-	repository := cache.Repository{
-		Provider: c.provider,
-		ID:       b.Project.ID,
-		URL:      "",
-		Owner:    b.Project.Owner,
-		Name:     b.Project.Name,
-	}
 
 	endpoint := c.url
 	pathFormat := "/projects/%s/%s/build/%s"
@@ -183,10 +186,10 @@ func (c AppVeyorClient) fetchBuild(ctx context.Context, owner string, repoName s
 		Build appVeyorBuild `json:"build"`
 	}
 	if err := c.getJSON(ctx, endpoint, &bVersion); err != nil {
-		return cache.Build{}, err
+		return cache.Pipeline{}, err
 	}
 
-	return bVersion.Build.toCacheBuild(c.provider.ID, &repository)
+	return bVersion.Build.toCachePipeline(b.Project.Owner, b.Project.Name)
 }
 
 // Extract owner, repository and build ID from web URL of build
@@ -249,54 +252,59 @@ type appVeyorBuild struct {
 	UpdatedAt   string        `json:"updated"`
 }
 
-func (b appVeyorBuild) toCacheBuild(accountID string, repo *cache.Repository) (cache.Build, error) {
-	build := cache.Build{
-		Repository:      repo,
-		ID:              strconv.Itoa(b.ID),
-		Sha:             b.Sha,
-		Ref:             b.Branch,
-		IsTag:           b.IsTag,
-		RepoBuildNumber: strconv.Itoa(b.Number),
-		State:           fromAppVeyorState(b.Status),
-		Stages:          make(map[int]*cache.Stage),
-		Jobs:            make([]*cache.Job, 0),
+func (b appVeyorBuild) toCachePipeline(owner string, repository string) (cache.Pipeline, error) {
+	pipeline := cache.Pipeline{
+		Number: strconv.Itoa(b.Number),
+		GitReference: cache.GitReference{
+			SHA:   b.Sha,
+			Ref:   b.Branch,
+			IsTag: b.IsTag,
+		},
+		Step: cache.Step{
+			ID:    strconv.Itoa(b.ID),
+			Type:  cache.StepPipeline,
+			State: fromAppVeyorState(b.Status),
+		},
 	}
 	var err error
-	build.CreatedAt, err = utils.NullTimeFromString(b.CreatedAt)
+	pipeline.CreatedAt, err = utils.NullTimeFromString(b.CreatedAt)
 	if err != nil {
-		return build, err
+		return pipeline, err
 	}
-	build.StartedAt, err = utils.NullTimeFromString(b.StartedAt)
+	pipeline.StartedAt, err = utils.NullTimeFromString(b.StartedAt)
 	if err != nil {
-		return build, err
+		return pipeline, err
 	}
-	build.FinishedAt, err = utils.NullTimeFromString(b.FinishedAt)
+	pipeline.FinishedAt, err = utils.NullTimeFromString(b.FinishedAt)
 	if err != nil {
-		return build, err
+		return pipeline, err
 	}
-	if build.UpdatedAt, err = time.Parse(time.RFC3339, b.UpdatedAt); err != nil {
+	if pipeline.UpdatedAt, err = time.Parse(time.RFC3339, b.UpdatedAt); err != nil {
 		// Best effort since it sometimes happens that UpdatedAt is null but another date is
 		// available
-		nullUpdateAt := utils.MinNullTime(build.CreatedAt, build.StartedAt, build.FinishedAt)
+		nullUpdateAt := utils.MinNullTime(pipeline.CreatedAt, pipeline.StartedAt, pipeline.FinishedAt)
 		if !nullUpdateAt.Valid {
-			return build, err
+			return pipeline, err
 		}
-		build.UpdatedAt = nullUpdateAt.Time
+		pipeline.UpdatedAt = nullUpdateAt.Time
 	}
 
-	build.Duration = utils.NullSub(build.FinishedAt, build.StartedAt)
-	build.WebURL = fmt.Sprintf("https://ci.appveyor.com/project/%s/%s/builds/%d",
-		url.PathEscape(repo.Owner), url.PathEscape(repo.Name), b.ID)
+	pipeline.Duration = utils.NullSub(pipeline.FinishedAt, pipeline.StartedAt)
+	pipeline.WebURL = utils.NullString{
+		String: fmt.Sprintf("https://ci.appveyor.com/project/%s/%s/builds/%d",
+			url.PathEscape(owner), url.PathEscape(repository), b.ID),
+		Valid: true,
+	}
 
 	for _, job := range b.Jobs {
-		j, err := job.toCacheJob(job.ID, build.WebURL)
+		j, err := job.toCacheStep(job.ID, pipeline.WebURL.String)
 		if err != nil {
-			return build, err
+			return pipeline, err
 		}
-		build.Jobs = append(build.Jobs, &j)
+		pipeline.Children = append(pipeline.Children, j)
 	}
 
-	return build, nil
+	return pipeline, nil
 }
 
 type appVeyorJob struct {
@@ -309,32 +317,36 @@ type appVeyorJob struct {
 	FinishedAt   string `json:"finished"`
 }
 
-func (j appVeyorJob) toCacheJob(id string, buildURL string) (cache.Job, error) {
+func (j appVeyorJob) toCacheStep(id string, buildURL string) (cache.Step, error) {
 	if id == "" {
-		return cache.Job{}, errors.New("job id must not be the empty string")
+		return cache.Step{}, errors.New("job id must not be the empty string")
 	}
-	job := cache.Job{
-		ID:           id,
-		State:        fromAppVeyorState(j.Status),
-		Name:         j.Name,
-		WebURL:       fmt.Sprintf("%s/job/%s", buildURL, url.PathEscape(j.ID)),
+	step := cache.Step{
+		ID:    id,
+		Type:  cache.StepJob,
+		State: fromAppVeyorState(j.Status),
+		Name:  j.Name,
+		WebURL: utils.NullString{
+			String: fmt.Sprintf("%s/job/%s", buildURL, url.PathEscape(j.ID)),
+			Valid:  true,
+		},
 		AllowFailure: j.AllowFailure,
 	}
 
 	var err error
-	job.CreatedAt, err = utils.NullTimeFromString(j.CreatedAt)
+	step.CreatedAt, err = utils.NullTimeFromString(j.CreatedAt)
 	if err != nil {
-		return job, err
+		return step, err
 	}
-	job.StartedAt, err = utils.NullTimeFromString(j.StartedAt)
+	step.StartedAt, err = utils.NullTimeFromString(j.StartedAt)
 	if err != nil {
-		return job, err
+		return step, err
 	}
-	job.FinishedAt, err = utils.NullTimeFromString(j.FinishedAt)
+	step.FinishedAt, err = utils.NullTimeFromString(j.FinishedAt)
 	if err != nil {
-		return job, err
+		return step, err
 	}
-	job.Duration = utils.NullSub(job.FinishedAt, job.StartedAt)
+	step.Duration = utils.NullSub(step.FinishedAt, step.StartedAt)
 
-	return job, nil
+	return step, nil
 }

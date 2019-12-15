@@ -49,7 +49,7 @@ func TestClient(t *testing.T) {
 	}
 
 	sha := "d58600a58bf1738c6529ce3489a546bfa2178e07"
-	urls, err := client.RefStatuses(context.Background(), ts.URL+"/nbedos/termtosvg", sha)
+	urls, err := client.RefStatuses(context.Background(), ts.URL+"/nbedos/termtosvg", "", sha)
 	if err != nil {
 		t.Fatal(err)
 	}

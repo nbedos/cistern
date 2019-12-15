@@ -1,12 +1,14 @@
 package tui
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
+	"regexp"
+	"sync"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -36,16 +38,15 @@ type Controller struct {
 	inputDestination inputDestination
 	defaultStatus    string
 	help             string
-	tempDir          string
 }
 
 var ErrExit = errors.New("exit")
 
 type SourceFromRef = func(ref string) cache.HierarchicalTabularDataSource
 
-func NewController(tui *TUI, ref string, c cache.Cache, loc *time.Location, tempDir string, defaultStatus string, help string) (Controller, error) {
+func NewController(tui *TUI, ref string, c cache.Cache, loc *time.Location, defaultStatus string, help string) (Controller, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
-	width, height := 10, 10
+	width, height := tui.Size()
 	header, err := NewTextArea(width, height)
 	if err != nil {
 		return Controller{}, err
@@ -66,53 +67,27 @@ func NewController(tui *TUI, ref string, c cache.Cache, loc *time.Location, temp
 		tui:           tui,
 		ref:           ref,
 		cache:         c,
+		width:         width,
+		height:        height,
 		header:        &header,
 		table:         &table,
 		status:        &status,
-		tempDir:       tempDir,
 		defaultStatus: defaultStatus,
 		help:          help,
 	}, nil
 }
 
 func (c *Controller) setRef(ref string) error {
-	table, err := NewTable(c.cache.BuildsOfRef(ref), c.table.width, c.table.height, c.table.location)
-	if err != nil {
-		return err
-	}
-	c.table, c.ref = &table, ref
-
-	return nil
-}
-
-func (c *Controller) MonitorPipelines(ctx context.Context, repositoryURL string, ref string) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	errc := make(chan error)
-	updates := make(chan time.Time)
-	go func() {
-		errc <- c.cache.MonitorPipelines(ctx, repositoryURL, ref, updates)
-	}()
-
-	refSet := false
-	for {
-		select {
-		case <-updates:
-			// Update the controller once we receive an update, meaning the reference exists at
-			// least locally or remotely
-			if !refSet {
-				if err := c.setRef(ref); err != nil {
-					return err
-				}
-				refSet = true
-			}
-			c.refresh()
-			c.draw()
-		case err := <-errc:
+	if ref != c.ref {
+		// TODO Preserve traversable state across calls to setRef()
+		table, err := NewTable(c.cache.BuildsOfRef(ref), c.table.width, c.table.height, c.table.location)
+		if err != nil {
 			return err
 		}
+		c.table, c.ref = &table, ref
 	}
+
+	return nil
 }
 
 func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
@@ -120,8 +95,12 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 	defer cancel()
 	errc := make(chan error)
 	refc := make(chan string)
+	updates := make(chan time.Time)
 
-	// Trigger pipeline monitoring for git reference c.ref
+	c.refresh()
+	c.draw()
+
+	// Start pipeline monitoring
 	go func() {
 		select {
 		case refc <- c.ref:
@@ -129,6 +108,8 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 		}
 	}()
 
+	var tmpRef string
+	var mux = &sync.Mutex{}
 	var refCtx context.Context
 	var refCancel = func() {}
 	var err error
@@ -137,11 +118,25 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 		case ref := <-refc:
 			// Each time a new git reference is received, cancel the last function call
 			// and start a new one.
+			mux.Lock()
+			tmpRef = ref
+			mux.Unlock()
 			refCancel()
 			refCtx, refCancel = context.WithCancel(ctx)
 			go func(ctx context.Context, ref string) {
-				errc <- c.MonitorPipelines(refCtx, repositoryURL, ref)
+				errc <- c.cache.MonitorPipelines(ctx, repositoryURL, ref, updates)
 			}(refCtx, ref)
+
+		case <-updates:
+			// Update the controller once we receive an update, meaning the reference exists at
+			// least locally or remotely
+			mux.Lock()
+			if err := c.setRef(tmpRef); err != nil {
+				return err
+			}
+			mux.Unlock()
+			c.refresh()
+			c.draw()
 
 		case e := <-errc:
 			switch e {
@@ -172,12 +167,12 @@ func (c *Controller) SetHeader(lines []text.StyledString) {
 	c.header.Write(lines...)
 }
 
-func (c *Controller) setStatus(s string) {
+func (c *Controller) writeStatus(s string) {
 	c.status.Write(s)
 }
 
-func (c *Controller) clearStatus() {
-	c.setStatus(c.defaultStatus)
+func (c *Controller) writeDefaultStatus() {
+	c.writeStatus(c.defaultStatus)
 }
 
 func (c *Controller) refresh() {
@@ -203,11 +198,11 @@ func (c Controller) text() []text.LocalizedStyledString {
 	return texts
 }
 
-func (c *Controller) NextMatch() {
+func (c *Controller) nextMatch() {
 	if c.tableSearch != "" {
 		found := c.table.NextMatch(c.tableSearch, true)
 		if !found {
-			c.setStatus(fmt.Sprintf("No match found for %#v", c.tableSearch))
+			c.writeStatus(fmt.Sprintf("No match found for %#v", c.tableSearch))
 		}
 	}
 }
@@ -225,12 +220,75 @@ func (c *Controller) resize(width int, height int) {
 	c.width, c.height = width, height
 }
 
+// Turn `aaa\rbbb\rccc\r\n` into `ccc\r\n`
+// This is mostly for Travis logs that contain metadata hidden by carriage returns
+var deleteUntilCarriageReturn = regexp.MustCompile(`.*\r([^\r\n])`)
+
+// https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
+var deleteANSIEscapeSequence = regexp.MustCompile(`\x1b[@-_][0-?]*[ -/]*[@-~]`)
+
+func (c *Controller) viewLog(ctx context.Context) error {
+	c.writeStatus("Fetching logs...")
+	c.draw()
+	defer func() {
+		c.writeDefaultStatus()
+		c.draw()
+	}()
+
+	log, err := c.table.ActiveRowLog(ctx)
+	if err != nil {
+		if err == cache.ErrNoLogHere {
+			return nil
+		}
+		return err
+	}
+
+	stdin := bytes.Buffer{}
+	log = deleteANSIEscapeSequence.ReplaceAllString(log, "")
+	log = deleteUntilCarriageReturn.ReplaceAllString(log, "$1")
+	stdin.WriteString(log)
+
+	pager := os.Getenv("PAGER")
+	if pager == "" {
+		pager = "less"
+	}
+
+	return c.tui.Exec(ctx, pager, nil, &stdin)
+}
+
+func (c *Controller) viewHelp(ctx context.Context) error {
+	stdin := bytes.Buffer{}
+	stdin.WriteString(c.help)
+
+	return c.tui.Exec(ctx, "man", []string{"-l", "-"}, &stdin)
+}
+
+func (c Controller) openWebBrowser(url string) error {
+	// FIXME Move this out of here
+	browser := os.Getenv("BROWSER")
+	if browser == "" {
+		return errors.New("BROWSER environment variable not set")
+	}
+
+	argv := []string{path.Base(browser), url}
+	process, err := os.StartProcess(browser, argv, &os.ProcAttr{})
+	if err != nil {
+		return err
+	}
+
+	if err := process.Release(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *Controller) draw() {
 	c.tui.Draw(c.text()...)
 }
 
 func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<- string) error {
-	c.clearStatus()
+	c.writeDefaultStatus()
 	switch ev := event.(type) {
 	case *tcell.EventResize:
 		sx, sy := ev.Size()
@@ -259,7 +317,7 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 				switch c.inputDestination {
 				case inputSearch:
 					c.tableSearch = c.status.InputBuffer
-					c.NextMatch()
+					c.nextMatch()
 				case inputRef:
 					if ref := c.status.InputBuffer; ref != "" && ref != c.ref {
 						go func() {
@@ -273,7 +331,7 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 				c.inputDestination = inputNone
 				c.status.ShowInput = false
 			} else {
-				c.NextMatch()
+				c.nextMatch()
 			}
 		case tcell.KeyCtrlU:
 			if c.inputDestination != inputNone {
@@ -293,12 +351,10 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 			}
 			switch keyRune := ev.Rune(); keyRune {
 			case 'b':
-				browser := os.Getenv("BROWSER")
-				if browser == "" {
-					return errors.New("BROWSER environment variable not set")
-				}
-				if err := c.table.OpenInBrowser(browser); err != nil {
-					return err
+				if u := c.table.ActiveRowURL(); u.Valid {
+					if err := c.openWebBrowser(u.String); err != nil {
+						return err
+					}
 				}
 			case 'j':
 				c.table.Scroll(+1)
@@ -328,46 +384,23 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 				c.status.ShowInput = true
 				c.status.InputBuffer = ""
 				c.status.inputPrefix = "ref: "
+			case 'u':
+				// TODO Fix controller.setRef to preserve traversable state
+				go func() {
+					select {
+					case refc <- c.ref:
+					case <-ctx.Done():
+					}
+				}()
 			case '?':
-				file, err := ioutil.TempFile(c.tempDir, "citop_")
-				if err != nil {
-					return err
-				}
-				_, err = file.Write([]byte(c.help))
-				if err != nil {
-					return err
-				}
-
-				cmd := ExecCmd{
-					name: "man",
-					args: []string{"-l", path.Join(c.tempDir, path.Base(file.Name()))},
-				}
-				if err := c.tui.Exec(ctx, cmd); err != nil {
+				if err := c.viewHelp(ctx); err != nil {
 					return err
 				}
 
 			case 'v':
-				c.setStatus("Fetching logs...")
-				c.draw()
-				defer func() {
-					c.clearStatus()
-					c.draw()
-				}()
-
-				logPath, err := c.table.WriteToDisk(ctx, c.tempDir)
-				if err != nil {
-					if err == cache.ErrNoLogHere {
-						return nil
-					}
+				if err := c.viewLog(ctx); err != nil {
 					return err
 				}
-
-				cmd := ExecCmd{
-					name: "less",
-					args: []string{"-R", logPath},
-				}
-
-				return c.tui.Exec(ctx, cmd)
 			}
 		}
 	}

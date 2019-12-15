@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -15,11 +16,6 @@ import (
 	"github.com/nbedos/citop/text"
 )
 
-type ExecCmd struct {
-	name string
-	args []string
-}
-
 var ErrNoProvider = errors.New("list of providers must not be empty")
 
 func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, ref string, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location, help string) (err error) {
@@ -30,12 +26,6 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 	//  idle HTTP channel" from GitLab's HTTP client
 	log.SetOutput(ioutil.Discard)
 	encoding.Register()
-
-	tmpDir, err := ioutil.TempDir("", "citop")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(tmpDir)
 
 	defaultStyle := tcell.StyleDefault
 	styleSheet := text.StyleSheet{
@@ -85,7 +75,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 
 	cacheDB := cache.NewCache(CIProviders, SourceProviders)
 
-	controller, err := NewController(&ui, ref, cacheDB, loc, tmpDir, defaultStatus, help)
+	controller, err := NewController(&ui, ref, cacheDB, loc, defaultStatus, help)
 	if err != nil {
 		return err
 	}
@@ -140,6 +130,10 @@ func (t TUI) Events() <-chan tcell.Event {
 	return t.eventc
 }
 
+func (t TUI) Size() (int, int) {
+	return t.screen.Size()
+}
+
 func (t TUI) poll() {
 	// Exits when t.Finish() is called
 	for {
@@ -157,7 +151,7 @@ func (t TUI) Draw(texts ...text.LocalizedStyledString) {
 	t.screen.Show()
 }
 
-func (t *TUI) Exec(ctx context.Context, e ExecCmd) error {
+func (t *TUI) Exec(ctx context.Context, name string, args []string, stdin io.Reader) error {
 	var err error
 	t.Finish()
 	defer func() {
@@ -166,8 +160,8 @@ func (t *TUI) Exec(ctx context.Context, e ExecCmd) error {
 		}
 	}()
 
-	cmd := exec.CommandContext(ctx, e.name, e.args...)
-	cmd.Stdin = os.Stdin
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Stdin = stdin
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 

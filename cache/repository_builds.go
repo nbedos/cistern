@@ -4,12 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"path"
-	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -17,17 +13,21 @@ import (
 	"github.com/nbedos/citop/utils"
 )
 
-type buildRowKey struct {
-	ref       string
-	sha       string
-	accountID string
-	buildID   string
-	stageID   int
-	jobID     string
+const maxStepIDs = 10
+
+// We need an array instead of a slice so that this type (and thus taskKey) is hashable
+type StepPath [maxStepIDs]utils.NullString
+
+type taskKey struct {
+	providerID   string
+	providerHost string
+	stepIDs      StepPath
 }
 
-type buildRow struct {
-	key         buildRowKey
+type task struct {
+	key         taskKey
+	ref         GitReference
+	number      string
 	type_       string
 	state       State
 	name        string
@@ -38,29 +38,29 @@ type buildRow struct {
 	finishedAt  utils.NullTime
 	updatedAt   utils.NullTime
 	duration    utils.NullDuration
-	children    []*buildRow
+	children    []*task
 	traversable bool
-	url         string
+	url         utils.NullString
 }
 
-func (b buildRow) Diff(other buildRow) string {
-	options := cmp.AllowUnexported(buildRowKey{}, buildRow{})
-	return cmp.Diff(b, other, options)
+func (t task) Diff(other task) string {
+	options := cmp.AllowUnexported(taskKey{}, task{})
+	return cmp.Diff(t, other, options)
 }
 
-func (b buildRow) Traversable() bool {
-	return b.traversable
+func (t task) Traversable() bool {
+	return t.traversable
 }
 
-func (b buildRow) Children() []utils.TreeNode {
-	children := make([]utils.TreeNode, len(b.children))
-	for i := range b.children {
-		children[i] = b.children[i]
+func (t task) Children() []utils.TreeNode {
+	children := make([]utils.TreeNode, len(t.children))
+	for i := range t.children {
+		children[i] = t.children[i]
 	}
 	return children
 }
 
-func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
+func (t task) Tabular(loc *time.Location) map[string]text.StyledString {
 	const nullPlaceholder = "-"
 
 	nullTimeToString := func(t utils.NullTime) text.StyledString {
@@ -71,8 +71,8 @@ func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
 		return text.NewStyledString(s)
 	}
 
-	state := text.NewStyledString(string(b.state))
-	switch b.state {
+	state := text.NewStyledString(string(t.state))
+	switch t.state {
 	case Failed, Canceled:
 		state.Add(text.StatusFailed)
 	case Passed:
@@ -83,180 +83,133 @@ func (b buildRow) Tabular(loc *time.Location) map[string]text.StyledString {
 		state.Add(text.StatusSkipped)
 	}
 
-	name := text.NewStyledString(b.prefix)
-	if b.type_ == "P" {
-		name.Append(b.provider, text.Provider)
+	name := text.NewStyledString(t.prefix)
+	if t.type_ == "P" {
+		name.Append(t.provider, text.Provider)
+		if t.name != "" {
+			name.Append(fmt.Sprintf(": %s", t.name))
+		}
 	} else {
-		name.Append(b.name)
-	}
-
-	pipeline := b.key.buildID
-	if _, err := strconv.Atoi(b.key.buildID); err == nil {
-		pipeline = "#" + pipeline
+		name.Append(t.name)
 	}
 
 	refClass := text.GitBranch
-	if strings.HasPrefix(b.key.ref, "tag:") {
+	if t.ref.IsTag {
 		refClass = text.GitTag
 	}
 
 	return map[string]text.StyledString{
-		"REF":      text.NewStyledString(b.key.ref, refClass),
-		"PIPELINE": text.NewStyledString(pipeline),
-		"TYPE":     text.NewStyledString(b.type_),
+		"REF":      text.NewStyledString(t.ref.Ref, refClass),
+		"PIPELINE": text.NewStyledString(t.number),
+		"TYPE":     text.NewStyledString(t.type_),
 		"STATE":    state,
 		"NAME":     name,
-		"CREATED":  nullTimeToString(b.createdAt),
-		"STARTED":  nullTimeToString(b.startedAt),
-		"FINISHED": nullTimeToString(b.finishedAt),
-		"UPDATED":  nullTimeToString(b.updatedAt),
-		"DURATION": text.NewStyledString(b.duration.String()),
+		"CREATED":  nullTimeToString(t.createdAt),
+		"STARTED":  nullTimeToString(t.startedAt),
+		"FINISHED": nullTimeToString(t.finishedAt),
+		"UPDATED":  nullTimeToString(t.updatedAt),
+		"DURATION": text.NewStyledString(t.duration.String()),
 	}
 }
 
-func (b buildRow) Key() interface{} {
-	return b.key
+func (t task) Key() interface{} {
+	return t.key
 }
 
-func (b buildRow) URL() string {
-	return b.url
+func (t task) URL() utils.NullString {
+	return t.url
 }
 
-func (b *buildRow) SetTraversable(traversable bool, recursive bool) {
-	b.traversable = traversable
+func (t *task) SetTraversable(traversable bool, recursive bool) {
+	t.traversable = traversable
 	if recursive {
-		for _, child := range b.children {
+		for _, child := range t.children {
 			child.SetTraversable(traversable, recursive)
 		}
 	}
 }
 
-func (b *buildRow) SetPrefix(s string) {
-	b.prefix = s
+func (t *task) SetPrefix(s string) {
+	t.prefix = s
 }
 
-func ref(ref string, tag bool) string {
-	if tag {
-		return fmt.Sprintf("tag: %s", ref)
+func taskFromPipeline(p Pipeline, providerByID map[string]CIProvider) task {
+	key := taskKey{
+		providerID:   p.providerID,
+		providerHost: p.providerHost,
+		stepIDs:      [maxStepIDs]utils.NullString{},
 	}
-	return ref
+
+	providerName := "unknown"
+	if provider, exists := providerByID[p.providerID]; exists {
+		providerName = provider.Name()
+	}
+
+	number := p.Number
+	if number == "" {
+		number = p.ID
+	}
+	if _, err := strconv.Atoi(number); err == nil {
+		number = "#" + number
+	}
+
+	return taskFromStep(p.Step, p.GitReference, key, providerName, number)
 }
 
-func buildRowFromBuild(b Build) buildRow {
-	ref := ref(b.Ref, b.IsTag)
-	row := buildRow{
-		key: buildRowKey{
-			ref:       ref,
-			sha:       b.Sha,
-			accountID: b.Repository.Provider.ID,
-			buildID:   b.ID,
-		},
-		type_:      "P",
-		state:      b.State,
-		createdAt:  b.CreatedAt,
-		startedAt:  b.StartedAt,
-		finishedAt: b.FinishedAt,
-		updatedAt:  utils.NullTime{Time: b.UpdatedAt, Valid: true},
-		url:        b.WebURL,
-		duration:   b.Duration,
-		provider:   b.Repository.Provider.Name,
-	}
-
-	// Prefix only numeric IDs with hash
-	if _, err := strconv.Atoi(b.ID); err == nil {
-		row.name = fmt.Sprintf("#%s", b.ID)
-	} else {
-		row.name = b.ID
-	}
-
-	for _, job := range b.Jobs {
-		child := buildRowFromJob(b.Repository.Provider, b.Sha, ref, b.ID, 0, *job)
-		row.children = append(row.children, &child)
-	}
-
-	if b.Stages != nil {
-		stageIDs := make([]int, 0, len(b.Stages))
-		for stageID := range b.Stages {
-			stageIDs = append(stageIDs, stageID)
-		}
-		sort.Ints(stageIDs)
-		for _, stageID := range stageIDs {
-			child := buildRowFromStage(b.Repository.Provider, b.Sha, ref, b.ID, b.WebURL, *b.Stages[stageID])
-			row.children = append(row.children, &child)
+func taskFromStep(s Step, ref GitReference, key taskKey, provider string, number string) task {
+	keySet := false
+	for i, ID := range key.stepIDs {
+		if !ID.Valid {
+			key.stepIDs[i] = utils.NullString{
+				String: s.ID,
+				Valid:  true,
+			}
+			keySet = true
+			break
 		}
 	}
+	// TODO Get rid off this after changing task.Key() so that it returns a hashable value
+	//  while still allowing taskKey.StepIDs to be a slice (non hashable) instead of an array
+	//  (hashable, but requires special handling to avoid overflow)
+	if !keySet {
+		panic("exceeded maximum nesting depth for type task")
+	}
 
-	return row
-}
-
-func buildRowFromStage(provider Provider, sha string, ref string, buildID string, webURL string, s Stage) buildRow {
-	row := buildRow{
-		key: buildRowKey{
-			ref:       ref,
-			sha:       sha,
-			accountID: provider.ID,
-			buildID:   buildID,
-			stageID:   s.ID,
+	t := task{
+		key:        key,
+		ref:        ref,
+		number:     number,
+		state:      s.State,
+		name:       s.Name,
+		provider:   provider,
+		createdAt:  s.CreatedAt,
+		startedAt:  s.StartedAt,
+		finishedAt: s.FinishedAt,
+		updatedAt: utils.NullTime{
+			Time:  s.UpdatedAt,
+			Valid: true,
 		},
-		type_:    "S",
-		state:    s.State,
-		name:     s.Name,
-		url:      webURL,
-		provider: provider.Name,
+		duration: s.Duration,
+		url:      s.WebURL,
 	}
 
-	// We aggregate jobs by name and only keep the most recent to weed out previous runs of the job.
-	// This is mainly for GitLab which keeps jobs after they are restarted.
-	jobByName := make(map[string]*Job, len(s.Jobs))
-	for _, job := range s.Jobs {
-		namedJob, exists := jobByName[job.Name]
-		if !exists || job.CreatedAt.Valid && job.CreatedAt.Time.After(namedJob.CreatedAt.Time) {
-			jobByName[job.Name] = job
-		}
+	switch s.Type {
+	case StepPipeline:
+		t.type_ = "P"
+	case StepStage:
+		t.type_ = "S"
+	case StepJob:
+		t.type_ = "J"
+	case StepTask:
+		t.type_ = "T"
 	}
 
-	for _, job := range jobByName {
-		row.createdAt = utils.MinNullTime(row.createdAt, job.CreatedAt)
-		row.startedAt = utils.MinNullTime(row.startedAt, job.StartedAt)
-		row.finishedAt = utils.MaxNullTime(row.finishedAt, job.FinishedAt)
-		row.updatedAt = utils.MaxNullTime(row.updatedAt, job.FinishedAt, job.StartedAt, job.CreatedAt)
+	for _, childStep := range s.Children {
+		childTask := taskFromStep(childStep, ref, t.key, provider, number)
+		t.children = append(t.children, &childTask)
 	}
 
-	row.duration = utils.NullSub(row.finishedAt, row.startedAt)
-
-	for _, job := range s.Jobs {
-		child := buildRowFromJob(provider, sha, ref, buildID, s.ID, *job)
-		row.children = append(row.children, &child)
-	}
-
-	return row
-}
-
-func buildRowFromJob(provider Provider, sha string, ref string, buildID string, stageID int, j Job) buildRow {
-	name := j.Name
-	if name == "" {
-		name = j.ID
-	}
-	return buildRow{
-		key: buildRowKey{
-			ref:       ref,
-			sha:       sha,
-			accountID: provider.ID,
-			buildID:   buildID,
-			stageID:   stageID,
-			jobID:     j.ID,
-		},
-		type_:      "J",
-		state:      j.State,
-		name:       name,
-		createdAt:  j.CreatedAt,
-		startedAt:  j.StartedAt,
-		finishedAt: j.FinishedAt,
-		updatedAt:  utils.MaxNullTime(j.FinishedAt, j.StartedAt, j.CreatedAt),
-		url:        j.WebURL,
-		duration:   j.Duration,
-		provider:   provider.Name,
-	}
+	return t
 }
 
 type BuildsByCommit struct {
@@ -272,7 +225,7 @@ func (c Cache) BuildsOfRef(ref string) HierarchicalTabularDataSource {
 }
 
 func (s BuildsByCommit) Headers() []string {
-	return []string{"REF", "PIPELINE", "TYPE", "STATE", "CREATED", "DURATION", "NAME"}
+	return []string{"REF", "PIPELINE", "TYPE", "STATE", "STARTED", "DURATION", "NAME"}
 }
 
 func (s BuildsByCommit) Alignment() map[string]text.Alignment {
@@ -291,13 +244,13 @@ func (s BuildsByCommit) Alignment() map[string]text.Alignment {
 
 func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 	rows := make([]HierarchicalTabularSourceRow, 0)
-	for _, build := range s.cache.BuildsByRef(s.ref) {
-		row := buildRowFromBuild(build)
-		rows = append(rows, &row)
+	for _, p := range s.cache.PipelinesByRef(s.ref) {
+		t := taskFromPipeline(p, s.cache.ciProvidersById)
+		rows = append(rows, &t)
 	}
 
 	sort.Slice(rows, func(i, j int) bool {
-		ri, rj := rows[i].(*buildRow), rows[j].(*buildRow)
+		ri, rj := rows[i].(*task), rows[j].(*task)
 		ti := utils.MinNullTime(
 			ri.createdAt,
 			ri.startedAt,
@@ -318,31 +271,11 @@ func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 
 var ErrNoLogHere = errors.New("no log is associated to this row")
 
-func (s BuildsByCommit) WriteToDisk(ctx context.Context, key interface{}, dir string) (string, error) {
-	// TODO Allow filtering for errored jobs
-	buildKey, ok := key.(buildRowKey)
+func (s BuildsByCommit) Log(ctx context.Context, key interface{}) (string, error) {
+	stepKey, ok := key.(taskKey)
 	if !ok {
-		return "", fmt.Errorf("key conversion to buildRowKey failed: '%v'", key)
+		return "", fmt.Errorf("key conversion to taskKey failed: '%v'", key)
 	}
 
-	if buildKey.jobID == "" {
-		return "", ErrNoLogHere
-	}
-
-	accountID := buildKey.accountID
-	buildID := buildKey.buildID
-	stageID := buildKey.stageID
-	jobID := buildKey.jobID
-
-	pattern := fmt.Sprintf("job_%s_*.log", jobID)
-	file, err := ioutil.TempFile(dir, pattern)
-	w := utils.NewANSIStripper(file)
-	defer w.Close()
-	if err != nil {
-		return "", err
-	}
-	logPath := path.Join(dir, filepath.Base(file.Name()))
-
-	err = s.cache.WriteLog(ctx, accountID, buildID, stageID, jobID, w)
-	return logPath, err
+	return s.cache.Log(ctx, stepKey)
 }

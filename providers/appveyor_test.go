@@ -37,8 +37,9 @@ func TestAppVeyorJob_ToCacheJob(t *testing.T) {
 		FinishedAt:   "2019-11-23T12:24:34.5646724+00:00",
 	}
 
-	expectedJob := cache.Job{
+	expectedJob := cache.Step{
 		ID:    "id",
+		Type:  cache.StepJob,
 		State: "passed",
 		Name:  "name",
 		CreatedAt: utils.NullTime{
@@ -58,30 +59,23 @@ func TestAppVeyorJob_ToCacheJob(t *testing.T) {
 			Duration: 2750098900 * time.Nanosecond,
 		},
 		AllowFailure: true,
-		WebURL:       "buildURL/job/id",
+		WebURL: utils.NullString{
+			String: "buildURL/job/id",
+			Valid:  true,
+		},
 	}
 
-	job, err := j.toCacheJob(expectedJob.ID, "buildURL")
+	job, err := j.toCacheStep(expectedJob.ID, "buildURL")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff(expectedJob, job); len(diff) > 0 {
+	if diff := expectedJob.Diff(job); len(diff) > 0 {
 		t.Fatal(diff)
 	}
 }
 
 func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
-	repo := cache.Repository{
-		Provider: cache.Provider{
-			ID:   "id",
-			Name: "name",
-		},
-		ID:    42,
-		URL:   "github.com/owner/repo",
-		Owner: "owner",
-		Name:  "repo",
-	}
 	b := appVeyorBuild{
 		ID:          42,
 		Jobs:        nil,
@@ -100,42 +94,46 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 		UpdatedAt:   "2019-11-23T12:24:34.5646724+00:00",
 	}
 
-	expectedBuild := cache.Build{
-		Repository:      &repo,
-		ID:              "42",
-		Sha:             "fd4c4ae5a4005e38c66566e2480087072620e9de",
-		Ref:             "feature/appveyor",
-		IsTag:           false,
-		RepoBuildNumber: "42",
-		State:           "failed",
-		CreatedAt: utils.NullTime{
-			Valid: true,
-			Time:  time.Date(2019, 11, 23, 12, 24, 25, 590025800, time.UTC),
+	expectedBuild := cache.Pipeline{
+		Number: "42",
+		GitReference: cache.GitReference{
+			SHA:   "fd4c4ae5a4005e38c66566e2480087072620e9de",
+			Ref:   "feature/appveyor",
+			IsTag: false,
 		},
-		StartedAt: utils.NullTime{
-			Valid: true,
-			Time:  time.Date(2019, 11, 23, 12, 24, 31, 814573500, time.UTC),
+		Step: cache.Step{
+			ID:    "42",
+			State: "failed",
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 23, 12, 24, 25, 590025800, time.UTC),
+			},
+			StartedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 23, 12, 24, 31, 814573500, time.UTC),
+			},
+			FinishedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 23, 12, 24, 34, 564672400, time.UTC),
+			},
+			UpdatedAt: time.Date(2019, 11, 23, 12, 24, 34, 564672400, time.UTC),
+			Duration: utils.NullDuration{
+				Valid:    true,
+				Duration: 2750098900 * time.Nanosecond,
+			},
+			WebURL: utils.NullString{
+				String: "https://ci.appveyor.com/project/owner/repo/builds/42",
+				Valid:  true,
+			},
 		},
-		FinishedAt: utils.NullTime{
-			Valid: true,
-			Time:  time.Date(2019, 11, 23, 12, 24, 34, 564672400, time.UTC),
-		},
-		UpdatedAt: time.Date(2019, 11, 23, 12, 24, 34, 564672400, time.UTC),
-		Duration: utils.NullDuration{
-			Valid:    true,
-			Duration: 2750098900 * time.Nanosecond,
-		},
-		WebURL: "https://ci.appveyor.com/project/owner/repo/builds/42",
-		Stages: make(map[int]*cache.Stage),
-		Jobs:   make([]*cache.Job, 0),
 	}
 
-	build, err := b.toCacheBuild("account", &repo)
+	build, err := b.toCachePipeline("owner", "repo")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff(build, expectedBuild); len(diff) > 0 {
+	if diff := expectedBuild.Diff(build); len(diff) > 0 {
 		t.Fatal(diff)
 	}
 }
@@ -224,7 +222,11 @@ func TestCircleCIClient_Log(t *testing.T) {
 		},
 	}
 
-	log, err := client.Log(context.Background(), cache.Repository{}, "jobId")
+	job := cache.Step{
+		ID:   "jobId",
+		Type: cache.StepJob,
+	}
+	log, err := client.Log(context.Background(), job)
 	if err != nil {
 		t.Fatal(err)
 	}

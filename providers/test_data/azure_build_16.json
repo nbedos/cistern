@@ -114,11 +114,7 @@
             "orchestrationPlan": {
                 "planId": "8181923c-4508-4427-8ae3-1002b791fd01"
             },
-            "logs": {
-                "id": 0,
-                "type": "Container",
-                "url": "https://example.com/owner/repo/_apis/build/builds/16/logs"
-            },
+            "logs": null,
             "repository": {
                 "id": "owner/repo",
                 "type": "GitHub",

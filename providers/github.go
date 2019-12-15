@@ -109,10 +109,14 @@ func (c GitHubClient) Commit(ctx context.Context, repo string, ref string) (cach
 	return commit, nil
 }
 
-func (c GitHubClient) RefStatuses(ctx context.Context, u string, ref string) ([]string, error) {
+func (c GitHubClient) RefStatuses(ctx context.Context, u string, ref string, sha string) ([]string, error) {
 	owner, repo, err := c.parseRepositoryURL(u)
 	if err != nil {
 		return nil, err
+	}
+
+	if sha != "" {
+		ref = sha
 	}
 
 	owner = url.PathEscape(owner)
