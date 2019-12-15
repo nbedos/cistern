@@ -1,4 +1,4 @@
-.PHONY: usage all tests
+.PHONY: usage clean image tests releases citop
 .SILENT:
 
 export GO111MODULE=on
@@ -8,7 +8,7 @@ export CGO_ENABLED=0
 # Directory used to store the result of the build process
 BUILD=build
 # Name of the executable
-EXECUTABLE=citop
+EXEC=citop
 # Name of the go project
 PACKAGE=citop
 PACKAGE_PATH=github.com/nbedos/citop
@@ -17,20 +17,42 @@ VERSION=$(shell git describe --tags --long --dirty)
 
 usage:
 	echo "Usage:"
-	echo "    make all         # Build executable and manual pages (requires pandoc)"
+	echo "    make citop       # Build executable and manual pages (requires pandoc)"
 	echo "    make clean       # Remove build directory"
 	echo "    make image       # Build Docker image"
 	echo "    make man.go      # Build manual page in go format (requires pandoc)"
+	echo "    make releases    # Build release archives"
 	echo "    make tests       # Run unit tests"
 
-all: man.go $(BUILD) $(BUILD)/LICENSE
-	MD="$$(sed '1s/\\<version\\>/$(VERSION)/' man.md)" && \
-	echo "Building $(BUILD)/man.html..." && \
-	echo "$$MD" | pandoc -s -t html5 --template pandoc_template.html > $(BUILD)/man.html && \
-	echo "Building $(BUILD)/$(EXECUTABLE).man.1..." && \
-	echo "$$MD" | pandoc -s -t man >  $(BUILD)/$(EXECUTABLE).man.1
-	echo "Building $(BUILD)/$(EXECUTABLE)... (version $(VERSION))"
-	go build -ldflags "-X main.Version=$(VERSION)" -o "$(BUILD)/$(EXECUTABLE)"
+citop: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.html $(BUILD)/$(EXEC).man.1
+	BUILD_VERSION="$(VERSION) $$(go env GOOS)/$$(go env GOARCH)" && \
+	echo "Building $(BUILD)/$(EXEC)... (version $$BUILD_VERSION)" && \
+	go build -trimpath -ldflags "-X \"main.Version=$$BUILD_VERSION\"" -o "$(BUILD)/$(EXEC)"
+
+$(BUILD)/$(EXEC).man.html : man.md $(BUILD) pandoc_template.html
+	echo "Building $@..." && \
+	sed '1s/\\<version\\>/$(VERSION)/' man.md | \
+	pandoc -s -t html5 --template pandoc_template.html > $@
+
+$(BUILD)/$(EXEC).man.1 : man.md $(BUILD)
+	echo "Building $@..." && \
+	sed '1s/\\<version\\>/$(VERSION)/' man.md | \
+	pandoc -s -t man >  $@
+
+releases: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.1 $(BUILD)/$(EXEC).man.html
+	for GOARCH in amd64; \
+	do \
+	    for GOOS in linux freebsd openbsd netbsd osx; \
+	    do \
+		DIR="$(PACKAGE)-$(VERSION)-$$GOOS-$$GOARCH" && \
+		ARCHIVE="$(BUILD)/$$DIR.tar.gz" && \
+		echo "Building $$ARCHIVE..." && \
+		mkdir -p "$(BUILD)/$$DIR" && \
+		go build -trimpath -ldflags "-X \"main.Version=$(VERSION) $$GOOS/$$GOARCH\"" -o "$(BUILD)/$(EXEC)" && \
+		cp "$(BUILD)/$(EXEC)" "$(BUILD)/LICENSE" "$(BUILD)/$(EXEC).man.html" "$(BUILD)/$(EXEC).man.1" "$(BUILD)/$$DIR/" && \
+		tar -C "$(BUILD)" -czf "$$ARCHIVE" "$$DIR" ; \
+	    done ; \
+	done
 
 $(BUILD):
 	mkdir -p $(BUILD)
@@ -76,4 +98,4 @@ tests:
 	go test -v ./...
 
 image:
-	docker build -t citop:latest .
+	docker build -t $(EXEC):latest .
