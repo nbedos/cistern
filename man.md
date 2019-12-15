@@ -369,6 +369,10 @@ Specify both repository and commit
 citop -r github.com/nbedos/citop 64be3c6
 ```
 
+# BUGS
+Questions, bug reports and feature requests are welcome and should be submitted
+on [GitHub](https://github.com/nbedos/citop/issues).
+
 # NOTES
 1. **citop repository**
     * [https://github.com/nbedos/citop](https://github.com/nbedos/citop)

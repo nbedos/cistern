@@ -629,6 +629,10 @@ Specify both repository and commit
 citop -r github.com/nbedos/citop 64be3c6
 \f[R]
 .fi
+.SH BUGS
+.PP
+Questions, bug reports and feature requests are welcome and should be
+submitted on GitHub (https://github.com/nbedos/citop/issues).
 .SH NOTES
 .IP "1." 3
 \f[B]citop repository\f[R]

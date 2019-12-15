@@ -133,7 +133,7 @@ More information is available in the [manual page](https://nbedos.github.io/cito
 
 
 ## Support
-Question, bug reports and feature requests are welcome and should be submitted [here](https://github.com/nbedos/citop/issues).
+Questions, bug reports and feature requests are welcome and should be submitted [here](https://github.com/nbedos/citop/issues).
 
 ## Contributing
 Pull requests are welcome. If you foresee that a PR will take any significant amount of your time,
