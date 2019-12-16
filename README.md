@@ -42,6 +42,10 @@ make citop
 ./build/citop
 ```
 
+In addition to the executable this will also build two versions of the manual page:
+* `./build/citop.man.1` (roff format)
+* `./build/citop.man.html`
+
 ## Building manually from source
 This method requires only golang >= 1.12 and a UNIX system.
 ```shell
@@ -69,7 +73,7 @@ docker run -it "$CITOP_DOCKER_IMAGE"
 citop requires access to various APIs. The corresponding credentials should be stored in a
 configuration file as described in the [manual page](https://nbedos.github.io/citop/citop.man).
 
-If the configuration file is missing, citop will still work but with the following limitations:
+If the configuration file is missing, citop will run with the following limitations:
 * citop will likely reach the rate limit of the GitHub API for unauthenticated clients in a few minutes
 * citop will not be able to access pipeline jobs on GitLab without an API access token
     

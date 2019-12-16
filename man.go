@@ -302,6 +302,11 @@ This example describes and uses all existing configuration options.
 # citop requires credentials for at least one source provider and
 # one CI provider to run. Feel free to remove sections below 
 # as long as this rule is met.
+#
+# Note that for all providers, not setting an API token or 
+# setting \[ga]token = \[dq]\[dq]\[ga] will cause the provider to make
+# unauthenticated API requests. 
+#
 
 ### GITHUB ###
 [[providers.github]]
