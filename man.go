@@ -277,11 +277,14 @@ The configuration file is made of keys grouped together in tables.
 The specification of each table is given below.
 .SS Example
 .PP
-This file describes and uses all existing configuration options.
+This example describes and uses all existing configuration options.
 .IP
 .nf
 \f[C]
 #### CITOP CONFIGURATION FILE ####
+# This file is a complete, valid configuration file for citop
+# and should be located at $XDG_CONFIG_HOME/citop/citop.toml
+# 
 
 ## PROVIDERS ##
 [providers]
@@ -316,19 +319,22 @@ token = \[dq]\[dq]
 
 
 ### GITLAB ###
-# Uncomment the lines below and replace the API token to define a
-# GitLab account. Note that the API token is mandatory.
-# [[providers.gitlab]]
-# # Name shown by citop for this provider
-# # (optional, string, default: \[dq]gitlab\[dq])
-# name = \[dq]gitlab\[dq]
-# 
-# # GitLab API token. A valid token is required even for
-# # accessing public repositories since GitLab prevents access
-# # to pipeline jobs for unauthenticated users.
-# # GitLab token management:
-# #     https://gitlab.com/profile/personal_access_tokens
-# token = \[dq]gitlab_api_token\[dq]
+[[providers.gitlab]]
+# Name shown by citop for this provider
+# (optional, string, default: \[dq]gitlab\[dq])
+name = \[dq]gitlab\[dq]
+
+# GitLab API token (optional, string)
+#
+# Note: GitLab prevents access to pipeline jobs for 
+# unauthenticated users meaning if you wish to use citop
+# to view GitLab pipelines you will have to provide
+# appropriate credentials. This is true even for pipelines
+# of public repositories.
+#
+# GitLab token management:
+#     https://gitlab.com/profile/personal_access_tokens
+token = \[dq]\[dq]
 
 
 ### TRAVIS CI ###

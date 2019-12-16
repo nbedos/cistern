@@ -67,7 +67,7 @@ docker run -it "$CITOP_DOCKER_IMAGE"
 
 # Configuration
 citop requires access to various APIs. The corresponding credentials should be stored in a
-configuration file as described in the [manual page](https://nbedos.github.io/citop/man.html).
+configuration file as described in the [manual page](https://nbedos.github.io/citop/citop.man.html).
 
 If the configuration file is missing, citop will still work but with the following limitations:
     * citop will likely reach the rate limit of the GitHub API for unauthenticated clients in a few minutes
@@ -126,7 +126,7 @@ citop -r github.com/nbedos/citop
 citop -r github.com/nbedos/citop master
 ```
 
-More information is available in the [manual page](https://nbedos.github.io/citop/man.html).
+More information is available in the [manual page](https://nbedos.github.io/citop/citop.man.html).
 
 
 ## Support

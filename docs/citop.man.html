@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Nicolas Bedos" />
+  <title>CITOP(1) | version 0.0.0-124-g1765323-dirty</title>
+  <style>
+      code{white-space: pre-wrap;}
+      span.smallcaps{font-variant: small-caps;}
+      span.underline{text-decoration: underline;}
+      div.column{display: inline-block; vertical-align: top; width: 50%;}
+  </style>
+  <style type="text/css">/*<![CDATA[*/html,body{margin:auto;padding-right:1em;padding-left:1em;max-width:44em;color:#000}body{font:14px helvetica,arial,freesans,clean,sans-serif;line-height:1.4;padding:3px;background:#fff;border-radius:3px}p{margin:1em 0}a{color:#4183c4;text-decoration:none}body{background-color:#fff;padding:30px;margin:15px;font-size:14px;line-height:1.6}body > :first-child{margin-top:0}body > :last-child{margin-bottom:0}body{box-shadow:0 0 0 1px #cacaca,0 0 0 4px #eee}h1,h2,h3,h4,h5,h6{margin:20px 0 10px;padding:0;font-weight:700;cursor:text}header > h1{font-size:24px;color:#000}h1{font-size:20px;color:#000}h2{font-size:16px;border-bottom:1px solid #ccc;color:#000}h2 code{font-size:16px}p,blockquote,table,pre{margin:15px 0}ul{padding-left:30px}ol{padding-left:30px}ol li ul:first-of-type{margin-top:0}body > h2:first-child{margin-top:0;padding-top:0}body > h1:first-child{margin-top:0;padding-top:0}body > h1:first-child + h2{margin-top:0;padding-top:0}body > h3:first-child,body > h4:first-child,body > h5:first-child,body > h6:first-child{margin-top:0;padding-top:0}a:first-child h1,a:first-child h2,a:first-child h3,a:first-child h4,a:first-child h5,a:first-child h6{margin-top:0;padding-top:0}h1 + p,h2 + p,h3 + p,h4 + p,h5 + p,h6 + p,ul li > :first-child,ol li > :first-child{margin-top:0}dl{padding:0}dl dt{font-size:14px;font-weight:700;font-style:italic;padding:0;margin:15px 0 5px}dl dt:first-child{padding:0}dl dt > :first-child{margin-top:0}dl dt > :last-child{margin-bottom:0}dl dd{margin:0 0 15px;padding:0 15px}dl dd > :first-child{margin-top:0}dl dd > :last-child{margin-bottom:0}blockquote{border-left:4px solid #DDD;padding:0 15px;color:#777}blockquote > :first-child{margin-top:0}blockquote > :last-child{margin-bottom:0}table{border-collapse:collapse;border-spacing:0;font:inherit}table th{font-weight:700;border:1px solid #ccc;padding:6px 13px}table td{border:1px solid #ccc;padding:6px 13px}table tr{border-top:1px solid #ccc;background-color:#fff}table tr:nth-child(2n){background-color:#f8f8f8}img{max-width:100%}code,tt{margin:0 2px;padding:0 5px;white-space:nowrap;border:1px solid #eaeaea;background-color:#f8f8f8;border-radius:3px;font-family:Consolas,'Liberation Mono',Courier,monospace;font-size:12px;color:#333}pre > code{margin:0;padding:0;white-space:pre;border:0;background:transparent}pre{background-color:#f8f8f8;border:1px solid #ccc;font-size:13px;line-height:19px;overflow:auto;padding:6px 10px;border-radius:3px}pre code,pre tt{background-color:transparent;border:0}sup,sub,a.footnote{font-size:1.4ex;height:0;line-height:1;vertical-align:super;position:relative}sub{vertical-align:sub;top:-1px}/*]]>*/</style>
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">CITOP(1) | version 0.0.0-124-g1765323-dirty</h1>
+<p class="author">Nicolas Bedos</p>
+</header>
+<h1 id="name">NAME</h1>
+<p><strong>citop</strong> – Continuous Integration Table Of Pipelines</p>
+<h1 id="synopsis">SYNOPSIS</h1>
+<p><code>citop [-r REPOSITORY | --repository REPOSITORY] [COMMIT]</code></p>
+<p><code>citop -h | --help</code></p>
+<p><code>citop --version</code></p>
+<h1 id="description">DESCRIPTION</h1>
+<p>citop monitors the CI pipelines associated to a specific commit of a git repository.</p>
+<p>citop currently integrates with the following online services. Each of the service is one or both of the following:</p>
+<ul>
+<li>A “source provider” that is used to list the pipelines associated to a given commit of an online repository</li>
+<li>A “CI provider” that is used to get detailed information about CI builds</li>
+</ul>
+<table style="width:83%;">
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 12%" />
+<col style="width: 11%" />
+<col style="width: 38%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Service</th>
+<th style="text-align: left;">Source</th>
+<th style="text-align: left;">CI</th>
+<th style="text-align: left;">URL</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">GitHub</td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;"><a href="https://github.com/">https://github.com/</a></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">GitLab</td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;"><a href="https://gitlab.com/">https://gitlab.com/</a></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">AppVeyor</td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;"><a href="https://www.appveyor.com/">https://www.appveyor.com/</a></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">CircleCI</td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;"><a href="https://circleci.com/">https://circleci.com/</a></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Travis CI</td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;"><a href="https://travis-ci.org/">https://travis-ci.org/</a> <a href="https://travis-ci.com/">https://travis-ci.com/</a></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Azure Devops</td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;"><a href="https://dev.azure.com">https://dev.azure.com</a></td>
+</tr>
+</tbody>
+</table>
+<h1 id="positional-arguments">POSITIONAL ARGUMENTS</h1>
+<h2 id="commit"><code>COMMIT</code></h2>
+<p>Specify the commit to monitor. COMMIT is expected to be the SHA identifier of a commit, or the name of a tag or a branch. If this option is missing citop will monitor the commit referenced by HEAD.</p>
+<p>Example:</p>
+<pre class="shell"><code># Show pipelines for commit 64be3c6
+citop 64be3c6
+# Show pipelines for the commit referenced by the tag &#39;0.9.0&#39;
+citop 0.9.0
+# Show pipelines for the commit at the tip of a branch
+citop feature/doc</code></pre>
+<h1 id="options">OPTIONS</h1>
+<h2 id="rrepository---repositoryrepository"><code>-r=REPOSITORY, --repository=REPOSITORY</code></h2>
+<p>Specify the git repository to work with. REPOSITORY can be either a path to a local git repository, or the URL of an online repository hosted at GitHub or GitLab. Both web URLs and git URLs are accepted.</p>
+<p>In the absence of this option, citop will work with the git repository located in the current directory. If there is no such repository, citop will fail.</p>
+<p>Examples:</p>
+<pre class="shell"><code># Work with the git repository in the current directory
+citop
+# Work with the repository specified by a web URL
+citop -r https://gitlab.com/nbedos/citop
+citop -r github.com/nbedos/citop
+# Git URLs are accepted
+citop -r git@github.com:nbedos/citop.git
+# Paths to a local repository are accepted too
+citop -r /home/user/repos/myrepo</code></pre>
+<h2 id="h---help"><code>-h, --help</code></h2>
+<p>Show usage of citop</p>
+<h2 id="version"><code>--version</code></h2>
+<p>Print the version of citop being run</p>
+<h1 id="interactive-commands">INTERACTIVE COMMANDS</h1>
+<p>Below are the default commands for interacting with citop.</p>
+<table style="width:82%;">
+<colgroup>
+<col style="width: 15%" />
+<col style="width: 66%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Key</th>
+<th style="text-align: left;">Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Up, j</td>
+<td style="text-align: left;">Move cursor up by one line</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Down, k</td>
+<td style="text-align: left;">Move cursor down by one line</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Page Up</td>
+<td style="text-align: left;">Move cursor up by one screen</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Page Down</td>
+<td style="text-align: left;">Move cursor down by one screen</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">o, +</td>
+<td style="text-align: left;">Open the fold at the cursor</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">O</td>
+<td style="text-align: left;">Open the fold at the cursor and all sub-folds</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">c, -</td>
+<td style="text-align: left;">Close the fold at the cursor</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C</td>
+<td style="text-align: left;">Close the fold at the cursor and all sub-folds</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">/</td>
+<td style="text-align: left;">Open search prompt</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Escape</td>
+<td style="text-align: left;">Close search prompt</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Enter, n</td>
+<td style="text-align: left;">Move to the next match</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">N</td>
+<td style="text-align: left;">Move to the previous match</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">v</td>
+<td style="text-align: left;">View the log of the job at the cursor<sup>[a]</sup></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">b</td>
+<td style="text-align: left;">Open with default web browser</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">q</td>
+<td style="text-align: left;">Quit</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">?</td>
+<td style="text-align: left;">View manual page</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><sup>[a]</sup> Note that if the job is still running, the log may be incomplete.</li>
+</ul>
+<h1 id="configuration-file">CONFIGURATION FILE</h1>
+<h2 id="location">Location</h2>
+<p>citop follows the XDG base directory specification [2] and expects to find the configuration file at one of the following locations depending on the value of the two environment variables <code>XDG_CONFIG_HOME</code> and <code>XDG_CONFIG_DIRS</code>:</p>
+<ol type="1">
+<li><code>"$XDG_CONFIG_HOME/citop/citop.toml"</code></li>
+<li><code>"$DIR/citop/citop.toml"</code> for every directory <code>DIR</code> in the comma-separated list <code>"$XDG_CONFIG_DIRS"</code></li>
+</ol>
+<p>If <code>XDG_CONFIG_HOME</code> (resp. <code>XDG_CONFIG_DIRS</code>) is not set, citop uses the default value <code>"$HOME/.config"</code> (resp. <code>"/etc/xdg"</code>) instead.</p>
+<h2 id="format">Format</h2>
+<p>citop uses a configuration file in <a href="https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md">TOML version v0.5.0</a> format. The configuration file is made of keys grouped together in tables. The specification of each table is given below.</p>
+<h2 id="example">Example</h2>
+<p>This example describes and uses all existing configuration options.</p>
+<pre class="toml"><code>#### CITOP CONFIGURATION FILE ####
+# This file is a complete, valid configuration file for citop
+# and should be located at $XDG_CONFIG_HOME/citop/citop.toml
+# 
+
+## PROVIDERS ##
+[providers]
+# The &#39;providers&#39; table is used to define credentials for 
+# accessing online services. citop relies on two types of
+# providers:
+#
+#    - &#39;source providers&#39; are used for listing the CI pipelines
+#    associated to a given commit (GitHub and GitLab are source
+#    providers)
+#    - &#39;CI providers&#39; are used to get detailed information about
+#    CI pipelines (GitLab, AppVeyor, CircleCI, Travis and Azure
+#    Devops are CI providers)
+#
+# citop requires credentials for at least one source provider and
+# one CI provider to run. Feel free to remove sections below 
+# as long as this rule is met.
+
+### GITHUB ###
+[[providers.github]]
+# GitHub API token (optional, string)
+#
+# Note: Unauthenticated API requests are heavily rate-limited by 
+# GitHub (60 requests per hour and per IP address) whereas 
+# authenticated clients benefit from a rate of 5000 requests per
+# hour. Providing an  API token is strongly encouraged: without
+# one, citop will likely reach the rate limit in a matter of
+# minutes.
+#
+# GitHub token management: https://github.com/settings/tokens
+token = &quot;&quot;
+
+
+### GITLAB ###
+[[providers.gitlab]]
+# Name shown by citop for this provider
+# (optional, string, default: &quot;gitlab&quot;)
+name = &quot;gitlab&quot;
+
+# GitLab API token (optional, string)
+#
+# Note: GitLab prevents access to pipeline jobs for 
+# unauthenticated users meaning if you wish to use citop
+# to view GitLab pipelines you will have to provide
+# appropriate credentials. This is true even for pipelines
+# of public repositories.
+#
+# GitLab token management:
+#     https://gitlab.com/profile/personal_access_tokens
+token = &quot;&quot;
+
+
+### TRAVIS CI ###
+[[providers.travis]]
+# Name shown by citop for this provider
+# (optional, string, default: &quot;travis&quot;)
+name = &quot;travis&quot;
+
+# URL of the Travis instance. &quot;org&quot; and &quot;com&quot; can be used as
+# shorthands for the full URL of travis.org and travis.com
+# (string, mandatory)
+url = &quot;org&quot;
+
+# API access token for the travis API (string, optional)
+# Travis tokens are managed at:
+#    - https://travis-ci.org/account/preferences
+#    - https://travis-ci.com/account/preferences
+token = &quot;&quot;
+
+
+# Define another account for accessing travis.com
+[[providers.travis]]
+name = &quot;travis&quot;
+url = &quot;com&quot;
+token = &quot;&quot;
+
+
+### APPVEYOR ###
+[[providers.appveyor]]
+# Name shown by citop for this provider
+# (optional, string, default: &quot;appveyor&quot;)
+name = &quot;appveyor&quot;
+
+# AppVeyor API token (optional, string)
+# AppVeyor token managemement: https://ci.appveyor.com/api-keys
+token = &quot;&quot;
+
+
+### CIRCLECI ###
+[[providers.circleci]]
+# Name shown by citop for this provider
+# (optional, string, default: &quot;circleci&quot;)
+name = &quot;circleci&quot;
+
+# Circle CI API token (optional, string)
+# See https://circleci.com/account/api
+token = &quot;&quot;
+
+
+### AZURE DEVOPS ###
+[[providers.azure]]
+# Name shown by citop for this provider
+# (optional, string, default: &quot;azure&quot;)
+name = &quot;azure&quot;
+
+# Azure API token (optional, string)
+# Azure token management is done at https://dev.azure.com/ via
+# the user settings menu
+token = &quot;&quot;
+</code></pre>
+<h1 id="environment">ENVIRONMENT</h1>
+<h2 id="environment-variables">ENVIRONMENT VARIABLES</h2>
+<ul>
+<li><code>BROWSER</code> is used to find the path of the default web browser</li>
+<li><code>PAGER</code> is used to view log files. If the variable is not set, citop will call <code>less</code></li>
+<li><code>HOME</code>, <code>XDG_CONFIG_HOME</code> and <code>XDG_CONFIG_DIRS</code> are used to locate the configuration file</li>
+</ul>
+<h2 id="local-programs">LOCAL PROGRAMS</h2>
+<p>citop relies on the following local executables:</p>
+<ul>
+<li><code>git</code> to translate the abbreviated SHA identifier of a commit into a non-abbreviated SHA</li>
+<li><code>less</code> to view log files, unless <code>PAGER</code> is set</li>
+<li><code>man</code> to show the manual page</li>
+</ul>
+<h1 id="examples">EXAMPLES</h1>
+<p>Show pipelines associated to the HEAD of the current git repository</p>
+<pre class="shell"><code>citop</code></pre>
+<p>Show pipelines associated to a specific commit, tag or branch</p>
+<pre class="shell"><code>citop 64be3c6
+citop 0.9.0
+citop feature/doc</code></pre>
+<p>Show pipelines of a repository specified by a URL</p>
+<pre class="shell"><code>citop -r https://gitlab.com/nbedos/citop
+citop -r git@github.com:nbedos/citop.git
+citop -r github.com/nbedos/citop</code></pre>
+<p>Show pipelines of a local repository specified by a path</p>
+<pre class="shell"><code>citop -r /home/user/repos/myrepo</code></pre>
+<p>Specify both repository and commit</p>
+<pre class="shell"><code>citop -r github.com/nbedos/citop 64be3c6</code></pre>
+<h1 id="bugs">BUGS</h1>
+<p>Questions, bug reports and feature requests are welcome and should be submitted on <a href="https://github.com/nbedos/citop/issues">GitHub</a>.</p>
+<h1 id="notes">NOTES</h1>
+<ol type="1">
+<li><strong>citop repository</strong>
+<ul>
+<li><a href="https://github.com/nbedos/citop">https://github.com/nbedos/citop</a></li>
+</ul></li>
+<li><strong>XDG base directory specification</strong>
+<ul>
+<li><a href="https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html">https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html</a></li>
+</ul></li>
+</ol>
+</body>
+</html>
