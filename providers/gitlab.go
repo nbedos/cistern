@@ -225,7 +225,7 @@ func (c GitLabClient) parsePipelineURL(u string) (string, int, error) {
 	return slug, id, nil
 }
 
-func (c *GitLabClient) GetTraceFile(ctx context.Context, repositorySlug string, jobID int) (bytes.Buffer, error) {
+func (c *GitLabClient) getTraceFile(ctx context.Context, repositorySlug string, jobID int) (bytes.Buffer, error) {
 	buf := bytes.Buffer{}
 	select {
 	case <-c.rateLimiter:
@@ -241,7 +241,7 @@ func (c *GitLabClient) GetTraceFile(ctx context.Context, repositorySlug string, 
 	return buf, err
 }
 
-func FromGitLabState(s string) cache.State {
+func fromGitLabState(s string) cache.State {
 	switch strings.ToLower(s) {
 	case "created", "pending":
 		return cache.Pending
@@ -262,15 +262,6 @@ func FromGitLabState(s string) cache.State {
 	}
 }
 
-func (c GitLabClient) GetJob(ctx context.Context, repositoryID int, jobID int) (*gitlab.Job, *gitlab.Response, error) {
-	select {
-	case <-c.rateLimiter:
-	case <-ctx.Done():
-		return nil, nil, ctx.Err()
-	}
-	return c.remote.Jobs.GetJob(repositoryID, jobID, gitlab.WithContext(ctx))
-}
-
 func (c GitLabClient) Log(ctx context.Context, step cache.Step) (string, error) {
 	if step.Log.Key == "" {
 		return "", cache.ErrNoLogHere
@@ -280,7 +271,7 @@ func (c GitLabClient) Log(ctx context.Context, step cache.Step) (string, error) 
 		return "", err
 	}
 
-	buf, err := c.GetTraceFile(ctx, step.Log.Key, id)
+	buf, err := c.getTraceFile(ctx, step.Log.Key, id)
 	if err != nil {
 		return "", err
 	}
@@ -312,7 +303,7 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 		Step: cache.Step{
 			ID:         strconv.Itoa(gitlabPipeline.ID),
 			Type:       cache.StepPipeline,
-			State:      FromGitLabState(gitlabPipeline.Status),
+			State:      fromGitLabState(gitlabPipeline.Status),
 			CreatedAt:  utils.NullTimeFromTime(gitlabPipeline.CreatedAt),
 			StartedAt:  utils.NullTimeFromTime(gitlabPipeline.StartedAt),
 			FinishedAt: utils.NullTimeFromTime(gitlabPipeline.FinishedAt),
@@ -365,7 +356,7 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 		job := cache.Step{
 			ID:    strconv.Itoa(gitlabJob.ID),
 			Type:  cache.StepJob,
-			State: FromGitLabState(gitlabJob.Status),
+			State: fromGitLabState(gitlabJob.Status),
 			Name:  gitlabJob.Name,
 			Log: cache.Log{
 				Key: slug,

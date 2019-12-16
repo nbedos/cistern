@@ -1,0 +1,79 @@
+[
+    {
+        "id": 379869167,
+        "status": "success",
+        "stage": "test",
+        "name": "golang 1.13",
+        "ref": "master",
+        "tag": false,
+        "coverage": null,
+        "allow_failure": false,
+        "created_at": "2019-12-15T21:46:40.706Z",
+        "started_at": "2019-12-15T21:46:41.151Z",
+        "finished_at": "2019-12-15T21:48:13.005Z",
+        "duration": 91.854941,
+        "user": {
+            "id": 4400568,
+            "name": "Nicolas Bedos",
+            "username": "nbedos",
+            "state": "active",
+            "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/4400568/avatar.png",
+            "web_url": "https://gitlab.com/nbedos",
+            "created_at": "2019-08-02T08:16:31.204Z",
+            "bio": "",
+            "location": "",
+            "public_email": "",
+            "skype": "",
+            "linkedin": "",
+            "twitter": "",
+            "website_url": "",
+            "organization": ""
+        },
+        "commit": {
+            "id": "6645b9ba15963e480be7763d68d9c275760d555e",
+            "short_id": "6645b9ba",
+            "created_at": "2019-12-15T22:46:23.000+01:00",
+            "parent_ids": [
+                "0e04997502c99369e87b7822ffcc2f744cc7b5bb",
+                "70019fa2caab3f68867e4209bd0e6baf36a3e740"
+            ],
+            "title": "Merge branch 'feature/circleci'",
+            "message": "Merge branch 'feature/circleci'\n",
+            "author_name": "nbedos",
+            "author_email": "nicolas.bedos@gmail.com",
+            "authored_date": "2019-12-15T22:46:23.000+01:00",
+            "committer_name": "nbedos",
+            "committer_email": "nicolas.bedos@gmail.com",
+            "committed_date": "2019-12-15T22:46:23.000+01:00"
+        },
+        "pipeline": {
+            "id": 103230300,
+            "sha": "6645b9ba15963e480be7763d68d9c275760d555e",
+            "ref": "master",
+            "status": "success",
+            "created_at": "2019-12-15T21:46:40.694Z",
+            "updated_at": "2019-12-15T21:48:13.077Z",
+            "web_url": "https://gitlab.com/nbedos/citop/pipelines/103230300"
+        },
+        "web_url": "https://gitlab.com/nbedos/citop/-/jobs/379869167",
+        "artifacts": [
+            {
+                "file_type": "trace",
+                "size": 15553,
+                "filename": "job.log",
+                "file_format": null
+            }
+        ],
+        "runner": {
+            "id": 44949,
+            "description": "shared-runners-manager-4.gitlab.com",
+            "ip_address": "104.196.221.206",
+            "active": true,
+            "is_shared": true,
+            "name": "gitlab-runner",
+            "online": true,
+            "status": "online"
+        },
+        "artifacts_expire_at": null
+    }
+]

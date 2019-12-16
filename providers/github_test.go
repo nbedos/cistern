@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"sort"
 	"testing"
 	"time"
@@ -15,7 +16,7 @@ import (
 	"github.com/nbedos/citop/cache"
 )
 
-func setup() (*http.Client, string, func()) {
+func setupGitHubTestServer() (*http.Client, string, func()) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filename := ""
 		switch r.URL.Path {
@@ -34,7 +35,7 @@ func setup() (*http.Client, string, func()) {
 			return
 		}
 
-		bs, err := ioutil.ReadFile(fmt.Sprintf("test_data/%s", filename))
+		bs, err := ioutil.ReadFile(path.Join("test_data", "github", filename))
 		if err != nil {
 			w.WriteHeader(500)
 			fmt.Fprint(w, err.Error())
@@ -51,7 +52,7 @@ func setup() (*http.Client, string, func()) {
 }
 
 func TestRefStatuses(t *testing.T) {
-	httpClient, serverURL, teardown := setup()
+	httpClient, serverURL, teardown := setupGitHubTestServer()
 	defer teardown()
 
 	c, err := github.NewEnterpriseClient(serverURL, serverURL, httpClient)
@@ -84,7 +85,7 @@ func TestRefStatuses(t *testing.T) {
 }
 
 func TestCommit(t *testing.T) {
-	httpClient, serverURL, teardown := setup()
+	httpClient, serverURL, teardown := setupGitHubTestServer()
 	defer teardown()
 
 	c, err := github.NewEnterpriseClient(serverURL, serverURL, httpClient)

@@ -1,0 +1,24 @@
+[
+  {
+    "id": 381007180,
+    "sha": "a24840cf94b395af69da4a1001d32e3694637e20",
+    "ref": "master",
+    "status": "success",
+    "name": "golang 1.13",
+    "target_url": null,
+    "description": null,
+    "created_at": "2019-12-16T18:06:38.668Z",
+    "started_at": "2019-12-16T18:06:39.662Z",
+    "finished_at": "2019-12-16T18:08:12.207Z",
+    "allow_failure": false,
+    "coverage": null,
+    "author": {
+      "id": 4400568,
+      "name": "Nicolas Bedos",
+      "username": "nbedos",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/4400568/avatar.png",
+      "web_url": "https://gitlab.com/nbedos"
+    }
+  }
+]

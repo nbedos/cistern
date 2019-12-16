@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path"
 	"strings"
 	"sync"
 	"testing"
@@ -22,17 +23,17 @@ func Setup() (AzurePipelinesClient, func(), error) {
 		filename := ""
 		switch {
 		case r.Method == "GET" && r.URL.Path == "/owner/repo/_apis/build/builds":
-			filename = "test_data/azure_build_16.json"
+			filename = "azure_build_16.json"
 		case r.Method == "GET" && r.URL.Path == "/owner/repo/_apis/build/builds/16/Timeline":
-			filename = "test_data/azure_build_16_timeline.json"
+			filename = "azure_build_16_timeline.json"
 		case r.Method == "GET" && r.URL.Path == "/owner/repo/_apis/build/builds/16/logs/1234":
-			filename = "test_data/azure_build_16_job_log.txt"
+			filename = "azure_build_16_job_log.txt"
 		default:
 			w.WriteHeader(404)
 			return
 		}
 
-		bs, err := ioutil.ReadFile(filename)
+		bs, err := ioutil.ReadFile(path.Join("test_data", "azure", filename))
 		if err != nil {
 			w.WriteHeader(500)
 			fmt.Fprint(w, err.Error())
