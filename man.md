@@ -143,185 +143,124 @@ citop uses a configuration file in [TOML version v0.5.0](https://github.com/toml
 format. The configuration file is made of keys grouped together in tables. The specification of
 each table is given below.
 
-### Table `[providers]`
-The 'providers' table is used to define credentials for accessing online services. citop
-relies on two types of providers:
+## Example
+This example describes and uses all existing configuration options.
 
-- 'source providers' are used for listing the CI pipelines associated to a given commit
-(GitHub and GitLab are source providers)
-- 'CI providers' are used to get detailed information about CI pipelines (GitLab, AppVeyor,
-CircleCI, Travis and Azure Devops are CI providers)
-
-citop requires credentials for at least one source provider and one CI provider to run.
-
-### Table `[[providers.gitlab]]`
-`[[providers.gitlab]]` defines a GitLab account
-
-----------------------------------------------------------
-Key      Description
-------   -------------------------------------------------
-name     Name under which this provider appears in the TUI (string, optional, default: "gitlab")
-
-url      URL of the GitLab instance (string, optional, default: "gitlab.com")
-
-token    Personal access token for the GitLab API (string, optional, default: "")
-
-----------------------------------------------------------
-
-GitLab access tokens are managed at [https://gitlab.com/profile/personal_access_tokens](https://gitlab.com/profile/personal_access_tokens)
-
-Example:
 ```toml
-[[providers.gitlab]]
-name = "gitlab.com"
-url = "https://gitlab.com"
-token = "gitlab_api_token"
-```
+#### CITOP CONFIGURATION FILE ####
+# This file is a complete, valid configuration file for citop
+# and should be located at $XDG_CONFIG_HOME/citop/citop.toml
+# 
 
-### Table `[[providers.github]]`
-`[[providers.github]]` defines a GitHub account
+## PROVIDERS ##
+[providers]
+# The 'providers' table is used to define credentials for 
+# accessing online services. citop relies on two types of
+# providers:
+#
+#    - 'source providers' are used for listing the CI pipelines
+#    associated to a given commit (GitHub and GitLab are source
+#    providers)
+#    - 'CI providers' are used to get detailed information about
+#    CI pipelines (GitLab, AppVeyor, CircleCI, Travis and Azure
+#    Devops are CI providers)
+#
+# citop requires credentials for at least one source provider and
+# one CI provider to run. Feel free to remove sections below 
+# as long as this rule is met.
 
------------------------------------------------------------
-Key     Description
-------  ---------------------------------------------------
-token   Personal access token for the GitHub API (string, optional, default: "")
-
------------------------------------------------------------
-
-GitHub access tokens are managed at [https://github.com/settings/tokens](https://github.com/settings/tokens)
-
-Example:
-```toml
+### GITHUB ###
 [[providers.github]]
-token = "github_api_token"
-```
+# GitHub API token (optional, string)
+#
+# Note: Unauthenticated API requests are heavily rate-limited by 
+# GitHub (60 requests per hour and per IP address) whereas 
+# authenticated clients benefit from a rate of 5000 requests per
+# hour. Providing an  API token is strongly encouraged: without
+# one, citop will likely reach the rate limit in a matter of
+# minutes.
+#
+# GitHub token management: https://github.com/settings/tokens
+token = ""
 
 
-### Table `[[providers.travis]]`
-`[[providers.travis]]` defines a Travis CI account
+### GITLAB ###
+[[providers.gitlab]]
+# Name shown by citop for this provider
+# (optional, string, default: "gitlab")
+name = "gitlab"
 
------------------------------------------------------------
-Key     Description
-------  ---------------------------------------------------
-name    Name under which this provider appears in the TUI (string, mandatory)
-
-url     URL of the GitLab instance. "org" and "com" can be used as shorthands for the full URL of travis.org and travis.com (string, mandatory)
-
-token   Personal access token for the Travis API (string, optional, default: "")
-
-----------------------------------------------------------
-
-Travis access tokens are managed at the following locations:
-
-* [https://travis-ci.org/account/preferences](https://travis-ci.org/account/preferences)
-* [https://travis-ci.com/account/preferences](https://travis-ci.com/account/preferences)
+# GitLab API token (optional, string)
+#
+# Note: GitLab prevents access to pipeline jobs for 
+# unauthenticated users meaning if you wish to use citop
+# to view GitLab pipelines you will have to provide
+# appropriate credentials. This is true even for pipelines
+# of public repositories.
+#
+# GitLab token management:
+#     https://gitlab.com/profile/personal_access_tokens
+token = ""
 
 
-Example:
-```toml
+### TRAVIS CI ###
 [[providers.travis]]
-name = "travis.org"
+# Name shown by citop for this provider
+# (optional, string, default: "travis")
+name = "travis"
+
+# URL of the Travis instance. "org" and "com" can be used as
+# shorthands for the full URL of travis.org and travis.com
+# (string, mandatory)
 url = "org"
-token = "travis_org_api_token"
 
+# API access token for the travis API (string, optional)
+# Travis tokens are managed at:
+#    - https://travis-ci.org/account/preferences
+#    - https://travis-ci.com/account/preferences
+token = ""
+
+
+# Define another account for accessing travis.com
 [[providers.travis]]
-name = "travis.com"
+name = "travis"
 url = "com"
-token = "travis_com_api_token"
-```
+token = ""
 
 
-### Table `[[providers.appveyor]]`
-`[[providers.appveyor]]` defines an AppVeyor account
-
-----------------------------------------------------------
-Key     Description
-------  --------------------------------------------------
-name    Name under which this provider appears in the TUI (string, optional, default: "appveyor")
-
-token   Personal access token for the AppVeyor API (string, optional, default: "")
-
-----------------------------------------------------------
-
-AppVeyor access tokens are managed at [https://ci.appveyor.com/api-keys](https://ci.appveyor.com/api-keys)
-
-
-Example:
-```toml
+### APPVEYOR ###
 [[providers.appveyor]]
+# Name shown by citop for this provider
+# (optional, string, default: "appveyor")
 name = "appveyor"
-token = "appveyor_api_key"
-```
+
+# AppVeyor API token (optional, string)
+# AppVeyor token managemement: https://ci.appveyor.com/api-keys
+token = ""
 
 
-### Table `[[providers.circleci]]`
-`[[providers.circleci]]` defines a CircleCI account
-
-----------------------------------------------------------
-Key     Description
-------  --------------------------------------------------
-name    Name under which this provider appears in the TUI (string, optional, default: "circleci")
-
-token   Personal access token for the CircleCI API (string, optional, default: "")
-
-----------------------------------------------------------
-
-CircleCI access tokens are managed at [https://circleci.com/account/api](https://circleci.com/account/api)
-
-
-Example:
-```toml
+### CIRCLECI ###
 [[providers.circleci]]
+# Name shown by citop for this provider
+# (optional, string, default: "circleci")
 name = "circleci"
-token = "circleci_api_token"
-```
 
-### Table `[[providers.azure]]`
-`[[providers.azure]]` defines an Azure Devops account
-
-----------------------------------------------------------
-Key     Description
-------  --------------------------------------------------
-name    Name under which this provider appears in the TUI (string, optional, default: "azure")
-
-token   Personal access token for the Azure Devops API (string, optional, default: "")
-
-----------------------------------------------------------
-
-Azure Devops personal access tokens are managed at [https://dev.azure.com/](https://dev.azure.com/)
+# Circle CI API token (optional, string)
+# See https://circleci.com/account/api
+token = ""
 
 
-Example:
-```toml
+### AZURE DEVOPS ###
 [[providers.azure]]
+# Name shown by citop for this provider
+# (optional, string, default: "azure")
 name = "azure"
-token = "azure_api_token"
-```
 
+# Azure API token (optional, string)
+# Azure token management is done at https://dev.azure.com/ via
+# the user settings menu
+token = ""
 
-### Examples
-Here are a few examples of `citop.toml` configuration files.
-
-Monitor pipelines on Travis CI, AppVeyor and CircleCI for a repository hosted on GitHub:
-```toml
-[[providers.github]]
-token = "github_api_token"
-
-[[providers.travis]]
-url = "org"
-token = "travis_org_api_token"
-
-[[providers.appveyor]]
-token = "appveyor_api_key"
-
-[[providers.circleci]]
-token = "circleci_api_token"
-```
-
-Monitor pipelines on GitLab CI for a repository hosted on GitLab itself:
-```toml
-[[providers.gitlab]]
-token = "gitlab_api_token"
 ```
 
 # ENVIRONMENT

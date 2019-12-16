@@ -22,7 +22,7 @@ type GitHubClient struct {
 func NewGitHubClient(ctx context.Context, id string, token *string) GitHubClient {
 	var httpClient *http.Client
 
-	if token != nil {
+	if token != nil && *token != "" {
 		ts := oauth2.StaticTokenSource(
 			&oauth2.Token{AccessToken: *token},
 		)

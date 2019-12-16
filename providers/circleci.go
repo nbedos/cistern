@@ -45,9 +45,11 @@ func NewCircleCIClient(id string, name string, token string, URL url.URL, rateLi
 }
 
 func (c CircleCIClient) get(ctx context.Context, resourceURL url.URL) (*bytes.Buffer, error) {
-	parameters := resourceURL.Query()
-	parameters.Add("circle-token", c.token)
-	resourceURL.RawQuery = parameters.Encode()
+	if c.token != "" {
+		parameters := resourceURL.Query()
+		parameters.Add("circle-token", c.token)
+		resourceURL.RawQuery = parameters.Encode()
+	}
 
 	req, err := http.NewRequest("GET", resourceURL.String(), nil)
 	if err != nil {

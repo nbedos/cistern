@@ -1,11 +1,11 @@
-FROM golang:1.13
+FROM golang:1.13 AS builder
 WORKDIR /citop/
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o citop .
+RUN apt-get update && yes | apt-get install pandoc
+RUN make citop
 
 FROM debian:latest
-WORKDIR /citop/
-COPY . .
-RUN apt-get update && yes | apt-get install ca-certificates less
-COPY --from=0 /citop/citop /bin
-CMD ["citop"]
+RUN apt-get update && yes | apt-get install ca-certificates less man
+COPY --from=builder /citop/build/citop /bin
+CMD ["-r", "github.com/nbedos/citop", "master"]
+ENTRYPOINT ["citop"]

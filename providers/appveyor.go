@@ -112,7 +112,9 @@ func (c AppVeyorClient) get(ctx context.Context, u url.URL) (io.ReadCloser, erro
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.token))
+	if c.token != "" {
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.token))
+	}
 	req = req.WithContext(ctx)
 
 	select {

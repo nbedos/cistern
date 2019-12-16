@@ -275,296 +275,119 @@ v0.5.0 (https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md
 format.
 The configuration file is made of keys grouped together in tables.
 The specification of each table is given below.
-.SS Table \f[C][providers]\f[R]
+.SS Example
 .PP
-The ` + "`" + `providers' table is used to define credentials for accessing online
-services.
-citop relies on two types of providers:
-.IP \[bu] 2
-` + "`" + `source providers' are used for listing the CI pipelines associated to a
-given commit (GitHub and GitLab are source providers)
-.IP \[bu] 2
-` + "`" + `CI providers' are used to get detailed information about CI pipelines
-(GitLab, AppVeyor, CircleCI, Travis and Azure Devops are CI providers)
-.PP
-citop requires credentials for at least one source provider and one CI
-provider to run.
-.SS Table \f[C][[providers.gitlab]]\f[R]
-.PP
-\f[C][[providers.gitlab]]\f[R] defines a GitLab account
-.PP
-.TS
-tab(@);
-lw(8.8n) lw(48.6n).
-T{
-Key
-T}@T{
-Description
-T}
-_
-T{
-name
-T}@T{
-Name under which this provider appears in the TUI (string, optional,
-default: \[lq]gitlab\[rq])
-T}
-T{
-url
-T}@T{
-URL of the GitLab instance (string, optional, default:
-\[lq]gitlab.com\[rq])
-T}
-T{
-token
-T}@T{
-Personal access token for the GitLab API (string, optional, default:
-\[dq]\[dq])
-T}
-.TE
-.PP
-GitLab access tokens are managed at
-<https://gitlab.com/profile/personal_access_tokens>
-.PP
-Example:
+This file describes and uses all existing configuration options.
 .IP
 .nf
 \f[C]
-[[providers.gitlab]]
-name = \[dq]gitlab.com\[dq]
-url = \[dq]https://gitlab.com\[dq]
-token = \[dq]gitlab_api_token\[dq]
-\f[R]
-.fi
-.SS Table \f[C][[providers.github]]\f[R]
-.PP
-\f[C][[providers.github]]\f[R] defines a GitHub account
-.PP
-.TS
-tab(@);
-lw(7.8n) lw(50.6n).
-T{
-Key
-T}@T{
-Description
-T}
-_
-T{
-token
-T}@T{
-Personal access token for the GitHub API (string, optional, default:
-\[dq]\[dq])
-T}
-.TE
-.PP
-GitHub access tokens are managed at <https://github.com/settings/tokens>
-.PP
-Example:
-.IP
-.nf
-\f[C]
-[[providers.github]]
-token = \[dq]github_api_token\[dq]
-\f[R]
-.fi
-.SS Table \f[C][[providers.travis]]\f[R]
-.PP
-\f[C][[providers.travis]]\f[R] defines a Travis CI account
-.PP
-.TS
-tab(@);
-lw(7.8n) lw(50.6n).
-T{
-Key
-T}@T{
-Description
-T}
-_
-T{
-name
-T}@T{
-Name under which this provider appears in the TUI (string, mandatory)
-T}
-T{
-url
-T}@T{
-URL of the GitLab instance.
-\[lq]org\[rq] and \[lq]com\[rq] can be used as shorthands for the full
-URL of travis.org and travis.com (string, mandatory)
-T}
-T{
-token
-T}@T{
-Personal access token for the Travis API (string, optional, default:
-\[dq]\[dq])
-T}
-.TE
-.PP
-Travis access tokens are managed at the following locations:
-.IP \[bu] 2
-<https://travis-ci.org/account/preferences>
-.IP \[bu] 2
-<https://travis-ci.com/account/preferences>
-.PP
-Example:
-.IP
-.nf
-\f[C]
-[[providers.travis]]
-name = \[dq]travis.org\[dq]
-url = \[dq]org\[dq]
-token = \[dq]travis_org_api_token\[dq]
+#### CITOP CONFIGURATION FILE ####
 
+## PROVIDERS ##
+[providers]
+# The \[aq]providers\[aq] table is used to define credentials for 
+# accessing online services. citop relies on two types of
+# providers:
+#
+#    - \[aq]source providers\[aq] are used for listing the CI pipelines
+#    associated to a given commit (GitHub and GitLab are source
+#    providers)
+#    - \[aq]CI providers\[aq] are used to get detailed information about
+#    CI pipelines (GitLab, AppVeyor, CircleCI, Travis and Azure
+#    Devops are CI providers)
+#
+# citop requires credentials for at least one source provider and
+# one CI provider to run. Feel free to remove sections below 
+# as long as this rule is met.
+
+### GITHUB ###
+[[providers.github]]
+# GitHub API token (optional, string)
+#
+# Note: Unauthenticated API requests are heavily rate-limited by 
+# GitHub (60 requests per hour and per IP address) whereas 
+# authenticated clients benefit from a rate of 5000 requests per
+# hour. Providing an  API token is strongly encouraged: without
+# one, citop will likely reach the rate limit in a matter of
+# minutes.
+#
+# GitHub token management: https://github.com/settings/tokens
+token = \[dq]\[dq]
+
+
+### GITLAB ###
+# Uncomment the lines below and replace the API token to define a
+# GitLab account. Note that the API token is mandatory.
+# [[providers.gitlab]]
+# # Name shown by citop for this provider
+# # (optional, string, default: \[dq]gitlab\[dq])
+# name = \[dq]gitlab\[dq]
+# 
+# # GitLab API token. A valid token is required even for
+# # accessing public repositories since GitLab prevents access
+# # to pipeline jobs for unauthenticated users.
+# # GitLab token management:
+# #     https://gitlab.com/profile/personal_access_tokens
+# token = \[dq]gitlab_api_token\[dq]
+
+
+### TRAVIS CI ###
 [[providers.travis]]
-name = \[dq]travis.com\[dq]
+# Name shown by citop for this provider
+# (optional, string, default: \[dq]travis\[dq])
+name = \[dq]travis\[dq]
+
+# URL of the Travis instance. \[dq]org\[dq] and \[dq]com\[dq] can be used as
+# shorthands for the full URL of travis.org and travis.com
+# (string, mandatory)
+url = \[dq]org\[dq]
+
+# API access token for the travis API (string, optional)
+# Travis tokens are managed at:
+#    - https://travis-ci.org/account/preferences
+#    - https://travis-ci.com/account/preferences
+token = \[dq]\[dq]
+
+
+# Define another account for accessing travis.com
+[[providers.travis]]
+name = \[dq]travis\[dq]
 url = \[dq]com\[dq]
-token = \[dq]travis_com_api_token\[dq]
-\f[R]
-.fi
-.SS Table \f[C][[providers.appveyor]]\f[R]
-.PP
-\f[C][[providers.appveyor]]\f[R] defines an AppVeyor account
-.PP
-.TS
-tab(@);
-lw(7.8n) lw(49.6n).
-T{
-Key
-T}@T{
-Description
-T}
-_
-T{
-name
-T}@T{
-Name under which this provider appears in the TUI (string, optional,
-default: \[lq]appveyor\[rq])
-T}
-T{
-token
-T}@T{
-Personal access token for the AppVeyor API (string, optional, default:
-\[dq]\[dq])
-T}
-.TE
-.PP
-AppVeyor access tokens are managed at <https://ci.appveyor.com/api-keys>
-.PP
-Example:
-.IP
-.nf
-\f[C]
+token = \[dq]\[dq]
+
+
+### APPVEYOR ###
 [[providers.appveyor]]
+# Name shown by citop for this provider
+# (optional, string, default: \[dq]appveyor\[dq])
 name = \[dq]appveyor\[dq]
-token = \[dq]appveyor_api_key\[dq]
-\f[R]
-.fi
-.SS Table \f[C][[providers.circleci]]\f[R]
-.PP
-\f[C][[providers.circleci]]\f[R] defines a CircleCI account
-.PP
-.TS
-tab(@);
-lw(7.8n) lw(49.6n).
-T{
-Key
-T}@T{
-Description
-T}
-_
-T{
-name
-T}@T{
-Name under which this provider appears in the TUI (string, optional,
-default: \[lq]circleci\[rq])
-T}
-T{
-token
-T}@T{
-Personal access token for the CircleCI API (string, optional, default:
-\[dq]\[dq])
-T}
-.TE
-.PP
-CircleCI access tokens are managed at <https://circleci.com/account/api>
-.PP
-Example:
-.IP
-.nf
-\f[C]
+
+# AppVeyor API token (optional, string)
+# AppVeyor token managemement: https://ci.appveyor.com/api-keys
+token = \[dq]\[dq]
+
+
+### CIRCLECI ###
 [[providers.circleci]]
+# Name shown by citop for this provider
+# (optional, string, default: \[dq]circleci\[dq])
 name = \[dq]circleci\[dq]
-token = \[dq]circleci_api_token\[dq]
-\f[R]
-.fi
-.SS Table \f[C][[providers.azure]]\f[R]
-.PP
-\f[C][[providers.azure]]\f[R] defines an Azure Devops account
-.PP
-.TS
-tab(@);
-lw(7.8n) lw(49.6n).
-T{
-Key
-T}@T{
-Description
-T}
-_
-T{
-name
-T}@T{
-Name under which this provider appears in the TUI (string, optional,
-default: \[lq]azure\[rq])
-T}
-T{
-token
-T}@T{
-Personal access token for the Azure Devops API (string, optional,
-default: \[dq]\[dq])
-T}
-.TE
-.PP
-Azure Devops personal access tokens are managed at
-<https://dev.azure.com/>
-.PP
-Example:
-.IP
-.nf
-\f[C]
+
+# Circle CI API token (optional, string)
+# See https://circleci.com/account/api
+token = \[dq]\[dq]
+
+
+### AZURE DEVOPS ###
 [[providers.azure]]
+# Name shown by citop for this provider
+# (optional, string, default: \[dq]azure\[dq])
 name = \[dq]azure\[dq]
-token = \[dq]azure_api_token\[dq]
-\f[R]
-.fi
-.SS Examples
-.PP
-Here are a few examples of \f[C]citop.toml\f[R] configuration files.
-.PP
-Monitor pipelines on Travis CI, AppVeyor and CircleCI for a repository
-hosted on GitHub:
-.IP
-.nf
-\f[C]
-[[providers.github]]
-token = \[dq]github_api_token\[dq]
 
-[[providers.travis]]
-url = \[dq]org\[dq]
-token = \[dq]travis_org_api_token\[dq]
-
-[[providers.appveyor]]
-token = \[dq]appveyor_api_key\[dq]
-
-[[providers.circleci]]
-token = \[dq]circleci_api_token\[dq]
-\f[R]
-.fi
-.PP
-Monitor pipelines on GitLab CI for a repository hosted on GitLab itself:
-.IP
-.nf
-\f[C]
-[[providers.gitlab]]
-token = \[dq]gitlab_api_token\[dq]
+# Azure API token (optional, string)
+# Azure token management is done at https://dev.azure.com/ via
+# the user settings menu
+token = \[dq]\[dq]
 \f[R]
 .fi
 .SH ENVIRONMENT

@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/nbedos/citop/cache"
@@ -16,11 +15,9 @@ import (
 )
 
 type GitLabClient struct {
-	provider             cache.Provider
-	remote               *gitlab.Client
-	rateLimiter          <-chan time.Time
-	updateTimePerBuildID map[string]time.Time
-	mux                  *sync.Mutex
+	provider    cache.Provider
+	remote      *gitlab.Client
+	rateLimiter <-chan time.Time
 }
 
 func NewGitLabClient(id string, name string, token string, rateLimit time.Duration) GitLabClient {
@@ -29,10 +26,8 @@ func NewGitLabClient(id string, name string, token string, rateLimit time.Durati
 			ID:   id,
 			Name: name,
 		},
-		remote:               gitlab.NewClient(nil, token),
-		rateLimiter:          time.Tick(rateLimit),
-		updateTimePerBuildID: make(map[string]time.Time),
-		mux:                  &sync.Mutex{},
+		remote:      gitlab.NewClient(nil, token),
+		rateLimiter: time.Tick(rateLimit),
 	}
 }
 
@@ -418,8 +413,5 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 		pipeline.Children[i].Duration = aggregate.Duration
 	}
 
-	c.mux.Lock()
-	c.updateTimePerBuildID[pipeline.ID] = pipeline.UpdatedAt
-	c.mux.Unlock()
 	return pipeline, nil
 }

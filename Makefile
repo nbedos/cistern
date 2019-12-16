@@ -25,9 +25,9 @@ usage:
 	echo "    make tests       # Run unit tests"
 
 citop: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.html $(BUILD)/$(EXEC).man.1
-	BUILD_VERSION="$(VERSION) $$(go env GOOS)/$$(go env GOARCH)" && \
+	BUILD_VERSION="$(VERSION)_$$(go env GOOS)/$$(go env GOARCH)" && \
 	echo "Building $(BUILD)/$(EXEC)... (version $$BUILD_VERSION)" && \
-	go build -trimpath -ldflags "-X \"main.Version=$$BUILD_VERSION\"" -o "$(BUILD)/$(EXEC)"
+	go build -trimpath -ldflags "-X main.Version=$$BUILD_VERSION" -o "$(BUILD)/$(EXEC)"
 
 $(BUILD)/$(EXEC).man.html : man.md $(BUILD) pandoc_template.html
 	echo "Building $@..." && \
@@ -98,4 +98,4 @@ tests:
 	go test -v ./...
 
 image:
-	docker build -t $(EXEC):latest .
+	docker build -t "$(EXEC):$(VERSION)" .

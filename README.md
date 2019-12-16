@@ -32,42 +32,49 @@ Just select the pipeline, stage or job you're interested in and press 'b' to ope
 web page on the CI provider's website. This gives easy access to features offered by CI providers
 that are not implemented by citop (pipeline cancellation, artifact download...)
 
-# Installation
-Install from source by running the following commands. Requires golang >= 1.12 and a UNIX system.
+# Building citop
+## Building automatically from source
+This method requires a UNIX system with `make`, `pandoc` and golang >= 1.12.
 ```shell
-$ git clone git@github.com:nbedos/citop.git
-$ cd citop
-$ go build .
+git clone git@github.com:nbedos/citop.git && cd citop
+make citop
+# Test newly built executable
+./build/citop
+```
+
+## Building manually from source
+This method requires only golang >= 1.12 and a UNIX system.
+```shell
+git clone git@github.com:nbedos/citop.git && cd citop
+mkdir build
+BUILD_VERSION="$(git describe --tags --long --dirty)_$(go env GOOS)/$(go env GOARCH)" && \
+go build -ldflags "-X main.Version=$BUILD_VERSION" -o build/citop
+# Test newly built executable
+./build/citop
+```
+
+Note that this method ignores eventual changes made to the file `man.md`. It is provided for
+users that do not wish to install `pandoc` on their system.
+
+## Building a Docker image
+This method requires access to a Docker instance
+```shell
+git clone git@github.com:nbedos/citop.git && cd citop
+export CITOP_DOCKER_IMAGE="citop:$(git describe --tags --long --dirty)"
+docker build -t "$CITOP_DOCKER_IMAGE" .
+docker run -it "$CITOP_DOCKER_IMAGE"
 ```
 
 # Configuration
-citop requires access to various APIs. Credentials are stored in a configuration file located
-at `$XDG_CONFIG_HOME/citop/citop.toml` which usually defaults to `~/.config/citop/citop.toml`.
+citop requires access to various APIs. The corresponding credentials should be stored in a
+configuration file as described in the [manual page](https://nbedos.github.io/citop/man.html).
 
-Below is an example of a minimal configuration file. Each API token must be replaced by your own
-token. For each service, the [manual page](https://nbedos.github.io/citop/man.html) has a link
-to the web page dedicated to API token management.
-```toml
-[[providers.github]]
-token = "github_api_token"
-
-[[providers.gitlab]]
-token = "gitlab_api_token"
-
-[[providers.travis]]
-url = "org"
-token = "travis_org_api_token"
-
-[[providers.appveyor]]
-token = "appveyor_api_key"
-
-[[providers.circleci]]
-token = "circleci_api_token"
-```
-
-You may remove the section for any one service but do note that citop needs access to at
-least one of GitLab or GitHub (depending on where your repositories are hosted) and at least one
-of GitLab, Travis, AppVeyor or CircleCI depending on which CI provider you use.
+If the configuration file is missing, citop will still work but with the following limitations:
+    * citop will likely reach the rate limit of the GitHub API for unauthenticated clients in a few minutes
+    * citop will not be able to access pipeline jobs on GitLab without an API access token
+    
+In most cases this should still be enough for a quick test of the application without having to
+bother with personal access tokens.
 
 # Usage
 ```
@@ -100,42 +107,33 @@ Options:
 ```
 
 ## Examples
-Show pipelines associated to the last commit of the current git repository
 ```shell
+# Show pipelines associated to the last commit of the current git repository 
 citop
-```
 
-Show pipelines associated to a specific commit, tag or branch
-```shell
+# Show pipelines associated to a specific commit, tag or branch of the
+# current git repository 
 citop 64be3c6
 citop 0.9.0
 citop feature/doc
-```
 
-Show pipelines of a repository specified by a URL
-```shell
+# Show pipelines of a repository identifier by a URL
 citop -r https://gitlab.com/nbedos/citop
 citop -r git@github.com:nbedos/citop.git
 citop -r github.com/nbedos/citop
-```
 
-Show pipelines of a local repository specified by a path
-```shell
-citop -r /home/user/repos/myrepo
-```
-
-Specify both repository and commit
-```shell
-citop -r github.com/nbedos/citop 64be3c6
+# Specify both repository and git reference
+citop -r github.com/nbedos/citop master
 ```
 
 More information is available in the [manual page](https://nbedos.github.io/citop/man.html).
 
 
 ## Support
-Questions, bug reports and feature requests are welcome and should be submitted [here](https://github.com/nbedos/citop/issues).
+Questions, bug reports and feature requests are welcome and should be submitted
+[here](https://github.com/nbedos/citop/issues).
 
 ## Contributing
 Pull requests are welcome. If you foresee that a PR will take any significant amount of your time,
 you probably want to open an issue first to discuss your changes and make sure they are
-likely to be accepted. 
+likely to be accepted.

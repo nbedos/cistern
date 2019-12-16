@@ -27,21 +27,57 @@ var Version = "undefined"
 
 const ConfDir = "citop"
 const ConfFilename = "citop.toml"
+const defaultConfiguration = `
+[[providers.github]]
 
-type ProviderConfiguration struct {
-	Name              string  `toml:"name"`
-	Url               string  `toml:"url"`
-	Token             string  `toml:"token"`
-	RequestsPerSecond float64 `toml:"max_requests_per_second"`
-}
+[[providers.gitlab]]
+
+[[providers.travis]]
+url = "org"
+token = ""
+
+[[providers.travis]]
+url = "com"
+token = ""
+
+[[providers.appveyor]]
+
+[[providers.circleci]]
+
+[[providers.azure]]
+
+`
 
 type ProvidersConfiguration struct {
-	GitLab   []ProviderConfiguration
-	GitHub   []ProviderConfiguration
-	CircleCI []ProviderConfiguration
-	Travis   []ProviderConfiguration
-	AppVeyor []ProviderConfiguration
-	Azure    []ProviderConfiguration
+	GitLab []struct {
+		Name              string  `toml:"name"`
+		Token             string  `toml:"token"`
+		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+	}
+	GitHub []struct {
+		Token string `toml:"token"`
+	}
+	CircleCI []struct {
+		Name              string  `toml:"name"`
+		Token             string  `toml:"token"`
+		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+	}
+	Travis []struct {
+		Name              string  `toml:"name"`
+		Url               string  `toml:"url"`
+		Token             string  `toml:"token"`
+		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+	}
+	AppVeyor []struct {
+		Name              string  `toml:"name"`
+		Token             string  `toml:"token"`
+		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+	}
+	Azure []struct {
+		Name              string  `toml:"name"`
+		Token             string  `toml:"token"`
+		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+	}
 }
 
 type Configuration struct {
@@ -71,6 +107,14 @@ func ConfigFromPaths(paths ...string) (Configuration, error) {
 		return c, err
 	}
 
+	tree, err := toml.LoadBytes([]byte(defaultConfiguration))
+	if err != nil {
+		return c, err
+	}
+	if err := tree.Unmarshal(&c); err != nil {
+		return c, err
+	}
+
 	return c, ErrMissingConf
 }
 
@@ -89,6 +133,7 @@ func (c ProvidersConfiguration) Providers(ctx context.Context) ([]cache.SourcePr
 		if conf.Name != "" {
 			name = conf.Name
 		}
+
 		client := providers.NewGitLabClient(id, name, conf.Token, rateLimit)
 		source = append(source, client)
 		ci = append(ci, client)
@@ -252,7 +297,24 @@ func main() {
 
 	paths := utils.XDGConfigLocations(path.Join(ConfDir, ConfFilename))
 	config, err := ConfigFromPaths(paths...)
-	if err != nil {
+	switch err {
+	case nil:
+		for _, g := range config.Providers.GitLab {
+			if g.Token == "" {
+				fmt.Fprintln(os.Stderr, "warning: citop will not be able to access pipeline jobs on GitLab without an API access token")
+				break
+			}
+		}
+	case ErrMissingConf:
+		msgFormat := `warning: No configuration file found at %s, using default configuration without credentials.
+Please note that:
+    - citop will likely reach the rate limit of the GitHub API for unauthenticated clients in a few minutes
+    - citop will not be able to access pipeline jobs on GitLab without an API access token
+	
+To lift these restrictions, create a configuration file containing your credentials at the aforementioned location.
+`
+		fmt.Fprintf(os.Stderr, msgFormat, paths[0])
+	default:
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
@@ -260,7 +322,7 @@ func main() {
 	ctx := context.Background()
 	sourceProviders, ciProviders, err := config.Providers.Providers(ctx)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+		fmt.Fprintln(os.Stderr, fmt.Sprintf("configuration error: %s", err.Error()))
 		os.Exit(1)
 	}
 	if err := tui.RunApplication(ctx, tcell.NewScreen, repo, sha, ciProviders, sourceProviders, time.Local, manualPage()); err != nil {
