@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"regexp"
@@ -257,10 +258,21 @@ func (c *Controller) viewLog(ctx context.Context) error {
 }
 
 func (c *Controller) viewHelp(ctx context.Context) error {
-	stdin := bytes.Buffer{}
-	stdin.WriteString(c.help)
+	// TODO Allow user configuration of this command
+	// There is no standard way to make 'man' read from stdin
+	// so instead we write the man page to disk and invoke
+	// man with the '-l' option.
+	file, err := ioutil.TempFile("", "citop_*.man.1")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
 
-	return c.tui.Exec(ctx, "man", []string{"-l", "-"}, &stdin)
+	if _, err := file.WriteString(c.help); err != nil {
+		return err
+	}
+
+	return c.tui.Exec(ctx, "man", []string{"-l", file.Name()}, nil)
 }
 
 func (c Controller) openWebBrowser(url string) error {
