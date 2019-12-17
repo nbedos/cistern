@@ -111,20 +111,26 @@ Options:
 ```
 
 ## Examples
+Monitor pipelines of the current git repository
 ```shell
-# Show pipelines associated to the last commit of the current git repository 
+# Move to a directory containing a git repository of your choosing
+git clone git@github.com:nbedos/citop.git && cd citop
+# Run citop to list the pipelines associated to the last commit of the repository 
 citop
 
-# Show pipelines associated to a specific commit, tag or branch of the
-# current git repository 
-citop 64be3c6
-citop 0.9.0
-citop feature/doc
+# Show pipelines associated to a specific commit, tag or branch
+citop a24840c
+citop 0.1.0
+citop master
+```
 
-# Show pipelines of a repository identified by a URL
-citop -r https://gitlab.com/nbedos/citop
-citop -r git@github.com:nbedos/citop.git
-citop -r github.com/nbedos/citop
+Monitor pipelines of other repositories
+```shell
+# Show pipelines of a repository identified by a URL or path
+citop -r https://gitlab.com/nbedos/citop        # Web URL
+citop -r git@github.com:nbedos/citop.git        # Git URL
+citop -r github.com/nbedos/citop                # URL without scheme
+citop -r /home/user/repos/repo                  # Path to a repository
 
 # Specify both repository and git reference
 citop -r github.com/nbedos/citop master

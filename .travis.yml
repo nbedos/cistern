@@ -47,7 +47,10 @@ jobs:
       skip_cleanup: true
       name: $TRAVIS_TAG
       file_glob: true
-      file: build/*.tar.gz
+      file: 
+        - build/*.tar.gz
+        - build/citop.man.1
+        - build/citop.man.html
       draft: true
       on:
           tags: true
