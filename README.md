@@ -34,6 +34,13 @@ that are not implemented by citop (pipeline cancellation, artifact download...)
 
 
 # Installation
+## Binary releases
+Binary releases are made available for each version of citop 
+[here](https://github.com/nbedos/citop/releases).
+
+Each release archive contains a statically linked executable named `citop`, the manual page
+in HTML and roff format and a copy of the license. 
+
 ## Building citop from source
 ### Building automatically from source (recommended)
 This method requires a UNIX system with `make`, `pandoc` and golang >= 1.11.
@@ -76,13 +83,6 @@ docker run -it -v "$PWD:/citop" "$CITOP_DOCKER_IMAGE"
 # Monitor non local repositories by specifying the URL:
 docker run -it "$CITOP_DOCKER_IMAGE" -r github.com/nbedos/citop
 ```
-
-## Binary releases
-Binary releases are made available for each version of citop 
-[here](https://github.com/nbedos/citop/releases).
-
-Each release archive contains a statically linked executable named `citop`, the manual page
-in HTML and roff format and a copy of the license. 
 
 # Configuration
 citop requires access to various APIs. The corresponding credentials should be stored in a

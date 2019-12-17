@@ -41,7 +41,7 @@ func Setup() (AzurePipelinesClient, func(), error) {
 		}
 
 		// Rewrite URLs in the file to match the scheme and host of the query
-		s := strings.ReplaceAll(string(bs), "https://example.com", "http://"+r.Host)
+		s := strings.Replace(string(bs), "https://example.com", "http://"+r.Host, -1)
 		if _, err := fmt.Fprint(w, s); err != nil {
 			w.WriteHeader(500)
 			fmt.Fprint(w, err.Error())
