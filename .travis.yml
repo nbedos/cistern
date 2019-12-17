@@ -2,10 +2,10 @@ language: go
 jobs:
   include:
   - stage: Tests
-    name: GoLang 1.13 on Ubuntu Bionic
+    name: GoLang 1.11 on Ubuntu Trusty
     os: linux
-    dist: bionic
-    go: 1.13.x
+    dist: trusty
+    go: 1.11.x
     script:
     - make tests
 
@@ -18,17 +18,9 @@ jobs:
     - make tests
 
   - stage: Tests
-    name: GoLang 1.11 on Ubuntu Trusty
+    name: GoLang 1.13 on Ubuntu Bionic
     os: linux
-    dist: trusty
-    go: 1.11.x
-    script:
-    - make tests
-
-  - stage: Tests
-    name: GoLang 1.13 on macOS 10.14
-    os: osx
-    osx_image: xcode11.2
+    dist: bionic
     go: 1.13.x
     script:
     - make tests
@@ -38,6 +30,14 @@ jobs:
     os: osx
     osx_image: xcode9.4
     go: 1.12.x
+    script:
+    - make tests
+
+  - stage: Tests
+    name: GoLang 1.13 on macOS 10.14
+    os: osx
+    osx_image: xcode11.2
+    go: 1.13.x
     script:
     - make tests
 
