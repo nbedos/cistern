@@ -1,3 +1,5 @@
+# /!\ Keep this Makefile compatible with both GNU Make and BSD Make /!\
+#
 .PHONY: usage clean image tests releases citop
 .SILENT:
 
@@ -12,7 +14,6 @@ EXEC=citop
 # Name of the go project
 PACKAGE=citop
 PACKAGE_PATH=github.com/nbedos/citop
-VERSION=$(shell git describe --tags --dirty)
 
 
 usage:
@@ -25,18 +26,18 @@ usage:
 	echo "    make tests       # Run unit tests"
 
 citop: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.html $(BUILD)/$(EXEC).man.1
-	BUILD_VERSION="$(VERSION)_$$(go env GOOS)/$$(go env GOARCH)" && \
+	BUILD_VERSION="$$(git describe --tags --dirty)_$$(go env GOOS)/$$(go env GOARCH)" && \
 	echo "Building $(BUILD)/$(EXEC)... (version $$BUILD_VERSION)" && \
 	go build -ldflags "-X main.Version=$$BUILD_VERSION" -o "$(BUILD)/$(EXEC)"
 
 $(BUILD)/$(EXEC).man.html : man.md $(BUILD) pandoc_template.html
 	echo "Building $@..." && \
-	sed '1s/\\<version\\>/$(VERSION)/' man.md | \
+	sed '1s/\\<version\\>/$$(git describe --tags --dirty)/' man.md | \
 	pandoc -s -t html5 --template pandoc_template.html > $@
 
 $(BUILD)/$(EXEC).man.1 : man.md $(BUILD)
 	echo "Building $@..." && \
-	sed '1s/\\<version\\>/$(VERSION)/' man.md | \
+	sed '1s/\\<version\\>/$$(git describe --tags --dirty)/' man.md | \
 	pandoc -s -t man >  $@
 
 releases: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.1 $(BUILD)/$(EXEC).man.html
@@ -47,13 +48,13 @@ releases: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.1 $(BUILD)/$(EXE
 	do \
 	    for GOOS in linux freebsd openbsd netbsd osx; \
 	    do \
-		DIR="$(PACKAGE)-$(VERSION)-$$GOOS-$$GOARCH" && \
-		ARCHIVE="$(BUILD)/$$DIR.tar.gz" && \
+		BUILD_VERSION="$(PACKAGE)-$$(git describe --tags --dirty)-$$GOOS-$$GOARCH" && \
+		ARCHIVE="$(BUILD)/$$BUILD_VERSION.tar.gz" && \
 		echo "Building $$ARCHIVE..." && \
-		mkdir -p "$(BUILD)/$$DIR" && \
-		go build -ldflags "-X \"main.Version=$(VERSION) $$GOOS/$$GOARCH\"" -o "$(BUILD)/$(EXEC)" && \
-		cp "$(BUILD)/$(EXEC)" "$(BUILD)/LICENSE" "$(BUILD)/$(EXEC).man.html" "$(BUILD)/$(EXEC).man.1" "$(BUILD)/$$DIR/" && \
-		tar -C "$(BUILD)" -czf "$$ARCHIVE" "$$DIR" ; \
+		mkdir -p "$(BUILD)/$$BUILD_VERSION" && \
+		go build -ldflags "-X main.Version=$$BUILD_VERSION" -o "$(BUILD)/$(EXEC)" && \
+		cp "$(BUILD)/$(EXEC)" "$(BUILD)/LICENSE" "$(BUILD)/$(EXEC).man.html" "$(BUILD)/$(EXEC).man.1" "$(BUILD)/$$BUILD_VERSION/" && \
+		tar -C "$(BUILD)" -czf "$$ARCHIVE" "$$BUILD_VERSION" ; \
 	    done ; \
 	done && \
 	cd "$(BUILD)" && sha1sum *gz
@@ -102,4 +103,4 @@ tests:
 	go test -v ./...
 
 image:
-	docker build -t "$(EXEC):$(VERSION)" .
+	docker build -t "$(EXEC):$$(git describe --tags --dirty)" .

@@ -41,7 +41,7 @@ Binary releases are made available for each version of citop
 Each release archive contains a statically linked executable named `citop`, the manual page
 in HTML and roff format and a copy of the license. 
 
-## Building citop from source
+## Building from source
 ### Building automatically from source (recommended)
 This method requires a UNIX system with `make`, `pandoc` and golang >= 1.11.
 ```shell
@@ -80,7 +80,7 @@ docker build -t "$CITOP_DOCKER_IMAGE" .
 # Mount a local repository as a volume mapped to `/citop` to monitor its pipelines 
 docker run -it -v "$PWD:/citop" "$CITOP_DOCKER_IMAGE"
 
-# Monitor non local repositories by specifying the URL:
+# Monitor a non local repository by specifying a URL:
 docker run -it "$CITOP_DOCKER_IMAGE" -r github.com/nbedos/citop
 ```
 
@@ -93,8 +93,8 @@ If the configuration file is missing, citop will run with the following limitati
 for unauthenticated clients in a few minutes
 * citop will not be able to access pipeline jobs on GitLab without an API access token
     
-In most cases running without a configuration file should still be enough for a quick test
-of the application without having to bother with personal access tokens.
+In most cases running without a configuration file should still work well enough for quickly
+testing the application without having to bother with personal access tokens.
 
 # Usage
 ```
