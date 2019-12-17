@@ -45,10 +45,10 @@ type SourceProvider interface {
 // Poll provider at increasing interval for the URL of statuses associated to "ref"
 func monitorRefStatuses(ctx context.Context, p SourceProvider, url string, ref string, commitc chan<- Commit) error {
 	b := backoff.ExponentialBackOff{
-		InitialInterval:     5 * time.Second,
+		InitialInterval:     10 * time.Second,
 		RandomizationFactor: backoff.DefaultRandomizationFactor,
 		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         1 * time.Minute,
+		MaxInterval:         2 * time.Minute,
 		MaxElapsedTime:      0,
 		Clock:               backoff.SystemClock,
 	}
@@ -534,10 +534,10 @@ func (c Cache) PipelinesByRef(ref string) []Pipeline {
 // for this specific pipeline.
 func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref string, updates chan<- time.Time) error {
 	b := backoff.ExponentialBackOff{
-		InitialInterval:     5 * time.Second,
+		InitialInterval:     10 * time.Second,
 		RandomizationFactor: backoff.DefaultRandomizationFactor,
 		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         1 * time.Minute,
+		MaxInterval:         2 * time.Minute,
 		MaxElapsedTime:      0,
 		Clock:               backoff.SystemClock,
 	}

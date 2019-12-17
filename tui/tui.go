@@ -70,6 +70,9 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		return err
 	}
 	defer func() {
+		// If another goroutine panicked this wouldn't run so we'd be left with a garbled screen.
+		// The alternative would be to defer a call to recover for every goroutine that we launch
+		// in order to have them return an error in case of a panic.
 		ui.Finish()
 	}()
 
