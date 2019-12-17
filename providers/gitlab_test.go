@@ -37,6 +37,7 @@ func setupGitLabTestServer(t *testing.T) (GitLabClient, string, func()) {
 		case "/api/v4/projects/nbedos/citop/pipelines/103230300":
 			filename = "gitlab_pipeline.json"
 		case "/api/v4/projects/nbedos/citop/pipelines/103230300/jobs":
+			w.Header().Add("X-Total-Pages", "1")
 			filename = "gitlab_jobs.json"
 		case "/api/v4/projects/nbedos/citop/jobs/42/trace":
 			filename = "gitlab_log"
@@ -197,29 +198,40 @@ func TestGitLabClient_Log(t *testing.T) {
 }
 
 func TestGitLabClient_Commit(t *testing.T) {
-	client, testURL, teardown := setupGitLabTestServer(t)
-	defer teardown()
+	t.Run("existing reference", func(t *testing.T) {
+		client, testURL, teardown := setupGitLabTestServer(t)
+		defer teardown()
 
-	commit, err := client.Commit(context.Background(), testURL+"/owner/repo", "master")
-	if err != nil {
-		t.Fatal(err)
-	}
+		commit, err := client.Commit(context.Background(), testURL+"/owner/repo", "master")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	expectedCommit := cache.Commit{
-		Sha:      "a24840cf94b395af69da4a1001d32e3694637e20",
-		Author:   "nbedos <nicolas.bedos@gmail.com>",
-		Date:     time.Date(2019, 12, 16, 18, 6, 43, 0, time.UTC),
-		Message:  "Fix typos\n",
-		Branches: []string{"master"},
-		Tags:     nil,
-		Head:     "",
-		Statuses: nil,
-	}
+		expectedCommit := cache.Commit{
+			Sha:      "a24840cf94b395af69da4a1001d32e3694637e20",
+			Author:   "nbedos <nicolas.bedos@gmail.com>",
+			Date:     time.Date(2019, 12, 16, 18, 6, 43, 0, time.UTC),
+			Message:  "Fix typos\n",
+			Branches: []string{"master"},
+			Tags:     nil,
+			Head:     "",
+			Statuses: nil,
+		}
 
-	if diff := cmp.Diff(expectedCommit, commit); len(diff) > 0 {
-		t.Fatal(diff)
-	}
+		if diff := cmp.Diff(expectedCommit, commit); len(diff) > 0 {
+			t.Fatal(diff)
+		}
+	})
 
+	t.Run("non existing commit", func(t *testing.T) {
+		client, testURL, teardown := setupGitLabTestServer(t)
+		defer teardown()
+
+		_, err := client.Commit(context.Background(), testURL+"/owner/repo", "0000000")
+		if err != cache.ErrUnknownGitReference {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestGitLabClient_RefStatuses(t *testing.T) {

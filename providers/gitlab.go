@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nbedos/citop/cache"
@@ -39,8 +40,19 @@ func (c GitLabClient) Commit(ctx context.Context, repo string, ref string) (cach
 
 	ref = url.PathEscape(ref)
 
-	gitlabCommit, _, err := c.remote.Commits.GetCommit(slug, url.PathEscape(ref))
+	select {
+	case <-c.rateLimiter:
+	case <-ctx.Done():
+		return cache.Commit{}, ctx.Err()
+	}
+	gitlabCommit, _, err := c.remote.Commits.GetCommit(slug, url.PathEscape(ref), gitlab.WithContext(ctx))
 	if err != nil {
+		if err, ok := err.(*gitlab.ErrorResponse); ok {
+			switch err.Response.StatusCode {
+			case 401, 404:
+				return cache.Commit{}, cache.ErrUnknownGitReference
+			}
+		}
 		return cache.Commit{}, err
 	}
 
@@ -53,7 +65,12 @@ func (c GitLabClient) Commit(ctx context.Context, repo string, ref string) (cach
 
 	opt := gitlab.GetCommitRefsOptions{}
 	for {
-		refs, resp, err := c.remote.Commits.GetCommitRefs(slug, commit.Sha, &opt)
+		select {
+		case <-c.rateLimiter:
+		case <-ctx.Done():
+			return cache.Commit{}, ctx.Err()
+		}
+		refs, resp, err := c.remote.Commits.GetCommitRefs(slug, commit.Sha, &opt, gitlab.WithContext(ctx))
 		if err != nil {
 			return cache.Commit{}, err
 		}
@@ -117,7 +134,7 @@ func (c GitLabClient) buildURLsStatuses(ctx context.Context, slug string, sha st
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
-		statuses, resp, err := c.remote.Commits.GetCommitStatuses(slug, sha, &options)
+		statuses, resp, err := c.remote.Commits.GetCommitStatuses(slug, sha, &options, gitlab.WithContext(ctx))
 		if err != nil {
 			return nil, err
 		}
@@ -279,6 +296,68 @@ func (c GitLabClient) Log(ctx context.Context, step cache.Step) (string, error) 
 	return buf.String(), nil
 }
 
+func (c GitLabClient) fetchJobs(ctx context.Context, slug string, pipelineID int) ([]*gitlab.Job, error) {
+	select {
+	case <-c.rateLimiter:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	jobs, resp, err := c.remote.Jobs.ListPipelineJobs(slug, pipelineID, nil, gitlab.WithContext(ctx))
+	if err != nil {
+		return nil, nil
+	}
+
+	wg := sync.WaitGroup{}
+	errc := make(chan error)
+	pageCtx, cancel := context.WithCancel(ctx)
+	allPages := make([][]*gitlab.Job, resp.TotalPages)
+	if len(allPages) > 0 {
+		allPages[0] = jobs
+	}
+	for page := 2; page <= resp.TotalPages; page++ {
+		wg.Add(1)
+		go func(page int) {
+			defer wg.Done()
+			select {
+			case <-c.rateLimiter:
+			case <-ctx.Done():
+				errc <- ctx.Err()
+				return
+			}
+			options := gitlab.ListJobsOptions{
+				ListOptions: gitlab.ListOptions{
+					Page: page,
+				},
+			}
+			jobs, _, err := c.remote.Jobs.ListPipelineJobs(slug, pipelineID, &options, gitlab.WithContext(pageCtx))
+			if err != nil {
+				errc <- err
+				return
+			}
+			allPages[page-1] = jobs
+		}(page)
+	}
+
+	go func() {
+		wg.Wait()
+		close(errc)
+	}()
+
+	for e := range errc {
+		if err == nil && e != nil {
+			err = e
+			cancel()
+		}
+	}
+
+	allJobs := make([]*gitlab.Job, 0)
+	for _, pageJobs := range allPages {
+		allJobs = append(allJobs, pageJobs...)
+	}
+
+	return allJobs, err
+}
+
 func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID int) (pipeline cache.Pipeline, err error) {
 	select {
 	case <-c.rateLimiter:
@@ -319,24 +398,9 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 		},
 	}
 
-	jobs := make([]*gitlab.Job, 0)
-	options := gitlab.ListJobsOptions{}
-	for {
-		select {
-		case <-c.rateLimiter:
-		case <-ctx.Done():
-			return pipeline, ctx.Err()
-		}
-		pageJobs, resp, err := c.remote.Jobs.ListPipelineJobs(slug, gitlabPipeline.ID, &options, gitlab.WithContext(ctx))
-		if err != nil {
-			return pipeline, nil
-		}
-		jobs = append(jobs, pageJobs...)
-
-		if resp.NextPage == 0 {
-			break
-		}
-		options.Page = resp.NextPage
+	jobs, err := c.fetchJobs(ctx, slug, gitlabPipeline.ID)
+	if err != nil {
+		return cache.Pipeline{}, err
 	}
 
 	stagesIndexByName := make(map[string]int)

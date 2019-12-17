@@ -722,7 +722,7 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref 
 // updated with new data, a message is sent on the 'updates' channel.
 // This function may return ErrUnknownRepositoryURL if none of the source providers is
 // able to handle 'repositoryURL'.
-func (c *Cache) MonitorPipelines(ctx context.Context, repo string, ref string, updates chan<- time.Time) error {
+func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURL string, ref string, updates chan<- time.Time) error {
 	commitc := make(chan Commit)
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
@@ -734,7 +734,7 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repo string, ref string, u
 		defer close(commitc)
 		// This gives us a stream of commits with a 'Statuses' attribute that may contain
 		// URLs refering to CI pipelines
-		errc <- c.broadcastMonitorRefStatus(ctx, repo, ref, commitc)
+		errc <- c.broadcastMonitorRefStatus(ctx, repositoryURL, ref, commitc)
 	}()
 
 	wg.Add(1)
@@ -744,13 +744,16 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repo string, ref string, u
 		// Ask for monitoring of each URL
 		for commit := range commitc {
 			c.SaveCommit(ref, commit)
-			select {
-			case updates <- time.Now():
-				// Do nothing
-			case <-ctx.Done():
-				errc <- ctx.Err()
-				return
-			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				select {
+				case updates <- time.Now():
+					// Do nothing
+				case <-ctx.Done():
+					// Do nothing
+				}
+			}()
 			for _, u := range commit.Statuses {
 				if _, exists := urls[u]; !exists {
 					wg.Add(1)
