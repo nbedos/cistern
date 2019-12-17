@@ -403,12 +403,13 @@ func (p Pipeline) Key() PipelineKey {
 }
 
 type Cache struct {
-	commitsByRef    map[string]Commit
-	pipelineByKey   map[PipelineKey]*Pipeline
-	pipelineByRef   map[string]map[PipelineKey]*Pipeline
-	mutex           *sync.Mutex
 	ciProvidersById map[string]CIProvider
 	sourceProviders []SourceProvider
+	mutex           *sync.Mutex
+	// All the following data structures must be accessed after acquiring mutex
+	commitsByRef  map[string]Commit
+	pipelineByKey map[PipelineKey]*Pipeline
+	pipelineByRef map[string]map[PipelineKey]*Pipeline
 }
 
 func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache {
@@ -848,9 +849,13 @@ func (c *Cache) Log(ctx context.Context, key taskKey) (string, error) {
 
 	log := step.Log.Content.String
 	if !step.Log.Content.Valid {
-		provider, exists := c.ciProvidersById[key.providerID]
+		pipeline, exists := c.Pipeline(pKey)
 		if !exists {
-			return "", fmt.Errorf("no matching provider found in cache for account ID %q", key.providerID)
+
+		}
+		provider, exists := c.ciProvidersById[pipeline.providerID]
+		if !exists {
+			return "", fmt.Errorf("no matching provider found in cache for account ID %q", pipeline.providerID)
 		}
 
 		log, err = provider.Log(ctx, step)

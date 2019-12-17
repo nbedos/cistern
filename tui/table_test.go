@@ -132,7 +132,7 @@ func TestNewTable(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expected := []string{"a", "b", "c", "f", "g"}
+		expected := []string{"a", "b", "c", "c.d", "c.e", "f", "g"}
 		if len(table.rows) != len(expected) {
 			t.Fatalf("wrong number of element in table: expected %d but got %d", len(expected),
 				len(table.rows))
@@ -161,7 +161,7 @@ func TestTable_Refresh(t *testing.T) {
 		table.source = source
 		table.Refresh()
 
-		expected := []string{"a", "b", "c", "f", "g"}
+		expected := []string{"a", "b", "c", "c.d", "c.e", "f", "g"}
 		if len(table.rows) != len(expected) {
 			t.Fatalf("wrong number of element in table: expected %d but got %d", len(expected),
 				len(table.rows))

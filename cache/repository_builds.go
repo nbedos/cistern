@@ -19,7 +19,6 @@ const maxStepIDs = 10
 type StepPath [maxStepIDs]utils.NullString
 
 type taskKey struct {
-	providerID   string
 	providerHost string
 	stepIDs      StepPath
 }
@@ -135,7 +134,6 @@ func (t *task) SetPrefix(s string) {
 
 func taskFromPipeline(p Pipeline, providerByID map[string]CIProvider) task {
 	key := taskKey{
-		providerID:   p.providerID,
 		providerHost: p.providerHost,
 		stepIDs:      [maxStepIDs]utils.NullString{},
 	}
