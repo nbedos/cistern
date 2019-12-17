@@ -1,6 +1,7 @@
 language: go
 
 jobs:
+  include:
     - stage: "Tests"
       name: "GoLang 1.13 on Ubuntu Bionic"
       os: linux
