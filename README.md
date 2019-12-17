@@ -51,7 +51,7 @@ This method requires only golang >= 1.12 and a UNIX system.
 ```shell
 git clone git@github.com:nbedos/citop.git && cd citop
 mkdir build
-BUILD_VERSION="$(git describe --tags --long --dirty)_$(go env GOOS)/$(go env GOARCH)" && \
+BUILD_VERSION="$(git describe --tags --dirty)_$(go env GOOS)/$(go env GOARCH)" && \
 go build -ldflags "-X main.Version=$BUILD_VERSION" -o build/citop
 # Test newly built executable
 ./build/citop
@@ -64,7 +64,7 @@ users that do not wish to install `pandoc` on their system.
 This method requires access to a Docker instance
 ```shell
 git clone git@github.com:nbedos/citop.git && cd citop
-export CITOP_DOCKER_IMAGE="citop:$(git describe --tags --long --dirty)"
+export CITOP_DOCKER_IMAGE="citop:$(git describe --tags --dirty)"
 docker build -t "$CITOP_DOCKER_IMAGE" .
 docker run -it "$CITOP_DOCKER_IMAGE"
 ```

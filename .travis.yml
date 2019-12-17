@@ -30,8 +30,8 @@ jobs:
     script:
     - make tests
   - stage: Deployment
-    name: GitHub release (draft)
-    if: tag IS present AND ( NOT tag =~ ^[0-9]+\.[0-9]+\.[0-9]+$ )
+    name: GitHub release
+    if: tag IS present
     os: linux
     dist: bionic
     go: 1.13.x
@@ -48,7 +48,6 @@ jobs:
       name: $TRAVIS_TAG
       file_glob: true
       file: build/*.tar.gz
-      release_notes_file: "build/notes.md"
       draft: true
       on:
           tags: true

@@ -12,7 +12,7 @@ EXEC=citop
 # Name of the go project
 PACKAGE=citop
 PACKAGE_PATH=github.com/nbedos/citop
-VERSION=$(shell git describe --tags --long --dirty)
+VERSION=$(shell git describe --tags --dirty)
 
 
 usage:
@@ -56,7 +56,7 @@ releases: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.1 $(BUILD)/$(EXE
 		tar -C "$(BUILD)" -czf "$$ARCHIVE" "$$DIR" ; \
 	    done ; \
 	done && \
-	cd "$(BUILD)" && sha1sum *gz | tee notes.md
+	cd "$(BUILD)" && sha1sum *gz
 
 $(BUILD):
 	mkdir -p $(BUILD)
