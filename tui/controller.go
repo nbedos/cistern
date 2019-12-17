@@ -249,6 +249,7 @@ func (c *Controller) viewLog(ctx context.Context) error {
 	log = deleteUntilCarriageReturn.ReplaceAllString(log, "$1")
 	stdin.WriteString(log)
 
+	// FIXME Do not make this choice here, move this to the configuration
 	pager := os.Getenv("PAGER")
 	if pager == "" {
 		pager = "less"
@@ -276,7 +277,7 @@ func (c *Controller) viewHelp(ctx context.Context) error {
 }
 
 func (c Controller) openWebBrowser(url string) error {
-	// FIXME Move this out of here
+	// FIXME Move this to the configuration
 	browser := os.Getenv("BROWSER")
 	if browser == "" {
 		return errors.New("BROWSER environment variable not set")

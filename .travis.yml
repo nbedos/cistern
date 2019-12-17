@@ -1,33 +1,46 @@
 language: go
 
 jobs:
-    include:
-        - stage: "tests"
-          name: "GoLang 1.13 on Ubuntu Bionic"
-          os: linux
-          dist: bionic
-          go: 1.13.x
+    - stage: "Tests"
+      name: "GoLang 1.13 on Ubuntu Bionic"
+      os: linux
+      dist: bionic
+      go: 1.13.x
+      script:
+        - make tests
 
-        - stage: "tests"
-          name: "GoLang 1.12 on Ubuntu Trusty"
-          os: linux
-          dist: trusty
-          go: 1.12.x
+    - stage: "Tests"
+      name: "GoLang 1.12 on Ubuntu Trusty"
+      os: linux
+      dist: trusty
+      go: 1.12.x
+      script:
+        - make tests
 
-        - stage: "tests"
-          name: "GoLang 1.13 on macOS 10.14"
-          os: osx
-          osx_image: xcode11.2
-          go: 1.12.x
+    - stage: "Tests"
+      name: "GoLang 1.13 on macOS 10.14"
+      os: osx
+      osx_image: xcode11.2
+      go: 1.13.x
+      script:
+        - make tests
 
-        - stage: "tests"
-          name: "GoLang 1.12 on macOS 10.13"
-          os: osx
-          osx_image: xcode9.4
-          go: 1.12.x
+    - stage: "Tests"
+      name: "GoLang 1.12 on macOS 10.13"
+      os: osx
+      osx_image: xcode9.4
+      go: 1.12.x
+      script:
+        - make tests
 
-install: true
-
-script:
-  - make tests
-
+    - stage: "Release"
+      name: "Release (staging)"
+      if: tag IS present AND ( NOT tag =~ ^[0-9]+\.[0-9]+\.[0-9]+$ )
+      os: linux
+      dist: bionic
+      go: 1.13.x
+      script:
+          - make releases
+      addons:
+          apt_packages:
+              - pandoc

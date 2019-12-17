@@ -40,6 +40,9 @@ $(BUILD)/$(EXEC).man.1 : man.md $(BUILD)
 	pandoc -s -t man >  $@
 
 releases: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.1 $(BUILD)/$(EXEC).man.html
+	echo "Starting release..." && \
+	go version && \
+	pandoc -v | head -n1 && \
 	for GOARCH in amd64; \
 	do \
 	    for GOOS in linux freebsd openbsd netbsd osx; \
@@ -52,7 +55,8 @@ releases: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.1 $(BUILD)/$(EXE
 		cp "$(BUILD)/$(EXEC)" "$(BUILD)/LICENSE" "$(BUILD)/$(EXEC).man.html" "$(BUILD)/$(EXEC).man.1" "$(BUILD)/$$DIR/" && \
 		tar -C "$(BUILD)" -czf "$$ARCHIVE" "$$DIR" ; \
 	    done ; \
-	done
+	done && \
+	cd "$(BUILD)" && sha1sum *gz
 
 $(BUILD):
 	mkdir -p $(BUILD)
