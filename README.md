@@ -23,7 +23,7 @@ This is as simple as running `git push && citop` to monitor the pipelines trigge
 `push` or running `citop <commit>` to monitor a specific commit. citop will show the status, timings
 and logs of pipelines, stages and jobs.
 
-## Integration with Travis CI, AppVeyor, CircleCI and GitLab CI
+## Integration with Travis CI, AppVeyor, CircleCI, GitLab CI and Azure DevOps
 For repositories that rely on multiple CI providers this allows monitoring pipelines of multiple
 providers in a single place.
 
@@ -32,53 +32,69 @@ Just select the pipeline, stage or job you're interested in and press 'b' to ope
 web page on the CI provider's website. This gives easy access to features offered by CI providers
 that are not implemented by citop (pipeline cancellation, artifact download...)
 
-# Building citop
-## Building automatically from source
-This method requires a UNIX system with `make`, `pandoc` and golang >= 1.12.
+
+# Installation
+## Building citop from source
+### Building automatically from source (recommended)
+This method requires a UNIX system with `make`, `pandoc` and golang >= 1.11.
 ```shell
 git clone git@github.com:nbedos/citop.git && cd citop
 make citop
-# Test newly built executable
-./build/citop
 ```
 
-In addition to the executable this will also build two versions of the manual page:
+At this point you should find the executable located at `./build/citop` as well as two versions
+of the manual page:
 * `./build/citop.man.1` (roff format)
 * `./build/citop.man.html`
 
-## Building manually from source
-This method requires only golang >= 1.12 and a UNIX system.
+### Building manually from source
+This method requires golang >= 1.11 and a UNIX system.
 ```shell
 git clone git@github.com:nbedos/citop.git && cd citop
 mkdir build
 BUILD_VERSION="$(git describe --tags --dirty)_$(go env GOOS)/$(go env GOARCH)" && \
+GO111MODULE=on && \
 go build -ldflags "-X main.Version=$BUILD_VERSION" -o build/citop
-# Test newly built executable
-./build/citop
 ```
 
-Note that this method ignores eventual changes made to the file `man.md`. It is provided for
-users that do not wish to install `pandoc` on their system.
+At this point you should find the executable located at `./build/citop`.
 
-## Building a Docker image
-This method requires access to a Docker instance
+Note that this method ignores eventual changes made to the file `man.md` and won't build the manual
+page. It is provided for users that do not wish to install `pandoc` on their system. In any case
+the manual page is made available for each [release](https://github.com/nbedos/citop/releases). 
+
+### Building a Docker image
+This method requires access to Docker 17.05 or higher since it relies on a multi-stage build.
 ```shell
 git clone git@github.com:nbedos/citop.git && cd citop
 export CITOP_DOCKER_IMAGE="citop:$(git describe --tags --dirty)"
 docker build -t "$CITOP_DOCKER_IMAGE" .
-docker run -it "$CITOP_DOCKER_IMAGE"
+
+# Mount a local repository as a volume mapped to `/citop` to monitor its pipelines 
+docker run -it -v "$PWD:/citop" "$CITOP_DOCKER_IMAGE"
+
+# Monitor non local repositories by specifying the URL:
+docker run -it "$CITOP_DOCKER_IMAGE" -r github.com/nbedos/citop
 ```
+
+## Binary releases
+Binary releases are made available for each version of citop 
+[here](https://github.com/nbedos/citop/releases).
+
+Each release archive contains a statically linked executable named `citop`, the manual page
+in HTML and roff format and a copy of the license. 
 
 # Configuration
 citop requires access to various APIs. The corresponding credentials should be stored in a
 configuration file as described in the [manual page](https://nbedos.github.io/citop/citop.man).
 
 If the configuration file is missing, citop will run with the following limitations:
-* citop will likely reach the rate limit of the GitHub API for unauthenticated clients in a few minutes
+* citop will likely reach the [rate limit of the GitHub API](https://developer.github.com/v3/#rate-limiting)
+for unauthenticated clients in a few minutes
 * citop will not be able to access pipeline jobs on GitLab without an API access token
     
-In most cases this should still be enough for a quick test of the application without having to
-bother with personal access tokens.
+In most cases running without a configuration file should still be enough for a quick test
+of the application without having to bother with personal access tokens.
 
 # Usage
 ```
@@ -140,8 +156,8 @@ More information is available in the [manual page](https://nbedos.github.io/cito
 
 
 ## Support
-Questions, bug reports and feature requests are welcome and should be submitted
-[here](https://github.com/nbedos/citop/issues).
+Questions, bug reports and feature requests are welcome and should be submitted as
+[issues](https://github.com/nbedos/citop/issues).
 
 ## Contributing
 Pull requests are welcome. If you foresee that a PR will take any significant amount of your time,

@@ -27,7 +27,7 @@ usage:
 citop: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.html $(BUILD)/$(EXEC).man.1
 	BUILD_VERSION="$(VERSION)_$$(go env GOOS)/$$(go env GOARCH)" && \
 	echo "Building $(BUILD)/$(EXEC)... (version $$BUILD_VERSION)" && \
-	go build -trimpath -ldflags "-X main.Version=$$BUILD_VERSION" -o "$(BUILD)/$(EXEC)"
+	go build -ldflags "-X main.Version=$$BUILD_VERSION" -o "$(BUILD)/$(EXEC)"
 
 $(BUILD)/$(EXEC).man.html : man.md $(BUILD) pandoc_template.html
 	echo "Building $@..." && \
@@ -51,7 +51,7 @@ releases: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.1 $(BUILD)/$(EXE
 		ARCHIVE="$(BUILD)/$$DIR.tar.gz" && \
 		echo "Building $$ARCHIVE..." && \
 		mkdir -p "$(BUILD)/$$DIR" && \
-		go build -trimpath -ldflags "-X \"main.Version=$(VERSION) $$GOOS/$$GOARCH\"" -o "$(BUILD)/$(EXEC)" && \
+		go build -ldflags "-X \"main.Version=$(VERSION) $$GOOS/$$GOARCH\"" -o "$(BUILD)/$(EXEC)" && \
 		cp "$(BUILD)/$(EXEC)" "$(BUILD)/LICENSE" "$(BUILD)/$(EXEC).man.html" "$(BUILD)/$(EXEC).man.1" "$(BUILD)/$$DIR/" && \
 		tar -C "$(BUILD)" -czf "$$ARCHIVE" "$$DIR" ; \
 	    done ; \

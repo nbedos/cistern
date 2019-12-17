@@ -5,7 +5,9 @@ COPY . .
 RUN make citop
 
 FROM alpine:latest
-RUN apk add man
+WORKDIR /citop
+RUN apk add man ca-certificates less
+ENV PAGER less
 COPY --from=builder /citop/build/citop /bin
-CMD ["-r", "github.com/nbedos/citop", "master"]
+CMD []
 ENTRYPOINT ["citop"]
