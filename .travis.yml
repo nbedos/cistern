@@ -48,7 +48,7 @@ jobs:
       name: $TRAVIS_TAG
       file_glob: true
       file: build/*.tar.gz
-      release_notes_file: build/notes.txt
+      release_notes_file: "build/notes.md"
       draft: true
       on:
           tags: true
