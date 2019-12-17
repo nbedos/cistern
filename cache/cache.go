@@ -403,7 +403,7 @@ func (p Pipeline) Key() PipelineKey {
 }
 
 type Cache struct {
-	ciProvidersById map[string]CIProvider
+	ciProvidersByID map[string]CIProvider
 	sourceProviders []SourceProvider
 	mutex           *sync.Mutex
 	// All the following data structures must be accessed after acquiring mutex
@@ -423,7 +423,7 @@ func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache 
 		pipelineByKey:   make(map[PipelineKey]*Pipeline),
 		pipelineByRef:   make(map[string]map[PipelineKey]*Pipeline),
 		mutex:           &sync.Mutex{},
-		ciProvidersById: providersByAccountID,
+		ciProvidersByID: providersByAccountID,
 		sourceProviders: sourceProviders,
 	}
 }
@@ -597,7 +597,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
-	for _, p := range c.ciProvidersById {
+	for _, p := range c.ciProvidersByID {
 		wg.Add(1)
 		go func(p CIProvider) {
 			defer wg.Done()
@@ -626,7 +626,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 		if e != nil {
 			// Only report ErrUnknownPipelineURL if all providers returned this error.
 			if e == ErrUnknownPipelineURL {
-				if n++; n < len(c.ciProvidersById) {
+				if n++; n < len(c.ciProvidersByID) {
 					continue
 				}
 			}
@@ -853,7 +853,7 @@ func (c *Cache) Log(ctx context.Context, key taskKey) (string, error) {
 		if !exists {
 
 		}
-		provider, exists := c.ciProvidersById[pipeline.providerID]
+		provider, exists := c.ciProvidersByID[pipeline.providerID]
 		if !exists {
 			return "", fmt.Errorf("no matching provider found in cache for account ID %q", pipeline.providerID)
 		}

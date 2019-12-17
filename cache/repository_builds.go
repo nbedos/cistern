@@ -243,7 +243,7 @@ func (s BuildsByCommit) Alignment() map[string]text.Alignment {
 func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 	rows := make([]HierarchicalTabularSourceRow, 0)
 	for _, p := range s.cache.PipelinesByRef(s.ref) {
-		t := taskFromPipeline(p, s.cache.ciProvidersById)
+		t := taskFromPipeline(p, s.cache.ciProvidersByID)
 		rows = append(rows, &t)
 	}
 
