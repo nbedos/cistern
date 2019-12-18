@@ -1,8 +1,6 @@
-[![Travis Build Status](https://travis-ci.org/nbedos/citop.svg?branch=master)](https://travis-ci.org/nbedos/citop/builds)
-
 # citop
-A UNIX program that displays information about pipelines of Continuous
-Integration services. citop stands for Continous Integration Table Of Pipelines.
+A UNIX program to monitor Continuous Integration pipelines from the command line.
+citop stands for Continous Integration Table Of Pipelines.
 
 ![Animated demonstration](demo.svg)
 
@@ -15,21 +13,37 @@ The remaining steps before a first alpha release are:
 * Implementing application configuration (essentially for credentials in a first time)
 * Improving quality by adding tests
 
-# Features
-## Monitor pipelines of GitHub or GitLab repository 
-This is as simple as running `git push && citop` to monitor the pipelines triggered by your last
-`push` or running `citop <commit>` to monitor a specific commit. citop will show the status, timings
-and logs of pipelines, stages and jobs.
+# Motivation
+I started working on citop because I needed a simple way to use multiple CI providers for a single
+repository. I've always found it inconvenient to have to use a web browser to check why a pipeline
+failed and using multiple providers only makes this worse. I've also never found email or instant
+messaging notifications convenient for that purpose.
 
-## Integration with Travis CI, AppVeyor, CircleCI, GitLab CI and Azure DevOps
-For repositories that rely on multiple CI providers this allows monitoring pipelines of multiple
-providers in a single place.
+A local git repository contains information about where (GitHub, GitLab...) it is hosted
+ and which commit is the most recent. Given a commit, online repository hosts are able to list
+all the pipelines associated to it. Then CI providers can provide detailed information about each
+pipeline. So really I should be able to run `git commit -m '<message>' && git push` and then call a
+utility that would show me the pipelines I just triggered, all their jobs with statuses updates in
+real time and an easy access to logs. This is what I would like citop to be.
 
-## Quick access to pipeline web pages
-Just select the pipeline, stage or job you're interested in and press 'b' to open the corresponding
-web page on the CI provider's website. This gives easy access to features offered by CI providers
-that are not implemented by citop (pipeline cancellation, artifact download...)
+# Features and limitations
+* **Monitor pipelines associated to a commit of a GitHub or GitLab repository**: See status, duration
+and start time of pipelines as well as stages and jobs (and job tasks if available). Download job
+logs on demand.
+* **Integration with Travis CI, AppVeyor, CircleCI, GitLab CI and Azure DevOps**: citop is mostly
+target at open source developers
+* **Open the web page of a pipeline by pressing a single key**: for quick access to the website of
+your CI provider if citop does not cover a specific use case.
 
+
+citop currently has the following shortcomings, some or all of which may end up being fixed:
+* **UI configurability is non existent**: No custom key mappings, colors, column order or sort order
+* **Starting, restarting or canceling a pipeline is not possible**
+* **Compatibility is restricted to Unix systems**: all dependencies and the majority of the code base
+should work on Windows, but there are still a few Unixisms here and there.
+* **No integration with GitHub Actions**: GitHub does not currently give access to action logs
+via their API
+* **Git is the only version-control system supported**
 
 # Installation
 ## Binary releases
