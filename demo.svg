@@ -159,9 +159,9 @@
         <g id="subtitles">
             <text filter="url(#solid)" class="subtext" x="50%" y="20px">Monitor CI pipelines from Travis, GitLab...</text>
             <text filter="url(#solid)" class="subtext" x="50%" y="220px">...Azure DevOps, CircleCI and AppVeyor</text>
-            <text filter="url(#solid)" class="subtext" x="50%" y="320px">For each pipeline, see the status of all...</text>
+            <text filter="url(#solid)" class="subtext" x="50%" y="320px">For each pipeline, view the status of all...</text>
             <text filter="url(#solid)" class="subtext" x="50%" y="520px">...stages, jobs and tasks</text>
-            <text filter="url(#solid)" class="subtext" x="50%" y="720px">View job logs in $PAGER</text>
+            <text filter="url(#solid)" class="subtext" x="50%" y="720px">Display job logs in $PAGER</text>
             <text filter="url(#solid)" class="subtext" x="50%" y="920px">All of this from the command line!</text>
     </g>
 </svg>
