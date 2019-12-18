@@ -5,13 +5,8 @@ citop stands for Continous Integration Table Of Pipelines.
 ![Animated demonstration](demo.svg)
 
 # Project status
-citop is under active development and not yet ready for public release.
-
-Integration with a few CI providers has been implemented and is usable.
-
-The remaining steps before a first alpha release are:
-* Implementing application configuration (essentially for credentials in a first time)
-* Improving quality by adding tests
+citop is currently in the initial development phase. Anything may change at any time and the API
+should not be considered stable.
 
 # Motivation
 I started working on citop because I needed a simple way to use multiple CI providers for a single

@@ -5,7 +5,7 @@
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <meta name="author" content="Nicolas Bedos" />
-  <title>CITOP(1) | version 0.0.0-124-g1765323-dirty</title>
+  <title>CITOP(1) | version $(git describe –tags –dirty)</title>
   <style>
       code{white-space: pre-wrap;}
       span.smallcaps{font-variant: small-caps;}
@@ -19,7 +19,7 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">CITOP(1) | version 0.0.0-124-g1765323-dirty</h1>
+<h1 class="title">CITOP(1) | version $(git describe –tags –dirty)</h1>
 <p class="author">Nicolas Bedos</p>
 </header>
 <h1 id="name">NAME</h1>
@@ -233,6 +233,11 @@ citop -r /home/user/repos/myrepo</code></pre>
 # citop requires credentials for at least one source provider and
 # one CI provider to run. Feel free to remove sections below 
 # as long as this rule is met.
+#
+# Note that for all providers, not setting an API token or 
+# setting `token = &quot;&quot;` will cause the provider to make
+# unauthenticated API requests. 
+#
 
 ### GITHUB ###
 [[providers.github]]
@@ -341,20 +346,25 @@ token = &quot;&quot;
 <li><code>man</code> to show the manual page</li>
 </ul>
 <h1 id="examples">EXAMPLES</h1>
-<p>Show pipelines associated to the HEAD of the current git repository</p>
-<pre class="shell"><code>citop</code></pre>
-<p>Show pipelines associated to a specific commit, tag or branch</p>
-<pre class="shell"><code>citop 64be3c6
-citop 0.9.0
-citop feature/doc</code></pre>
-<p>Show pipelines of a repository specified by a URL</p>
-<pre class="shell"><code>citop -r https://gitlab.com/nbedos/citop
-citop -r git@github.com:nbedos/citop.git
-citop -r github.com/nbedos/citop</code></pre>
-<p>Show pipelines of a local repository specified by a path</p>
-<pre class="shell"><code>citop -r /home/user/repos/myrepo</code></pre>
-<p>Specify both repository and commit</p>
-<pre class="shell"><code>citop -r github.com/nbedos/citop 64be3c6</code></pre>
+<p>Monitor pipelines of the current git repository</p>
+<pre class="shell"><code># Move to a directory containing a git repository of your choosing
+git clone git@github.com:nbedos/citop.git &amp;&amp; cd citop
+# Run citop to list the pipelines associated to the last commit of the repository 
+citop
+
+# Show pipelines associated to a specific commit, tag or branch
+citop a24840c
+citop 0.1.0
+citop master</code></pre>
+<p>Monitor pipelines of other repositories</p>
+<pre class="shell"><code># Show pipelines of a repository identified by a URL or path
+citop -r https://gitlab.com/nbedos/citop        # Web URL
+citop -r git@github.com:nbedos/citop.git        # Git URL
+citop -r github.com/nbedos/citop                # URL without scheme
+citop -r /home/user/repos/repo                  # Path to a repository
+
+# Specify both repository and git reference
+citop -r github.com/nbedos/citop master</code></pre>
 <h1 id="bugs">BUGS</h1>
 <p>Questions, bug reports and feature requests are welcome and should be submitted on <a href="https://github.com/nbedos/citop/issues">GitHub</a>.</p>
 <h1 id="notes">NOTES</h1>
