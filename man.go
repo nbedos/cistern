@@ -302,6 +302,11 @@ This example describes and uses all existing configuration options.
 # citop requires credentials for at least one source provider and
 # one CI provider to run. Feel free to remove sections below 
 # as long as this rule is met.
+#
+# Note that for all providers, not setting an API token or 
+# setting \[ga]token = \[dq]\[dq]\[ga] will cause the provider to make
+# unauthenticated API requests. 
+#
 
 ### GITHUB ###
 [[providers.github]]
@@ -418,47 +423,34 @@ into a non-abbreviated SHA
 \f[C]man\f[R] to show the manual page
 .SH EXAMPLES
 .PP
-Show pipelines associated to the HEAD of the current git repository
+Monitor pipelines of the current git repository
 .IP
 .nf
 \f[C]
+# Move to a directory containing a git repository of your choosing
+git clone git\[at]github.com:nbedos/citop.git && cd citop
+# Run citop to list the pipelines associated to the last commit of the repository 
 citop
+
+# Show pipelines associated to a specific commit, tag or branch
+citop a24840c
+citop 0.1.0
+citop master
 \f[R]
 .fi
 .PP
-Show pipelines associated to a specific commit, tag or branch
+Monitor pipelines of other repositories
 .IP
 .nf
 \f[C]
-citop 64be3c6
-citop 0.9.0
-citop feature/doc
-\f[R]
-.fi
-.PP
-Show pipelines of a repository specified by a URL
-.IP
-.nf
-\f[C]
-citop -r https://gitlab.com/nbedos/citop
-citop -r git\[at]github.com:nbedos/citop.git
-citop -r github.com/nbedos/citop
-\f[R]
-.fi
-.PP
-Show pipelines of a local repository specified by a path
-.IP
-.nf
-\f[C]
-citop -r /home/user/repos/myrepo
-\f[R]
-.fi
-.PP
-Specify both repository and commit
-.IP
-.nf
-\f[C]
-citop -r github.com/nbedos/citop 64be3c6
+# Show pipelines of a repository identified by a URL or path
+citop -r https://gitlab.com/nbedos/citop        # Web URL
+citop -r git\[at]github.com:nbedos/citop.git        # Git URL
+citop -r github.com/nbedos/citop                # URL without scheme
+citop -r /home/user/repos/repo                  # Path to a repository
+
+# Specify both repository and git reference
+citop -r github.com/nbedos/citop master
 \f[R]
 .fi
 .SH BUGS

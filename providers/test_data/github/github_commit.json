@@ -1,0 +1,98 @@
+{
+  "sha": "d58600a58bf1738c6529ce3489a546bfa2178e07",
+  "node_id": "MDY6Q29tbWl0MTM2NzI3NDcxOmQ1ODYwMGE1OGJmMTczOGM2NTI5Y2UzNDg5YTU0NmJmYTIxNzhlMDc=",
+  "commit": {
+    "author": {
+      "name": "nbedos",
+      "email": "nicolas.bedos@gmail.com",
+      "date": "2019-11-16T14:59:32Z"
+    },
+    "committer": {
+      "name": "nbedos",
+      "email": "nicolas.bedos@gmail.com",
+      "date": "2019-11-16T14:59:32Z"
+    },
+    "message": "Bump version to 1.0.0",
+    "tree": {
+      "sha": "2ee988099f05a4bf126f978824cb678f014e756c",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/git/trees/2ee988099f05a4bf126f978824cb678f014e756c"
+    },
+    "url": "https://api.github.com/repos/nbedos/termtosvg/git/commits/d58600a58bf1738c6529ce3489a546bfa2178e07",
+    "comment_count": 0,
+    "verification": {
+      "verified": false,
+      "reason": "unsigned",
+      "signature": null,
+      "payload": null
+    }
+  },
+  "url": "https://api.github.com/repos/nbedos/termtosvg/commits/d58600a58bf1738c6529ce3489a546bfa2178e07",
+  "html_url": "https://github.com/nbedos/termtosvg/commit/d58600a58bf1738c6529ce3489a546bfa2178e07",
+  "comments_url": "https://api.github.com/repos/nbedos/termtosvg/commits/d58600a58bf1738c6529ce3489a546bfa2178e07/comments",
+  "author": {
+    "login": "nbedos",
+    "id": 33371440,
+    "node_id": "MDQ6VXNlcjMzMzcxNDQw",
+    "avatar_url": "https://avatars0.githubusercontent.com/u/33371440?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/nbedos",
+    "html_url": "https://github.com/nbedos",
+    "followers_url": "https://api.github.com/users/nbedos/followers",
+    "following_url": "https://api.github.com/users/nbedos/following{/other_user}",
+    "gists_url": "https://api.github.com/users/nbedos/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/nbedos/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/nbedos/subscriptions",
+    "organizations_url": "https://api.github.com/users/nbedos/orgs",
+    "repos_url": "https://api.github.com/users/nbedos/repos",
+    "events_url": "https://api.github.com/users/nbedos/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/nbedos/received_events",
+    "type": "User",
+    "site_admin": false
+  },
+  "committer": {
+    "login": "nbedos",
+    "id": 33371440,
+    "node_id": "MDQ6VXNlcjMzMzcxNDQw",
+    "avatar_url": "https://avatars0.githubusercontent.com/u/33371440?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/nbedos",
+    "html_url": "https://github.com/nbedos",
+    "followers_url": "https://api.github.com/users/nbedos/followers",
+    "following_url": "https://api.github.com/users/nbedos/following{/other_user}",
+    "gists_url": "https://api.github.com/users/nbedos/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/nbedos/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/nbedos/subscriptions",
+    "organizations_url": "https://api.github.com/users/nbedos/orgs",
+    "repos_url": "https://api.github.com/users/nbedos/repos",
+    "events_url": "https://api.github.com/users/nbedos/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/nbedos/received_events",
+    "type": "User",
+    "site_admin": false
+  },
+  "parents": [
+    {
+      "sha": "64be3c628dd10af7825395de8160dfe88a30f1f7",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/64be3c628dd10af7825395de8160dfe88a30f1f7",
+      "html_url": "https://github.com/nbedos/termtosvg/commit/64be3c628dd10af7825395de8160dfe88a30f1f7"
+    }
+  ],
+  "stats": {
+    "total": 2,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "sha": "f630cefb1c9aaf49eb1f14946faebc0f599c8262",
+      "filename": "setup.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1,
+      "changes": 2,
+      "blob_url": "https://github.com/nbedos/termtosvg/blob/d58600a58bf1738c6529ce3489a546bfa2178e07/setup.py",
+      "raw_url": "https://github.com/nbedos/termtosvg/raw/d58600a58bf1738c6529ce3489a546bfa2178e07/setup.py",
+      "contents_url": "https://api.github.com/repos/nbedos/termtosvg/contents/setup.py?ref=d58600a58bf1738c6529ce3489a546bfa2178e07",
+      "patch": "@@ -4,7 +4,7 @@\n \n setup(\n     name='termtosvg',\n-    version='1.0.0rc1',\n+    version='1.0.0',\n     license='BSD 3-clause license',\n     author='Nicolas Bedos',\n     author_email='nicolas.bedos@gmail.com',"
+    }
+  ]
+}

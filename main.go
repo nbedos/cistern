@@ -64,7 +64,7 @@ type ProvidersConfiguration struct {
 	}
 	Travis []struct {
 		Name              string  `toml:"name"`
-		Url               string  `toml:"url"`
+		URL               string  `toml:"url"`
 		Token             string  `toml:"token"`
 		RequestsPerSecond float64 `toml:"max_requests_per_second"`
 	}
@@ -181,13 +181,13 @@ func (c ProvidersConfiguration) Providers(ctx context.Context) ([]cache.SourcePr
 		id := fmt.Sprintf("travis-%d", i)
 		var err error
 		var u *url.URL
-		switch strings.ToLower(conf.Url) {
+		switch strings.ToLower(conf.URL) {
 		case "org":
 			u = &providers.TravisOrgURL
 		case "com":
 			u = &providers.TravisComURL
 		default:
-			u, err = url.Parse(conf.Url)
+			u, err = url.Parse(conf.URL)
 			if err != nil {
 				return nil, nil, err
 			}

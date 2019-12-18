@@ -17,7 +17,7 @@ import (
 func TestTravisClientfetchPipeline(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && r.URL.Path == "/build/609256446" {
-			bs, err := ioutil.ReadFile("test_data/travis_build_609256446.json")
+			bs, err := ioutil.ReadFile("test_data/travis/travis_build_609256446.json")
 			if err != nil {
 				t.Fatal(err)
 			}

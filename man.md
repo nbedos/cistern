@@ -168,6 +168,11 @@ This example describes and uses all existing configuration options.
 # citop requires credentials for at least one source provider and
 # one CI provider to run. Feel free to remove sections below 
 # as long as this rule is met.
+#
+# Note that for all providers, not setting an API token or 
+# setting `token = ""` will cause the provider to make
+# unauthenticated API requests. 
+#
 
 ### GITHUB ###
 [[providers.github]]
@@ -280,33 +285,29 @@ citop relies on the following local executables:
 
 # EXAMPLES
 
-Show pipelines associated to the HEAD of the current git repository
+Monitor pipelines of the current git repository
 ```shell
+# Move to a directory containing a git repository of your choosing
+git clone git@github.com:nbedos/citop.git && cd citop
+# Run citop to list the pipelines associated to the last commit of the repository 
 citop
+
+# Show pipelines associated to a specific commit, tag or branch
+citop a24840c
+citop 0.1.0
+citop master
 ```
 
-Show pipelines associated to a specific commit, tag or branch
+Monitor pipelines of other repositories
 ```shell
-citop 64be3c6
-citop 0.9.0
-citop feature/doc
-```
+# Show pipelines of a repository identified by a URL or path
+citop -r https://gitlab.com/nbedos/citop        # Web URL
+citop -r git@github.com:nbedos/citop.git        # Git URL
+citop -r github.com/nbedos/citop                # URL without scheme
+citop -r /home/user/repos/repo                  # Path to a repository
 
-Show pipelines of a repository specified by a URL
-```shell
-citop -r https://gitlab.com/nbedos/citop
-citop -r git@github.com:nbedos/citop.git
-citop -r github.com/nbedos/citop
-```
-
-Show pipelines of a local repository specified by a path
-```shell
-citop -r /home/user/repos/myrepo
-```
-
-Specify both repository and commit
-```shell
-citop -r github.com/nbedos/citop 64be3c6
+# Specify both repository and git reference
+citop -r github.com/nbedos/citop master
 ```
 
 # BUGS

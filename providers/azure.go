@@ -149,7 +149,7 @@ type azureBuild struct {
 	} `json:"project"`
 	LastChangedDate string `json:"lastChangedDate"`
 	Logs            struct {
-		Url string `json:"url"`
+		URL string `json:"url"`
 	} `json:"logs"`
 	Repository struct {
 		ID string `json:"id"`

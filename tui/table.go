@@ -60,13 +60,12 @@ func (t *Table) computeMaxWidths() {
 
 func (t *Table) Refresh() {
 	// Save traversable state of current nodes
-	traversables := make(map[interface{}]struct{})
+	traversables := make(map[interface{}]bool)
 	for i := range t.nodes {
 		rowTraversal := utils.DepthFirstTraversal(t.nodes[i], true)
 		for j := range rowTraversal {
-			if row := rowTraversal[j].(cache.HierarchicalTabularSourceRow); row.Traversable() {
-				traversables[row.Key()] = struct{}{}
-			}
+			row := rowTraversal[j].(cache.HierarchicalTabularSourceRow)
+			traversables[row.Key()] = row.Traversable()
 		}
 	}
 
@@ -76,8 +75,8 @@ func (t *Table) Refresh() {
 	for _, node := range nodes {
 		for _, childRow := range utils.DepthFirstTraversal(node, true) {
 			childRow := childRow.(cache.HierarchicalTabularSourceRow)
-			_, exists := traversables[childRow.Key()]
-			childRow.SetTraversable(exists, false)
+			traversable, exists := traversables[childRow.Key()]
+			childRow.SetTraversable(traversable || !exists, false)
 		}
 		t.nodes = append(t.nodes, node)
 	}

@@ -1,12 +1,8 @@
-[![Travis Build Status](https://travis-ci.org/nbedos/citop.svg?branch=master)](https://travis-ci.org/nbedos/citop/builds)
-
 # citop
-A UNIX program that displays information about pipelines of Continuous
-Integration services. citop stands for Continous Integration Table Of Pipelines.
+A UNIX program to monitor Continuous Integration pipelines from the command line.
+citop stands for Continous Integration Table Of Pipelines.
 
-![User Interface](citop.svg)
-
-[Animated demo \[SVG, 290kB\]](https://nbedos.github.io/citop/demo.svg)
+![Animated demonstration](demo.svg)
 
 # Project status
 citop is under active development and not yet ready for public release.
@@ -17,64 +13,100 @@ The remaining steps before a first alpha release are:
 * Implementing application configuration (essentially for credentials in a first time)
 * Improving quality by adding tests
 
-# Features
-## Monitor pipelines of GitHub or GitLab repository 
-This is as simple as running `git push && citop` to monitor the pipelines triggered by your last
-`push` or running `citop <commit>` to monitor a specific commit. citop will show the status, timings
-and logs of pipelines, stages and jobs.
+# Motivation
+I started working on citop because I needed a simple way to use multiple CI providers for a single
+repository. I've always found it inconvenient to have to use a web browser to check why a pipeline
+failed and using multiple providers only makes this worse. I've also never found email or instant
+messaging notifications convenient for that purpose.
 
-## Integration with Travis CI, AppVeyor, CircleCI and GitLab CI
-For repositories that rely on multiple CI providers this allows monitoring pipelines of multiple
-providers in a single place.
+A local git repository contains information about where (GitHub, GitLab...) it is hosted
+ and which commit is the most recent. Given a commit, online repository hosts are able to list
+all the pipelines associated to it. Then CI providers can provide detailed information about each
+pipeline. So really I should be able to run `git commit -m '<message>' && git push` and then call a
+utility that would show me the pipelines I just triggered, all their jobs with statuses updates in
+real time and an easy access to logs. This is what I would like citop to be.
 
-## Quick access to pipeline web pages
-Just select the pipeline, stage or job you're interested in and press 'b' to open the corresponding
-web page on the CI provider's website. This gives easy access to features offered by CI providers
-that are not implemented by citop (pipeline cancellation, artifact download...)
+# Features and limitations
+* **List pipelines associated to a commit of a GitHub or GitLab repository**: pipelines are shown in
+a tree view where expanding a pipeline will reveal its stages, jobs and tasks 
+* **Integration with Travis CI, AppVeyor, CircleCI, GitLab CI and Azure DevOps**: citop is
+targeted at open source developers
+* **Monitor status changes in quasi real time**
+* **Open the web page of a pipeline by pressing a single key**: for quick access to the website of
+your CI provider if citop does not cover a specific use case.
 
-# Building citop
-## Building automatically from source
-This method requires a UNIX system with `make`, `pandoc` and golang >= 1.12.
+
+citop currently has the following shortcomings, some or all of which may end up being fixed:
+* **UI configurability is non existent**: No custom key mappings, colors, column order or sort order
+* **Starting, restarting or canceling a pipeline is not possible**
+* **Compatibility is restricted to Unix systems**: all dependencies and the majority of the code base
+should work on Windows, but there are still a few Unixisms here and there.
+* **No integration with GitHub Actions**: GitHub does not currently allow access to action logs
+via their API
+* **Git is the only version-control system supported**
+
+# Installation
+## Binary releases
+Binary releases are made available for each version of citop 
+[here](https://github.com/nbedos/citop/releases).
+
+Each release archive contains a statically linked executable named `citop`, the manual page
+in HTML and roff format and a copy of the license. 
+
+## Building from source
+### Building automatically from source (recommended)
+This method requires a UNIX system with `make`, `pandoc` and golang >= 1.11.
 ```shell
 git clone git@github.com:nbedos/citop.git && cd citop
 make citop
-# Test newly built executable
-./build/citop
 ```
 
-## Building manually from source
-This method requires only golang >= 1.12 and a UNIX system.
+At this point you should find the executable located at `./build/citop` as well as two versions
+of the manual page:
+* `./build/citop.man.1` (roff format)
+* `./build/citop.man.html`
+
+### Building manually from source
+This method requires golang >= 1.11 and a UNIX system.
 ```shell
 git clone git@github.com:nbedos/citop.git && cd citop
 mkdir build
-BUILD_VERSION="$(git describe --tags --long --dirty)_$(go env GOOS)/$(go env GOARCH)" && \
+BUILD_VERSION="$(git describe --tags --dirty)_$(go env GOOS)/$(go env GOARCH)" && \
+GO111MODULE=on && \
 go build -ldflags "-X main.Version=$BUILD_VERSION" -o build/citop
-# Test newly built executable
-./build/citop
 ```
 
-Note that this method ignores eventual changes made to the file `man.md`. It is provided for
-users that do not wish to install `pandoc` on their system.
+At this point you should find the executable located at `./build/citop`.
 
-## Building a Docker image
-This method requires access to a Docker instance
+Note that this method ignores eventual changes made to the file `man.md` and won't build the manual
+page. It is provided for users that do not wish to install `pandoc` on their system. In any case
+the manual page is made available for each [release](https://github.com/nbedos/citop/releases). 
+
+### Building a Docker image
+This method requires access to Docker 17.05 or higher since it relies on a multi-stage build.
 ```shell
 git clone git@github.com:nbedos/citop.git && cd citop
-export CITOP_DOCKER_IMAGE="citop:$(git describe --tags --long --dirty)"
+export CITOP_DOCKER_IMAGE="citop:$(git describe --tags --dirty)"
 docker build -t "$CITOP_DOCKER_IMAGE" .
-docker run -it "$CITOP_DOCKER_IMAGE"
+
+# Mount a local repository as a volume mapped to `/citop` to monitor its pipelines 
+docker run -it -v "$PWD:/citop" "$CITOP_DOCKER_IMAGE"
+
+# Monitor a non local repository by specifying a URL:
+docker run -it "$CITOP_DOCKER_IMAGE" -r github.com/nbedos/citop
 ```
 
 # Configuration
 citop requires access to various APIs. The corresponding credentials should be stored in a
 configuration file as described in the [manual page](https://nbedos.github.io/citop/citop.man).
 
-If the configuration file is missing, citop will still work but with the following limitations:
-* citop will likely reach the rate limit of the GitHub API for unauthenticated clients in a few minutes
+If the configuration file is missing, citop will run with the following limitations:
+* citop will likely reach the [rate limit of the GitHub API](https://developer.github.com/v3/#rate-limiting)
+for unauthenticated clients in a few minutes
 * citop will not be able to access pipeline jobs on GitLab without an API access token
     
-In most cases this should still be enough for a quick test of the application without having to
-bother with personal access tokens.
+In most cases running without a configuration file should still work well enough for quickly
+testing the application without having to bother with personal access tokens.
 
 # Usage
 ```
@@ -107,20 +139,26 @@ Options:
 ```
 
 ## Examples
+Monitor pipelines of the current git repository
 ```shell
-# Show pipelines associated to the last commit of the current git repository 
+# Move to a directory containing a git repository of your choosing
+git clone git@github.com:nbedos/citop.git && cd citop
+# Run citop to list the pipelines associated to the last commit of the repository 
 citop
 
-# Show pipelines associated to a specific commit, tag or branch of the
-# current git repository 
-citop 64be3c6
-citop 0.9.0
-citop feature/doc
+# Show pipelines associated to a specific commit, tag or branch
+citop a24840c
+citop 0.1.0
+citop master
+```
 
-# Show pipelines of a repository identified by a URL
-citop -r https://gitlab.com/nbedos/citop
-citop -r git@github.com:nbedos/citop.git
-citop -r github.com/nbedos/citop
+Monitor pipelines of other repositories
+```shell
+# Show pipelines of a repository identified by a URL or path
+citop -r https://gitlab.com/nbedos/citop        # Web URL
+citop -r git@github.com:nbedos/citop.git        # Git URL
+citop -r github.com/nbedos/citop                # URL without scheme
+citop -r /home/user/repos/repo                  # Path to a repository
 
 # Specify both repository and git reference
 citop -r github.com/nbedos/citop master
@@ -130,8 +168,8 @@ More information is available in the [manual page](https://nbedos.github.io/cito
 
 
 ## Support
-Questions, bug reports and feature requests are welcome and should be submitted
-[here](https://github.com/nbedos/citop/issues).
+Questions, bug reports and feature requests are welcome and should be submitted as
+[issues](https://github.com/nbedos/citop/issues).
 
 ## Contributing
 Pull requests are welcome. If you foresee that a PR will take any significant amount of your time,

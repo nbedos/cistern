@@ -19,7 +19,6 @@ const maxStepIDs = 10
 type StepPath [maxStepIDs]utils.NullString
 
 type taskKey struct {
-	providerID   string
 	providerHost string
 	stepIDs      StepPath
 }
@@ -135,7 +134,6 @@ func (t *task) SetPrefix(s string) {
 
 func taskFromPipeline(p Pipeline, providerByID map[string]CIProvider) task {
 	key := taskKey{
-		providerID:   p.providerID,
 		providerHost: p.providerHost,
 		stepIDs:      [maxStepIDs]utils.NullString{},
 	}
@@ -245,7 +243,7 @@ func (s BuildsByCommit) Alignment() map[string]text.Alignment {
 func (s BuildsByCommit) Rows() []HierarchicalTabularSourceRow {
 	rows := make([]HierarchicalTabularSourceRow, 0)
 	for _, p := range s.cache.PipelinesByRef(s.ref) {
-		t := taskFromPipeline(p, s.cache.ciProvidersById)
+		t := taskFromPipeline(p, s.cache.ciProvidersByID)
 		rows = append(rows, &t)
 	}
 

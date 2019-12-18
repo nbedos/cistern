@@ -138,14 +138,14 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 	}
 }
 
-func TestCircleCIClient_BuildFromURL(t *testing.T) {
+func TestAppVeyorClient_BuildFromURL(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filename := ""
 		switch {
 		case r.Method == "GET" && r.URL.Path == "/api/projects/nbedos/citop/history":
-			filename = "appveyor_history_29070120.json"
+			filename = "appveyor/appveyor_history_29070120.json"
 		case r.Method == "GET" && r.URL.Path == "/api/projects/nbedos/citop/build/1.0.22":
-			filename = "appveyor_build_1_0_22.json"
+			filename = "appveyor/appveyor_build_1_0_22.json"
 		default:
 			w.WriteHeader(404)
 			return
@@ -189,7 +189,7 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 	}
 }
 
-func TestCircleCIClient_Log(t *testing.T) {
+func TestAppVeyorClient_Log(t *testing.T) {
 	expectedLog := "log\n"
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {

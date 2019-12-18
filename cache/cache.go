@@ -45,10 +45,10 @@ type SourceProvider interface {
 // Poll provider at increasing interval for the URL of statuses associated to "ref"
 func monitorRefStatuses(ctx context.Context, p SourceProvider, url string, ref string, commitc chan<- Commit) error {
 	b := backoff.ExponentialBackOff{
-		InitialInterval:     5 * time.Second,
+		InitialInterval:     10 * time.Second,
 		RandomizationFactor: backoff.DefaultRandomizationFactor,
 		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         1 * time.Minute,
+		MaxInterval:         2 * time.Minute,
 		MaxElapsedTime:      0,
 		Clock:               backoff.SystemClock,
 	}
@@ -403,12 +403,13 @@ func (p Pipeline) Key() PipelineKey {
 }
 
 type Cache struct {
-	commitsByRef    map[string]Commit
-	pipelineByKey   map[PipelineKey]*Pipeline
-	pipelineByRef   map[string]map[PipelineKey]*Pipeline
-	mutex           *sync.Mutex
-	ciProvidersById map[string]CIProvider
+	ciProvidersByID map[string]CIProvider
 	sourceProviders []SourceProvider
+	mutex           *sync.Mutex
+	// All the following data structures must be accessed after acquiring mutex
+	commitsByRef  map[string]Commit
+	pipelineByKey map[PipelineKey]*Pipeline
+	pipelineByRef map[string]map[PipelineKey]*Pipeline
 }
 
 func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache {
@@ -422,7 +423,7 @@ func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache 
 		pipelineByKey:   make(map[PipelineKey]*Pipeline),
 		pipelineByRef:   make(map[string]map[PipelineKey]*Pipeline),
 		mutex:           &sync.Mutex{},
-		ciProvidersById: providersByAccountID,
+		ciProvidersByID: providersByAccountID,
 		sourceProviders: sourceProviders,
 	}
 }
@@ -533,10 +534,10 @@ func (c Cache) PipelinesByRef(ref string) []Pipeline {
 // for this specific pipeline.
 func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref string, updates chan<- time.Time) error {
 	b := backoff.ExponentialBackOff{
-		InitialInterval:     5 * time.Second,
+		InitialInterval:     10 * time.Second,
 		RandomizationFactor: backoff.DefaultRandomizationFactor,
 		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         1 * time.Minute,
+		MaxInterval:         2 * time.Minute,
 		MaxElapsedTime:      0,
 		Clock:               backoff.SystemClock,
 	}
@@ -596,7 +597,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
-	for _, p := range c.ciProvidersById {
+	for _, p := range c.ciProvidersByID {
 		wg.Add(1)
 		go func(p CIProvider) {
 			defer wg.Done()
@@ -625,7 +626,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 		if e != nil {
 			// Only report ErrUnknownPipelineURL if all providers returned this error.
 			if e == ErrUnknownPipelineURL {
-				if n++; n < len(c.ciProvidersById) {
+				if n++; n < len(c.ciProvidersByID) {
 					continue
 				}
 			}
@@ -721,7 +722,7 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref 
 // updated with new data, a message is sent on the 'updates' channel.
 // This function may return ErrUnknownRepositoryURL if none of the source providers is
 // able to handle 'repositoryURL'.
-func (c *Cache) MonitorPipelines(ctx context.Context, repo string, ref string, updates chan<- time.Time) error {
+func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURL string, ref string, updates chan<- time.Time) error {
 	commitc := make(chan Commit)
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
@@ -733,7 +734,7 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repo string, ref string, u
 		defer close(commitc)
 		// This gives us a stream of commits with a 'Statuses' attribute that may contain
 		// URLs refering to CI pipelines
-		errc <- c.broadcastMonitorRefStatus(ctx, repo, ref, commitc)
+		errc <- c.broadcastMonitorRefStatus(ctx, repositoryURL, ref, commitc)
 	}()
 
 	wg.Add(1)
@@ -743,13 +744,16 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repo string, ref string, u
 		// Ask for monitoring of each URL
 		for commit := range commitc {
 			c.SaveCommit(ref, commit)
-			select {
-			case updates <- time.Now():
-				// Do nothing
-			case <-ctx.Done():
-				errc <- ctx.Err()
-				return
-			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				select {
+				case updates <- time.Now():
+					// Do nothing
+				case <-ctx.Done():
+					// Do nothing
+				}
+			}()
 			for _, u := range commit.Statuses {
 				if _, exists := urls[u]; !exists {
 					wg.Add(1)
@@ -848,9 +852,13 @@ func (c *Cache) Log(ctx context.Context, key taskKey) (string, error) {
 
 	log := step.Log.Content.String
 	if !step.Log.Content.Valid {
-		provider, exists := c.ciProvidersById[key.providerID]
+		pipeline, exists := c.Pipeline(pKey)
 		if !exists {
-			return "", fmt.Errorf("no matching provider found in cache for account ID %q", key.providerID)
+
+		}
+		provider, exists := c.ciProvidersByID[pipeline.providerID]
+		if !exists {
+			return "", fmt.Errorf("no matching provider found in cache for account ID %q", pipeline.providerID)
 		}
 
 		log, err = provider.Log(ctx, step)

@@ -1,0 +1,172 @@
+[
+  {
+    "name": "1.0.0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/1.0.0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/1.0.0",
+    "commit": {
+      "sha": "d58600a58bf1738c6529ce3489a546bfa2178e07",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/d58600a58bf1738c6529ce3489a546bfa2178e07"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjEuMC4w"
+  },
+  {
+    "name": "1.0.0rc1",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/1.0.0rc1",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/1.0.0rc1",
+    "commit": {
+      "sha": "64be3c628dd10af7825395de8160dfe88a30f1f7",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/64be3c628dd10af7825395de8160dfe88a30f1f7"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjEuMC4wcmMx"
+  },
+  {
+    "name": "1.0.0rc0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/1.0.0rc0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/1.0.0rc0",
+    "commit": {
+      "sha": "5b72cea9d40e002f58296451c3437c2eccca9025",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/5b72cea9d40e002f58296451c3437c2eccca9025"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjEuMC4wcmMw"
+  },
+  {
+    "name": "0.9.0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.9.0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.9.0",
+    "commit": {
+      "sha": "e107277b83634229be8ee9c6f65b0696452040e9",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/e107277b83634229be8ee9c6f65b0696452040e9"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuOS4w"
+  },
+  {
+    "name": "0.9.0rc0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.9.0rc0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.9.0rc0",
+    "commit": {
+      "sha": "7fe781beb0190b20937dc56588daa121ad4c9d82",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/7fe781beb0190b20937dc56588daa121ad4c9d82"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuOS4wcmMw"
+  },
+  {
+    "name": "0.8.0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.8.0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.8.0",
+    "commit": {
+      "sha": "066e8c74d30ed44325abdbb728bc6adcb9bd4b30",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/066e8c74d30ed44325abdbb728bc6adcb9bd4b30"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuOC4w"
+  },
+  {
+    "name": "0.7.0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.7.0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.7.0",
+    "commit": {
+      "sha": "3b2f6c29003792ab8192a508749d83c2662943b6",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/3b2f6c29003792ab8192a508749d83c2662943b6"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuNy4w"
+  },
+  {
+    "name": "0.6.0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.6.0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.6.0",
+    "commit": {
+      "sha": "ad59126494a6dfec969c1fcbb611728a62cfadf0",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/ad59126494a6dfec969c1fcbb611728a62cfadf0"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuNi4w"
+  },
+  {
+    "name": "0.5.0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.5.0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.5.0",
+    "commit": {
+      "sha": "59081f5b6dc531d6e7bad850b62f1c727b51beaf",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/59081f5b6dc531d6e7bad850b62f1c727b51beaf"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuNS4w"
+  },
+  {
+    "name": "0.4.0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.4.0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.4.0",
+    "commit": {
+      "sha": "464f5ea0012aa1b3df629788d6fa0ae819e53c75",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/464f5ea0012aa1b3df629788d6fa0ae819e53c75"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuNC4w"
+  },
+  {
+    "name": "0.4.0rc0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.4.0rc0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.4.0rc0",
+    "commit": {
+      "sha": "2865cca4466946e116d96cb475b91996760ddd63",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/2865cca4466946e116d96cb475b91996760ddd63"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuNC4wcmMw"
+  },
+  {
+    "name": "0.3.0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.3.0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.3.0",
+    "commit": {
+      "sha": "a1c502bfd3ed2f8cb053fefc62bee5c4c7a1f47a",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/a1c502bfd3ed2f8cb053fefc62bee5c4c7a1f47a"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuMy4w"
+  },
+  {
+    "name": "0.3.0rc0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.3.0rc0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.3.0rc0",
+    "commit": {
+      "sha": "20e937c83ef3a6506089ef6dbf666bc9c3ec91ff",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/20e937c83ef3a6506089ef6dbf666bc9c3ec91ff"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuMy4wcmMw"
+  },
+  {
+    "name": "0.2.2",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.2.2",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.2.2",
+    "commit": {
+      "sha": "8afd1aef71af366d65118ba849fb13ba62a91da1",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/8afd1aef71af366d65118ba849fb13ba62a91da1"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuMi4y"
+  },
+  {
+    "name": "0.2.1",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.2.1",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.2.1",
+    "commit": {
+      "sha": "61aef23209069d19c3f14221300c0f3d3bba095d",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/61aef23209069d19c3f14221300c0f3d3bba095d"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuMi4x"
+  },
+  {
+    "name": "0.2.0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.2.0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.2.0",
+    "commit": {
+      "sha": "49c78745a15cf4285e16f5f9fad52edf0cee883d",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/49c78745a15cf4285e16f5f9fad52edf0cee883d"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuMi4w"
+  },
+  {
+    "name": "0.1.0",
+    "zipball_url": "https://api.github.com/repos/nbedos/termtosvg/zipball/0.1.0",
+    "tarball_url": "https://api.github.com/repos/nbedos/termtosvg/tarball/0.1.0",
+    "commit": {
+      "sha": "3b889dd73eedc3621019f268d6420ed987f64dcc",
+      "url": "https://api.github.com/repos/nbedos/termtosvg/commits/3b889dd73eedc3621019f268d6420ed987f64dcc"
+    },
+    "node_id": "MDM6UmVmMTM2NzI3NDcxOjAuMS4w"
+  }
+]

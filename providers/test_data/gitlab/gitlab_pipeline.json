@@ -1,0 +1,36 @@
+{
+    "id": 103230300,
+    "sha": "6645b9ba15963e480be7763d68d9c275760d555e",
+    "ref": "master",
+    "status": "success",
+    "created_at": "2019-12-15T21:46:40.694Z",
+    "updated_at": "2019-12-15T21:48:13.077Z",
+    "web_url": "https://gitlab.com/nbedos/citop/pipelines/103230300",
+    "before_sha": "0e04997502c99369e87b7822ffcc2f744cc7b5bb",
+    "tag": false,
+    "yaml_errors": null,
+    "user": {
+        "id": 4400568,
+        "name": "Nicolas Bedos",
+        "username": "nbedos",
+        "state": "active",
+        "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/4400568/avatar.png",
+        "web_url": "https://gitlab.com/nbedos"
+    },
+    "started_at": "2019-12-15T21:46:41.214Z",
+    "finished_at": "2019-12-15T21:48:13.072Z",
+    "committed_at": null,
+    "duration": 91,
+    "coverage": null,
+    "detailed_status": {
+        "icon": "status_success",
+        "text": "passed",
+        "label": "passed",
+        "group": "success",
+        "tooltip": "passed",
+        "has_details": true,
+        "details_path": "/nbedos/citop/pipelines/103230300",
+        "illustration": null,
+        "favicon": "https://gitlab.com/assets/ci_favicons/favicon_status_success-8451333011eee8ce9f2ab25dc487fe24a8758c694827a582f17f42b0a90446a2.png"
+    }
+}
