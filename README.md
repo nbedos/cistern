@@ -27,11 +27,11 @@ utility that would show me the pipelines I just triggered, all their jobs with s
 real time and an easy access to logs. This is what I would like citop to be.
 
 # Features and limitations
-* **Monitor pipelines associated to a commit of a GitHub or GitLab repository**: See status, duration
-and start time of pipelines as well as stages and jobs (and job tasks if available). Download job
-logs on demand.
-* **Integration with Travis CI, AppVeyor, CircleCI, GitLab CI and Azure DevOps**: citop is mostly
-target at open source developers
+* **List pipelines associated to a commit of a GitHub or GitLab repository**: pipelines are shown in
+a tree view where expanding a pipeline will reveal its stages, jobs and tasks 
+* **Integration with Travis CI, AppVeyor, CircleCI, GitLab CI and Azure DevOps**: citop is
+targeted at open source developers
+* **Monitor status changes in quasi real time**
 * **Open the web page of a pipeline by pressing a single key**: for quick access to the website of
 your CI provider if citop does not cover a specific use case.
 
@@ -41,7 +41,7 @@ citop currently has the following shortcomings, some or all of which may end up 
 * **Starting, restarting or canceling a pipeline is not possible**
 * **Compatibility is restricted to Unix systems**: all dependencies and the majority of the code base
 should work on Windows, but there are still a few Unixisms here and there.
-* **No integration with GitHub Actions**: GitHub does not currently give access to action logs
+* **No integration with GitHub Actions**: GitHub does not currently allow access to action logs
 via their API
 * **Git is the only version-control system supported**
 
