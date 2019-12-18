@@ -4,9 +4,7 @@
 A UNIX program that displays information about pipelines of Continuous
 Integration services. citop stands for Continous Integration Table Of Pipelines.
 
-![User Interface](citop.svg)
-
-[Animated demo \[SVG, 290kB\]](https://nbedos.github.io/citop/demo.svg)
+![Animated demonstration](demo.svg)
 
 # Project status
 citop is under active development and not yet ready for public release.
