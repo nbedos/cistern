@@ -32,12 +32,12 @@ citop: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.html $(BUILD)/$(EXE
 
 $(BUILD)/$(EXEC).man.html : man.md $(BUILD) pandoc_template.html
 	echo "Building $@..." && \
-	sed '1s/\\<version\\>/$$(git describe --tags --dirty)/' man.md | \
+	sed "1s/\\\\<version\\\\>/$$(git describe --tags --dirty)/" man.md | \
 	pandoc -s -t html5 --template pandoc_template.html > $@
 
 $(BUILD)/$(EXEC).man.1 : man.md $(BUILD)
 	echo "Building $@..." && \
-	sed '1s/\\<version\\>/$$(git describe --tags --dirty)/' man.md | \
+	sed "1s/\\\\<version\\\\>/$$(git describe --tags --dirty)/" man.md | \
 	pandoc -s -t man >  $@
 
 releases: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.1 $(BUILD)/$(EXEC).man.html
