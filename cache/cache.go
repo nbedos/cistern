@@ -223,7 +223,7 @@ func (c Commit) Strings() []text.StyledString {
 	return texts
 }
 
-func GitOriginURL(path string, sha string) (string, Commit, error) {
+func GitOriginURL(path string, ref string) ([]string, Commit, error) {
 	// If a path does not refer to an existing file or directory, go-git will continue
 	// running and will walk its way up the directory structure looking for a .git repository.
 	// This is not ideal for us since running 'citop -r github.com/owner/repo' from
@@ -236,33 +236,24 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 		if os.IsNotExist(err) {
 			err = ErrUnknownRepositoryURL
 		}
-		return "", Commit{}, err
+		return nil, Commit{}, err
 	}
 
 	r, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
-		return "", Commit{}, err
+		return nil, Commit{}, err
 	}
-
-	remote, err := r.Remote("origin")
-	if err != nil {
-		return "", Commit{}, err
-	}
-	if len(remote.Config().URLs) == 0 {
-		return "", Commit{}, fmt.Errorf("GIT repository %q: remote 'origin' has no associated URL", path)
-	}
-	origin := remote.Config().URLs[0]
 
 	head, err := r.Head()
 	if err != nil {
-		return origin, Commit{}, err
+		return nil, Commit{}, err
 	}
 
 	var hash plumbing.Hash
-	if sha == "HEAD" {
+	if ref == "HEAD" {
 		hash = head.Hash()
 	} else {
-		if p, err := r.ResolveRevision(plumbing.Revision(sha)); err == nil {
+		if p, err := r.ResolveRevision(plumbing.Revision(ref)); err == nil {
 			hash = *p
 		} else {
 			// Ideally we'd take this path only for certain error cases but some errors
@@ -272,10 +263,10 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 			// The failure of ResolveRevision may be due to go-git failure to resolve an
 			// abbreviated SHA. Abbreviated SHAs are quite useful so, for now, circumvent the
 			// problem by using the local git binary.
-			cmd := exec.Command("git", "show", sha, "--pretty=format:%H")
+			cmd := exec.Command("git", "-C", path, "show", ref, "--pretty=format:%H")
 			bs, err := cmd.Output()
 			if err != nil {
-				return origin, Commit{}, ErrUnknownGitReference
+				return nil, Commit{}, ErrUnknownGitReference
 			}
 
 			hash = plumbing.NewHash(strings.SplitN(string(bs), "\n", 2)[0])
@@ -284,7 +275,7 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 	}
 	commit, err := r.CommitObject(hash)
 	if err != nil {
-		return origin, Commit{}, err
+		return nil, Commit{}, err
 	}
 
 	c := Commit{
@@ -299,7 +290,7 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 
 	refs, err := r.References()
 	if err != nil {
-		return origin, Commit{}, err
+		return nil, Commit{}, err
 	}
 
 	err = refs.ForEach(func(ref *plumbing.Reference) error {
@@ -321,10 +312,19 @@ func GitOriginURL(path string, sha string) (string, Commit, error) {
 		return nil
 	})
 	if err != nil {
-		return origin, Commit{}, err
+		return nil, Commit{}, err
 	}
 
-	return origin, c, nil
+	remotes, err := r.Remotes()
+	if err != nil {
+		return nil, Commit{}, err
+	}
+	remoteURLs := make([]string, 0, len(remotes))
+	for _, remote := range remotes {
+		remoteURLs = append(remoteURLs, remote.Config().URLs...)
+	}
+
+	return remoteURLs, c, nil
 }
 
 type StepType int
@@ -645,7 +645,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 // channel urlc once. If no provider is able to handle the specified URL, ErrUnknownRepositoryURL
 // is returned.
 func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref string, commitc chan<- Commit) error {
-	originURL, commit, err := GitOriginURL(repo, ref)
+	originURLs, commit, err := GitOriginURL(repo, ref)
 	var repositoryURL string
 	switch err {
 	case nil:
@@ -655,10 +655,10 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref 
 			return ctx.Err()
 		}
 		ref = commit.Sha
-		repositoryURL = originURL
+		repositoryURL = originURLs[0]
 	case ErrUnknownGitReference:
 		// The reference was not found but we the repository was and we now know the URL of origin
-		repositoryURL = originURL
+		repositoryURL = originURLs[0]
 	case ErrUnknownRepositoryURL:
 		// Do nothing. The path does not refer to a local repository so it must be resolved
 		// by a SourceProvider

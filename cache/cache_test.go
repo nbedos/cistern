@@ -1,12 +1,18 @@
 package cache
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
 	"sort"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"gopkg.in/src-d/go-git.v4"
+	"gopkg.in/src-d/go-git.v4/config"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
 )
 
 func TestAggregateStatuses(t *testing.T) {
@@ -482,12 +488,126 @@ func sortPipelines(pipelines []Pipeline) {
 }
 
 func TestGitOriginURL(t *testing.T) {
-	u, _, err := GitOriginURL(".", "HEAD")
-	if err != nil {
-		t.Fatal(err)
+	setup := func(t *testing.T, remotes []config.RemoteConfig) (string, string) {
+		tmpDir, err := ioutil.TempDir("", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		repo, err := git.PlainInit(tmpDir, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, remoteConfig := range remotes {
+			if _, err := repo.CreateRemote(&remoteConfig); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// Populate repository with single commit
+		w, err := repo.Worktree()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := ioutil.WriteFile(path.Join(tmpDir, "file.txt"), []byte("abcd"), os.ModeAppend); err != nil {
+			t.Fatal(err)
+		}
+		sha, err := w.Commit("message", &git.CommitOptions{
+			Author: &object.Signature{
+				Name:  "name",
+				Email: "email",
+				When:  time.Date(2019, 19, 12, 21, 49, 0, 0, time.UTC),
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := repo.CreateTag("0.1.0", sha, nil); err != nil {
+			t.Fatal(err)
+		}
+
+		return tmpDir, sha.String()
 	}
 
-	if !strings.Contains(u, "nbedos/citop") {
-		t.Fatalf("expected url to contain 'nbedos/citop' but got %q", u)
-	}
+	t.Run("invalid path", func(t *testing.T) {
+		_, _, err := GitOriginURL("invalid path", "HEAD")
+		if err != ErrUnknownRepositoryURL {
+			t.Fatalf("expected %v but got %v", ErrUnknownRepositoryURL, err)
+		}
+	})
+
+	t.Run("invalid path in git repository", func(t *testing.T) {
+		repositoryPath, _ := setup(t, nil)
+		defer os.RemoveAll(repositoryPath)
+
+		_, _, err := GitOriginURL(path.Join(repositoryPath, "invalidpath"), "HEAD")
+		if err != ErrUnknownRepositoryURL {
+			t.Fatalf("expected %v but got %v", ErrUnknownRepositoryURL, err)
+		}
+	})
+
+	t.Run("remote URLs", func(t *testing.T) {
+		remotes := []config.RemoteConfig{
+			{
+				Name:  "origin",
+				URLs:  []string{"url1", "url2"},
+				Fetch: nil,
+			},
+			{
+				Name:  "other",
+				URLs:  []string{"url3", "url4"},
+				Fetch: nil,
+			},
+		}
+		repositoryPath, _ := setup(t, remotes)
+		defer os.RemoveAll(repositoryPath)
+
+		urls, _, err := GitOriginURL(repositoryPath, "HEAD")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sort.Strings(urls)
+		if diff := cmp.Diff(urls, []string{"url1", "url2", "url3", "url4"}); len(diff) > 0 {
+			t.Fatal(diff)
+		}
+	})
+
+	t.Run("commit references", func(t *testing.T) {
+		repositoryPath, sha := setup(t, nil)
+		defer os.RemoveAll(repositoryPath)
+
+		expectedCommit := Commit{
+			Sha:      sha,
+			Author:   "name <email>",
+			Date:     time.Date(2019, 19, 12, 21, 49, 0, 0, time.UTC),
+			Message:  "message",
+			Branches: []string{"master"},
+			Tags:     []string{"0.1.0"},
+			Head:     "master",
+		}
+
+		references := []string{
+			sha,      // Complete hash
+			sha[:7],  // Abbreviated hash
+			"master", // Branch
+			"0.1.0",  // Tag
+			"HEAD",
+		}
+
+		for _, ref := range references {
+			t.Run(fmt.Sprintf("reference %q", ref), func(t *testing.T) {
+				_, commit, err := GitOriginURL(repositoryPath, ref)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if diff := cmp.Diff(expectedCommit, commit); len(diff) > 0 {
+					t.Fatal(diff)
+				}
+			})
+		}
+	})
+
 }
