@@ -645,8 +645,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 // channel urlc once. If no provider is able to handle the specified URL, ErrUnknownRepositoryURL
 // is returned.
 func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref string, commitc chan<- Commit) error {
-	originURLs, commit, err := GitOriginURL(repo, ref)
-	var repositoryURL string
+	repositoryURLs, commit, err := GitOriginURL(repo, ref)
 	switch err {
 	case nil:
 		select {
@@ -655,14 +654,9 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref 
 			return ctx.Err()
 		}
 		ref = commit.Sha
-		repositoryURL = originURLs[0]
-	case ErrUnknownGitReference:
-		// The reference was not found but we the repository was and we now know the URL of origin
-		repositoryURL = originURLs[0]
 	case ErrUnknownRepositoryURL:
-		// Do nothing. The path does not refer to a local repository so it must be resolved
-		// by a SourceProvider
-		repositoryURL = repo
+		// The path does not refer to a local repository so it probably is a URL
+		repositoryURLs = []string{repo}
 	default:
 		return err
 	}
@@ -670,12 +664,14 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref 
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
-	for _, p := range c.sourceProviders {
-		wg.Add(1)
-		go func(p SourceProvider) {
-			defer wg.Done()
-			errc <- monitorRefStatuses(ctx, p, repositoryURL, ref, commitc)
-		}(p)
+	for _, u := range repositoryURLs {
+		for _, p := range c.sourceProviders {
+			wg.Add(1)
+			go func(p SourceProvider) {
+				defer wg.Done()
+				errc <- monitorRefStatuses(ctx, p, u, ref, commitc)
+			}(p)
+		}
 	}
 
 	go func() {
