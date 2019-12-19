@@ -64,6 +64,8 @@ jobs:
         - build/citop.man.1
         - build/citop.man.html
       draft: true
+      edge: true
+      release_notes_file: "build/notes.md"
       on:
           tags: true
 

@@ -57,7 +57,7 @@ releases: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.1 $(BUILD)/$(EXE
 		tar -C "$(BUILD)" -czf "$$ARCHIVE" "$$BUILD_VERSION" ; \
 	    done ; \
 	done && \
-	cd "$(BUILD)" && sha1sum *gz
+	cd "$(BUILD)" && sha1sum *gz | tee notes.md
 
 $(BUILD):
 	mkdir -p $(BUILD)
