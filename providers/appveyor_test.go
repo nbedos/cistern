@@ -128,14 +128,34 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 		},
 	}
 
-	build, err := b.toCachePipeline("owner", "repo")
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("git ref is branch", func(t *testing.T) {
+		build, err := b.toCachePipeline("owner", "repo")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if diff := expectedBuild.Diff(build); len(diff) > 0 {
-		t.Fatal(diff)
-	}
+		if diff := expectedBuild.Diff(build); len(diff) > 0 {
+			t.Fatal(diff)
+		}
+	})
+
+	t.Run("git ref is tag", func(t *testing.T) {
+		b := b
+		b.IsTag = true
+		b.Tag = "0.1.0"
+		build, err := b.toCachePipeline("owner", "repo")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expectedBuild := expectedBuild
+		expectedBuild.IsTag = true
+		expectedBuild.Ref = "0.1.0"
+		if diff := expectedBuild.Diff(build); len(diff) > 0 {
+			t.Fatal(diff)
+		}
+	})
+
 }
 
 func TestAppVeyorClient_BuildFromURL(t *testing.T) {

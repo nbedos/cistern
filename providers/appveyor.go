@@ -243,6 +243,7 @@ type appVeyorBuild struct {
 	Version     string        `json:"version"`
 	Message     string        `json:"message"`
 	Branch      string        `json:"branch"`
+	Tag         string        `json:"tag"`
 	IsTag       bool          `json:"isTag"`
 	Sha         string        `json:"commitId"`
 	Author      string        `json:"authorUsername"`
@@ -255,11 +256,16 @@ type appVeyorBuild struct {
 }
 
 func (b appVeyorBuild) toCachePipeline(owner string, repository string) (cache.Pipeline, error) {
+	ref := b.Branch
+	if b.IsTag {
+		ref = b.Tag
+	}
+
 	pipeline := cache.Pipeline{
 		Number: strconv.Itoa(b.Number),
 		GitReference: cache.GitReference{
 			SHA:   b.Sha,
-			Ref:   b.Branch,
+			Ref:   ref,
 			IsTag: b.IsTag,
 		},
 		Step: cache.Step{
