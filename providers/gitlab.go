@@ -21,15 +21,24 @@ type GitLabClient struct {
 	rateLimiter <-chan time.Time
 }
 
-func NewGitLabClient(id string, name string, token string, rateLimit time.Duration) GitLabClient {
+const gitLabCom = "https://gitlab.com"
+
+func NewGitLabClient(id string, name string, baseURL string, token string, rateLimit time.Duration) (GitLabClient, error) {
+	remote := gitlab.NewClient(nil, token)
+	if baseURL == "" {
+		baseURL = gitLabCom
+	}
+	if err := remote.SetBaseURL(baseURL); err != nil {
+		return GitLabClient{}, err
+	}
 	return GitLabClient{
 		provider: cache.Provider{
 			ID:   id,
 			Name: name,
 		},
-		remote:      gitlab.NewClient(nil, token),
+		remote:      remote,
 		rateLimiter: time.Tick(rateLimit),
-	}
+	}, nil
 }
 
 func (c GitLabClient) Commit(ctx context.Context, repo string, ref string) (cache.Commit, error) {

@@ -51,6 +51,7 @@ token = ""
 type ProvidersConfiguration struct {
 	GitLab []struct {
 		Name              string  `toml:"name"`
+		URL               string  `toml:"url"`
 		Token             string  `toml:"token"`
 		RequestsPerSecond float64 `toml:"max_requests_per_second"`
 	}
@@ -134,7 +135,10 @@ func (c ProvidersConfiguration) Providers(ctx context.Context) ([]cache.SourcePr
 			name = conf.Name
 		}
 
-		client := providers.NewGitLabClient(id, name, conf.Token, rateLimit)
+		client, err := providers.NewGitLabClient(id, name, conf.URL, conf.Token, rateLimit)
+		if err != nil {
+			return nil, nil, err
+		}
 		source = append(source, client)
 		ci = append(ci, client)
 	}

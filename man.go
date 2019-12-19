@@ -274,7 +274,7 @@ citop uses a configuration file in TOML version
 v0.5.0 (https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md)
 format.
 The configuration file is made of keys grouped together in tables.
-The specification of each table is given below.
+The specification of each table is given in the example below.
 .SS Example
 .PP
 This example describes and uses all existing configuration options.
@@ -329,6 +329,10 @@ token = \[dq]\[dq]
 # (optional, string, default: \[dq]gitlab\[dq])
 name = \[dq]gitlab\[dq]
 
+# GitLab instance URL (optional, string, default: \[dq]https://gitlab.com\[dq])
+# (the GitLab instance must support GitLab REST API V4)
+url = \[dq]https://gitlab.com\[dq]
+
 # GitLab API token (optional, string)
 #
 # Note: GitLab prevents access to pipeline jobs for 
@@ -337,7 +341,7 @@ name = \[dq]gitlab\[dq]
 # appropriate credentials. This is true even for pipelines
 # of public repositories.
 #
-# GitLab token management:
+# gitlab.com token management:
 #     https://gitlab.com/profile/personal_access_tokens
 token = \[dq]\[dq]
 

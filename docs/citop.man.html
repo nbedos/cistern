@@ -209,7 +209,7 @@ citop -r /home/user/repos/myrepo</code></pre>
 </ol>
 <p>If <code>XDG_CONFIG_HOME</code> (resp. <code>XDG_CONFIG_DIRS</code>) is not set, citop uses the default value <code>"$HOME/.config"</code> (resp. <code>"/etc/xdg"</code>) instead.</p>
 <h2 id="format">Format</h2>
-<p>citop uses a configuration file in <a href="https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md">TOML version v0.5.0</a> format. The configuration file is made of keys grouped together in tables. The specification of each table is given below.</p>
+<p>citop uses a configuration file in <a href="https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md">TOML version v0.5.0</a> format. The configuration file is made of keys grouped together in tables. The specification of each table is given in the example below.</p>
 <h2 id="example">Example</h2>
 <p>This example describes and uses all existing configuration options.</p>
 <pre class="toml"><code>#### CITOP CONFIGURATION FILE ####
@@ -260,6 +260,10 @@ token = &quot;&quot;
 # (optional, string, default: &quot;gitlab&quot;)
 name = &quot;gitlab&quot;
 
+# GitLab instance URL (optional, string, default: &quot;https://gitlab.com&quot;)
+# (the GitLab instance must support GitLab REST API V4)
+url = &quot;https://gitlab.com&quot;
+
 # GitLab API token (optional, string)
 #
 # Note: GitLab prevents access to pipeline jobs for 
@@ -268,7 +272,7 @@ name = &quot;gitlab&quot;
 # appropriate credentials. This is true even for pipelines
 # of public repositories.
 #
-# GitLab token management:
+# gitlab.com token management:
 #     https://gitlab.com/profile/personal_access_tokens
 token = &quot;&quot;
 

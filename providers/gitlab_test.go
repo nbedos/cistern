@@ -18,7 +18,10 @@ import (
 )
 
 func TestParsePipelineURL(t *testing.T) {
-	c := NewGitLabClient("gitlab", "gitlab", "", time.Millisecond)
+	c, err := NewGitLabClient("gitlab", "gitlab", "", "", time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	slug, id, err := c.parsePipelineURL("https://gitlab.com/nbedos/citop/pipelines/97604657")
 	if err != nil {

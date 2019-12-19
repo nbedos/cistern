@@ -141,7 +141,7 @@ If `XDG_CONFIG_HOME` (resp. `XDG_CONFIG_DIRS`) is not set, citop uses the defaul
 ## Format
 citop uses a configuration file in [TOML version v0.5.0](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md)
 format. The configuration file is made of keys grouped together in tables. The specification of
-each table is given below.
+each table is given in the example below.
 
 ## Example
 This example describes and uses all existing configuration options.
@@ -195,6 +195,10 @@ token = ""
 # (optional, string, default: "gitlab")
 name = "gitlab"
 
+# GitLab instance URL (optional, string, default: "https://gitlab.com")
+# (the GitLab instance must support GitLab REST API V4)
+url = "https://gitlab.com"
+
 # GitLab API token (optional, string)
 #
 # Note: GitLab prevents access to pipeline jobs for 
@@ -203,7 +207,7 @@ name = "gitlab"
 # appropriate credentials. This is true even for pipelines
 # of public repositories.
 #
-# GitLab token management:
+# gitlab.com token management:
 #     https://gitlab.com/profile/personal_access_tokens
 token = ""
 
