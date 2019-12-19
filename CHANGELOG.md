@@ -1,6 +1,6 @@
 # Changelog
 
-## Next Version
+## Version 0.1.1 (2019-12-18)
 
 * Support for private GitLab instances [#2]
 
