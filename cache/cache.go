@@ -215,7 +215,7 @@ func (c Commit) Strings() []text.StyledString {
 	return texts
 }
 
-func GitOriginURL(path string, ref string) ([]string, Commit, error) {
+func RemotesAndCommit(path string, ref string) ([]string, Commit, error) {
 	// If a path does not refer to an existing file or directory, go-git will continue
 	// running and will walk its way up the directory structure looking for a .git repository.
 	// This is not ideal for us since running 'citop -r github.com/owner/repo' from
@@ -637,7 +637,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 // channel urlc once. If no provider is able to handle the specified URL, ErrUnknownRepositoryURL
 // is returned.
 func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref string, commitc chan<- Commit, b backoff.ExponentialBackOff) error {
-	repositoryURLs, commit, err := GitOriginURL(repo, ref)
+	repositoryURLs, commit, err := RemotesAndCommit(repo, ref)
 	switch err {
 	case nil:
 		select {

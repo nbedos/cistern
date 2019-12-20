@@ -534,7 +534,7 @@ func createRepository(t *testing.T, remotes []config.RemoteConfig) (string, stri
 
 func TestGitOriginURL(t *testing.T) {
 	t.Run("invalid path", func(t *testing.T) {
-		_, _, err := GitOriginURL("invalid path", "HEAD")
+		_, _, err := RemotesAndCommit("invalid path", "HEAD")
 		if err != ErrUnknownRepositoryURL {
 			t.Fatalf("expected %v but got %v", ErrUnknownRepositoryURL, err)
 		}
@@ -544,7 +544,7 @@ func TestGitOriginURL(t *testing.T) {
 		repositoryPath, _ := createRepository(t, nil)
 		defer os.RemoveAll(repositoryPath)
 
-		_, _, err := GitOriginURL(path.Join(repositoryPath, "invalidpath"), "HEAD")
+		_, _, err := RemotesAndCommit(path.Join(repositoryPath, "invalidpath"), "HEAD")
 		if err != ErrUnknownRepositoryURL {
 			t.Fatalf("expected %v but got %v", ErrUnknownRepositoryURL, err)
 		}
@@ -566,7 +566,7 @@ func TestGitOriginURL(t *testing.T) {
 		repositoryPath, _ := createRepository(t, remotes)
 		defer os.RemoveAll(repositoryPath)
 
-		urls, _, err := GitOriginURL(repositoryPath, "HEAD")
+		urls, _, err := RemotesAndCommit(repositoryPath, "HEAD")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -601,7 +601,7 @@ func TestGitOriginURL(t *testing.T) {
 
 		for _, ref := range references {
 			t.Run(fmt.Sprintf("reference %q", ref), func(t *testing.T) {
-				_, commit, err := GitOriginURL(repositoryPath, ref)
+				_, commit, err := RemotesAndCommit(repositoryPath, ref)
 				if err != nil {
 					t.Fatal(err)
 				}
