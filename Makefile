@@ -46,13 +46,13 @@ releases: man.go $(BUILD) $(BUILD)/LICENSE $(BUILD)/$(EXEC).man.1 $(BUILD)/$(EXE
 	pandoc -v | head -n1 && \
 	for GOARCH in amd64; \
 	do \
-	    for GOOS in linux freebsd openbsd netbsd osx; \
+	    for GOOS in linux freebsd openbsd netbsd darwin; \
 	    do \
 		BUILD_VERSION="$(PACKAGE)-$$(git describe --tags --dirty)-$$GOOS-$$GOARCH" && \
 		ARCHIVE="$(BUILD)/$$BUILD_VERSION.tar.gz" && \
 		echo "Building $$ARCHIVE..." && \
 		mkdir -p "$(BUILD)/$$BUILD_VERSION" && \
-		go build -ldflags "-X main.Version=$$BUILD_VERSION" -o "$(BUILD)/$(EXEC)" && \
+		GOOS="$$GOOS" GOARCH="$$GOARCH" go build -ldflags "-X main.Version=$$BUILD_VERSION" -o "$(BUILD)/$(EXEC)" && \
 		cp "$(BUILD)/$(EXEC)" "$(BUILD)/LICENSE" "$(BUILD)/$(EXEC).man.html" "$(BUILD)/$(EXEC).man.1" "$(BUILD)/$$BUILD_VERSION/" && \
 		tar -C "$(BUILD)" -czf "$$ARCHIVE" "$$BUILD_VERSION" ; \
 	    done ; \
