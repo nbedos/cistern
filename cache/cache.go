@@ -43,15 +43,7 @@ type SourceProvider interface {
 }
 
 // Poll provider at increasing interval for the URL of statuses associated to "ref"
-func monitorRefStatuses(ctx context.Context, p SourceProvider, url string, ref string, commitc chan<- Commit) error {
-	b := backoff.ExponentialBackOff{
-		InitialInterval:     10 * time.Second,
-		RandomizationFactor: backoff.DefaultRandomizationFactor,
-		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         2 * time.Minute,
-		MaxElapsedTime:      0,
-		Clock:               backoff.SystemClock,
-	}
+func monitorRefStatuses(ctx context.Context, p SourceProvider, b backoff.ExponentialBackOff, url string, ref string, commitc chan<- Commit) error {
 	b.Reset()
 
 	commit, err := p.Commit(ctx, url, ref)
@@ -644,7 +636,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 // Ask all providers to monitor the statuses of 'ref'. The URL of each status is written on the
 // channel urlc once. If no provider is able to handle the specified URL, ErrUnknownRepositoryURL
 // is returned.
-func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref string, commitc chan<- Commit) error {
+func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref string, commitc chan<- Commit, b backoff.ExponentialBackOff) error {
 	repositoryURLs, commit, err := GitOriginURL(repo, ref)
 	switch err {
 	case nil:
@@ -664,13 +656,15 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref 
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
+	requestCount := 0
 	for _, u := range repositoryURLs {
 		for _, p := range c.sourceProviders {
+			requestCount++
 			wg.Add(1)
-			go func(p SourceProvider) {
+			go func(p SourceProvider, u string) {
 				defer wg.Done()
-				errc <- monitorRefStatuses(ctx, p, u, ref, commitc)
-			}(p)
+				errc <- monitorRefStatuses(ctx, p, b, u, ref, commitc)
+			}(p, u)
 		}
 	}
 
@@ -679,34 +673,43 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref 
 		close(errc)
 	}()
 
-	var n int
+	errCounts := struct {
+		nil   int
+		url   int
+		ref   int
+		other int
+	}{}
+
 	var canceled = false
 	for e := range errc {
 		if !canceled {
 			// ErrUnknownRepositoryURL and ErrUnknownGitReference are returned if
 			// all providers fail with one of these errors
 			switch e {
+			case nil:
+				errCounts.nil++
 			case ErrUnknownRepositoryURL:
-				n++
-				if err == nil {
-					err = e
-				}
+				errCounts.url++
 			case ErrUnknownGitReference:
-				n++
-				// ErrUnknownGitReference must be returned over ErrUnknownRepositoryURL
-				// since it means the repository was found but the reference was not
-				if err == nil || err == ErrUnknownRepositoryURL {
-					err = e
-				}
+				errCounts.ref++
 			default:
 				// Artificially trigger cancellation
-				n = len(c.sourceProviders)
-				err = e
+				errCounts.other += requestCount
 			}
 
-			if canceled = n >= len(c.sourceProviders); canceled {
+			canceled = (errCounts.nil + errCounts.url + errCounts.ref + errCounts.other) >= requestCount
+			if canceled {
 				cancel()
-				err = e
+				switch {
+				case errCounts.other > 0:
+					err = e
+				case errCounts.nil > 0:
+					err = nil
+				case errCounts.ref > 0:
+					err = ErrUnknownGitReference
+				case errCounts.url > 0:
+					err = ErrUnknownRepositoryURL
+				}
 			}
 		}
 	}
@@ -724,13 +727,22 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURL string, ref 
 	ctx, cancel := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
 
+	b := backoff.ExponentialBackOff{
+		InitialInterval:     10 * time.Second,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         2 * time.Minute,
+		MaxElapsedTime:      0,
+		Clock:               backoff.SystemClock,
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(commitc)
 		// This gives us a stream of commits with a 'Statuses' attribute that may contain
 		// URLs refering to CI pipelines
-		errc <- c.broadcastMonitorRefStatus(ctx, repositoryURL, ref, commitc)
+		errc <- c.broadcastMonitorRefStatus(ctx, repositoryURL, ref, commitc, b)
 	}()
 
 	wg.Add(1)

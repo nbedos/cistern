@@ -1,14 +1,17 @@
 package cache
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff/v3"
 	"github.com/google/go-cmp/cmp"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/config"
@@ -487,49 +490,49 @@ func sortPipelines(pipelines []Pipeline) {
 	})
 }
 
-func TestGitOriginURL(t *testing.T) {
-	setup := func(t *testing.T, remotes []config.RemoteConfig) (string, string) {
-		tmpDir, err := ioutil.TempDir("", "")
-		if err != nil {
-			t.Fatal(err)
-		}
-		repo, err := git.PlainInit(tmpDir, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		for _, remoteConfig := range remotes {
-			if _, err := repo.CreateRemote(&remoteConfig); err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		// Populate repository with single commit
-		w, err := repo.Worktree()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := ioutil.WriteFile(path.Join(tmpDir, "file.txt"), []byte("abcd"), os.ModeAppend); err != nil {
-			t.Fatal(err)
-		}
-		sha, err := w.Commit("message", &git.CommitOptions{
-			Author: &object.Signature{
-				Name:  "name",
-				Email: "email",
-				When:  time.Date(2019, 19, 12, 21, 49, 0, 0, time.UTC),
-			},
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if _, err := repo.CreateTag("0.1.0", sha, nil); err != nil {
-			t.Fatal(err)
-		}
-
-		return tmpDir, sha.String()
+func createRepository(t *testing.T, remotes []config.RemoteConfig) (string, string) {
+	tmpDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := git.PlainInit(tmpDir, false)
+	if err != nil {
+		t.Fatal(err)
 	}
 
+	for _, remoteConfig := range remotes {
+		if _, err := repo.CreateRemote(&remoteConfig); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Populate repository with single commit
+	w, err := repo.Worktree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(path.Join(tmpDir, "file.txt"), []byte("abcd"), os.ModeAppend); err != nil {
+		t.Fatal(err)
+	}
+	sha, err := w.Commit("message", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "name",
+			Email: "email",
+			When:  time.Date(2019, 19, 12, 21, 49, 0, 0, time.UTC),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := repo.CreateTag("0.1.0", sha, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	return tmpDir, sha.String()
+}
+
+func TestGitOriginURL(t *testing.T) {
 	t.Run("invalid path", func(t *testing.T) {
 		_, _, err := GitOriginURL("invalid path", "HEAD")
 		if err != ErrUnknownRepositoryURL {
@@ -538,7 +541,7 @@ func TestGitOriginURL(t *testing.T) {
 	})
 
 	t.Run("invalid path in git repository", func(t *testing.T) {
-		repositoryPath, _ := setup(t, nil)
+		repositoryPath, _ := createRepository(t, nil)
 		defer os.RemoveAll(repositoryPath)
 
 		_, _, err := GitOriginURL(path.Join(repositoryPath, "invalidpath"), "HEAD")
@@ -560,7 +563,7 @@ func TestGitOriginURL(t *testing.T) {
 				Fetch: nil,
 			},
 		}
-		repositoryPath, _ := setup(t, remotes)
+		repositoryPath, _ := createRepository(t, remotes)
 		defer os.RemoveAll(repositoryPath)
 
 		urls, _, err := GitOriginURL(repositoryPath, "HEAD")
@@ -575,7 +578,7 @@ func TestGitOriginURL(t *testing.T) {
 	})
 
 	t.Run("commit references", func(t *testing.T) {
-		repositoryPath, sha := setup(t, nil)
+		repositoryPath, sha := createRepository(t, nil)
 		defer os.RemoveAll(repositoryPath)
 
 		expectedCommit := Commit{
@@ -609,5 +612,132 @@ func TestGitOriginURL(t *testing.T) {
 			})
 		}
 	})
+}
 
+type testProvider struct {
+	id         string
+	url        string
+	callNumber int
+}
+
+func (p testProvider) ID() string { return p.id }
+
+func (p *testProvider) RefStatuses(ctx context.Context, url, ref, sha string) ([]string, error) {
+	if !strings.Contains(url, p.url) {
+		return nil, ErrUnknownRepositoryURL
+	}
+	switch p.callNumber++; p.callNumber {
+	case 1:
+		return []string{url + "_status0"}, nil
+	case 2:
+		return []string{url + "_status0", url + "_status1"}, nil
+	default:
+		return []string{url + "_status0", url + "_status1", url + "_status2"}, nil
+	}
+}
+
+func (p testProvider) Commit(ctx context.Context, repo, sha string) (Commit, error) {
+	if !strings.Contains(repo, p.url) {
+		return Commit{}, ErrUnknownRepositoryURL
+	}
+	return Commit{}, nil
+}
+
+func TestCache_monitorRefStatus(t *testing.T) {
+	ctx := context.Background()
+	p := testProvider{"provider", "url", 0}
+	commitc := make(chan Commit)
+	errc := make(chan error)
+
+	b := backoff.ExponentialBackOff{
+		InitialInterval:     time.Millisecond,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         10 * time.Millisecond,
+		MaxElapsedTime:      10 * time.Millisecond,
+		Clock:               backoff.SystemClock,
+	}
+
+	go func() {
+		err := monitorRefStatuses(ctx, &p, b, "url", "ref", commitc)
+		close(commitc)
+		errc <- err
+		close(errc)
+	}()
+
+	var c Commit
+	for c = range commitc {
+	}
+
+	if err := <-errc; err != nil {
+		t.Fatal(err)
+	}
+
+	statuses := []string{"url_status0", "url_status1", "url_status2"}
+	if diff := cmp.Diff(c.Statuses, statuses); len(diff) > 0 {
+		t.Fatal(diff)
+	}
+}
+
+func TestCache_broadcastMonitorRefStatus(t *testing.T) {
+	ctx := context.Background()
+	c := NewCache(nil, []SourceProvider{
+		&testProvider{"origin", "origin", 0},
+		&testProvider{"other", "other", 0},
+	})
+
+	repositoryPath, sha := createRepository(t, []config.RemoteConfig{
+		{
+			Name: "origin",
+			URLs: []string{"origin1", "origin2"},
+		},
+		{
+			Name: "other",
+			URLs: []string{"other1"},
+		},
+	})
+
+	commitc := make(chan Commit)
+	errc := make(chan error)
+	b := backoff.ExponentialBackOff{
+		InitialInterval:     time.Millisecond,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         10 * time.Millisecond,
+		MaxElapsedTime:      10 * time.Millisecond,
+		Clock:               backoff.SystemClock,
+	}
+
+	go func() {
+		err := c.broadcastMonitorRefStatus(ctx, repositoryPath, sha, commitc, b)
+		close(commitc)
+		errc <- err
+		close(errc)
+	}()
+
+	statuses := make(map[string]struct{}, 0)
+	for commit := range commitc {
+		for _, status := range commit.Statuses {
+			statuses[status] = struct{}{}
+		}
+	}
+
+	if err := <-errc; err != nil {
+		t.Fatal(err)
+	}
+
+	expectedStatuses := map[string]struct{}{
+		"origin1_status0": {},
+		"origin1_status1": {},
+		"origin1_status2": {},
+		"origin2_status0": {},
+		"origin2_status1": {},
+		"origin2_status2": {},
+		"other1_status0":  {},
+		"other1_status1":  {},
+		"other1_status2":  {},
+	}
+	if diff := cmp.Diff(statuses, expectedStatuses); len(diff) > 0 {
+		t.Fatal(diff)
+	}
 }
