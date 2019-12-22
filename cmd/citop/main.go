@@ -325,7 +325,7 @@ To lift these restrictions, create a configuration file containing your credenti
 		fmt.Fprintln(os.Stderr, fmt.Sprintf("configuration error: %s", err.Error()))
 		os.Exit(1)
 	}
-	if err := tui.RunApplication(ctx, tcell.NewScreen, repo, sha, ciProviders, sourceProviders, time.Local, manualPage()); err != nil {
+	if err := tui.RunApplication(ctx, tcell.NewScreen, repo, sha, ciProviders, sourceProviders, time.Local, manualPage); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
