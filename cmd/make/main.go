@@ -1,3 +1,17 @@
+// This is the build script for citop. It replaces an older
+// Makefile that was harder to keep compatible with all
+// target platforms without relying on specific building tools
+// (e.g. GNU make).
+//
+// This script depends on the following external program:
+//  - pandoc is required for building the manual page in various
+//  formats. See https://pandoc.org/installing.html for installation
+//  instructions.
+//
+//
+//
+//
+//
 package main
 
 import (
@@ -11,11 +25,32 @@ import (
 )
 
 const usage = `Usage:
-        make citop       # Build executable and manual pages (requires pandoc)
+        make             # Build executable and manual pages (requires pandoc)
         make releases    # Build release archives (requires pandoc)
         make clean       # Remove build directory
 `
 
+const buildDirectory = "build"
+
+var OSesByArch = map[string][]string{
+	"amd64": {"linux", "freebsd", "openbsd", "netbsd", "darwin"},
+}
+
+func version(env []string) (string, error) {
+	gitVersion, err := gitDescribe()
+	if err != nil {
+		return "", err
+	}
+
+	goOs, goArch, err := GoOsAndArch(env)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("citop-%s-%s-%s", gitVersion, goOs, goArch), nil
+}
+
+// Build version number from last git tag
 func gitDescribe() (string, error) {
 	cmd := exec.Command("git", "describe", "--tags", "--dirty")
 	bs, err := cmd.Output()
@@ -24,6 +59,7 @@ func gitDescribe() (string, error) {
 	}
 
 	version := strings.Split(string(bs), "\n")[0]
+	version = strings.Trim(version, "\r")
 	return version, nil
 }
 
@@ -35,7 +71,7 @@ func goBuild(version string, dir string, env []string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command("go", "build", "-ldflags", version, "-o", executable, path.Join(wd, "cmd", "citop"))
+	cmd := exec.Command("go", buildDirectory, "-ldflags", version, "-o", executable, path.Join(wd, "cmd", "citop"))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = append(os.Environ(), env...)
@@ -138,13 +174,39 @@ func license(dir string) error {
 	return ioutil.WriteFile(output, []byte(b.String()), os.ModePerm)
 }
 
-func build(dir string, env []string) error {
-	version, err := gitDescribe()
+func GoOsAndArch(env []string) (string, string, error) {
+	env = append(os.Environ(), env...)
+	goEnvGOOS := exec.Command("go", "env", "GOOS")
+	goEnvGOOS.Env = env
+	bs, err := goEnvGOOS.Output()
+	if err != nil {
+		return "", "", err
+	}
+	GoOS := strings.Trim(string(bs), "\r\n")
+
+	goEnvGOARCH := exec.Command("go", "env", "GOARCH")
+	goEnvGOARCH.Env = env
+	bs, err = goEnvGOARCH.Output()
+	if err != nil {
+		return "", "", err
+	}
+	GoArch := strings.Trim(string(bs), "\r\n")
+
+	return GoOS, GoArch, nil
+}
+
+func build(workdir string, env []string, archive bool) error {
+	version, err := version(env)
 	if err != nil {
 		return err
 	}
+	archiveDir := version
+	dir := path.Join(workdir, archiveDir)
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 		return err
+	}
+	if archive {
+		defer os.RemoveAll(dir)
 	}
 	if err := man(version, dir); err != nil {
 		return err
@@ -152,26 +214,40 @@ func build(dir string, env []string) error {
 	if err := goBuild(version, dir, env); err != nil {
 		return err
 	}
-
-	return license(dir)
-}
-
-func releases(dir string, OSesByArch map[string][]string) error {
-	version, err := gitDescribe()
-	if err != nil {
+	if err := license(dir); err != nil {
 		return err
 	}
 
+	archives := make([]string, 0)
+	if archive {
+		archivePath, err := compress(workdir, archiveDir)
+		if err != nil {
+			return err
+		}
+		archives = append(archives, archivePath)
+	}
+
+	return nil
+}
+
+func compress(workdir string, dir string) (string, error) {
+	archivePath := dir + ".tar.gz"
+	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", path.Join(workdir, archivePath)))
+	absoluteArchivePath := path.Join(workdir, archivePath)
+	cmd := exec.Command("tar", "-C", workdir, "-czf", absoluteArchivePath, dir)
+	return absoluteArchivePath, cmd.Run()
+}
+
+// Build binary release archives for all targets
+func releases(dir string, OSesByArch map[string][]string) error {
 	for arch, OSes := range OSesByArch {
 		for _, OS := range OSes {
-			execVersion := fmt.Sprintf("citop-%s-%s-%s", version, OS, arch)
-			buildDir := path.Join(dir, execVersion)
-
 			env := []string{
 				fmt.Sprintf("GOOS=%s", OS),
 				fmt.Sprintf("GOARCH=%s", arch),
 			}
-			if err := build(buildDir, env); err != nil {
+
+			if err := build(buildDirectory, env, true); err != nil {
 				return err
 			}
 		}
@@ -181,28 +257,25 @@ func releases(dir string, OSesByArch map[string][]string) error {
 }
 
 func main() {
-	if len(os.Args) != 2 {
+	if len(os.Args) < 1 || len(os.Args) > 2 {
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(1)
 	}
 
 	var err error
-	switch os.Args[1] {
-	case "usage":
-		fmt.Fprint(os.Stderr, usage)
-	case "citop":
-		err = build("build", nil)
-	case "releases":
-		OSesByArch := map[string][]string{
-			"amd64": {"linux", "freebsd", "openbsd", "netbsd", "darwin"},
+	if len(os.Args) == 1 {
+		err = build(buildDirectory, nil, false)
+	} else {
+		switch os.Args[1] {
+		case "releases":
+			err = releases(buildDirectory, OSesByArch)
+		case "clean":
+			err = os.RemoveAll(buildDirectory)
+		default:
+			fmt.Fprint(os.Stderr, fmt.Sprintf("unknow command: %q\n", os.Args[1]))
+			fmt.Fprint(os.Stderr, usage)
+			os.Exit(1)
 		}
-		err = releases("build", OSesByArch)
-	case "clean":
-		err = os.RemoveAll("build")
-	default:
-		fmt.Fprint(os.Stderr, fmt.Sprintf("unknow command: %q\n", os.Args[1]))
-		fmt.Fprint(os.Stderr, usage)
-		os.Exit(1)
 	}
 
 	if err != nil {

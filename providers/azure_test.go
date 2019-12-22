@@ -346,7 +346,7 @@ func TestAzurePipelinesClient_Log(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	log = strings.Trim(log, "\r\n")
 	if diff := cmp.Diff(log, "log"); len(diff) > 0 {
 		t.Fatal(diff)
