@@ -3,19 +3,21 @@
 // target platforms without relying on specific building tools
 // (e.g. GNU make).
 //
-// This script depends on the following external program:
-//  - pandoc is required for building the manual page in various
+// This script depends on the following external programs:
+//  - go to build executables
+//  - git for constructing the version number based
+//  on the last tag and the current state of the repository
+//  - pandoc for building the manual page in various
 //  formats. See https://pandoc.org/installing.html for installation
 //  instructions.
-//
-//
-//
+//  - tar for building gzipped binary archives
 //
 //
 package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -30,8 +32,10 @@ const usage = `Usage:
         make clean       # Remove build directory
 `
 
+// Location of the directory where build artifacts are stored
 const buildDirectory = "build"
 
+// List of OS + architecture targets for releases
 var OSesByArch = map[string][]string{
 	"amd64": {"linux", "freebsd", "openbsd", "netbsd", "darwin"},
 }
@@ -195,39 +199,27 @@ func GoOsAndArch(env []string) (string, string, error) {
 	return GoOS, GoArch, nil
 }
 
-func build(workdir string, env []string, archive bool) error {
+func build(workdir string, env []string) (string, error) {
 	version, err := version(env)
 	if err != nil {
-		return err
+		return "", err
 	}
 	archiveDir := version
 	dir := path.Join(workdir, archiveDir)
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		return err
-	}
-	if archive {
-		defer os.RemoveAll(dir)
+		return "", err
 	}
 	if err := man(version, dir); err != nil {
-		return err
+		return "", err
 	}
 	if err := goBuild(version, dir, env); err != nil {
-		return err
+		return "", err
 	}
 	if err := license(dir); err != nil {
-		return err
+		return "", err
 	}
 
-	archives := make([]string, 0)
-	if archive {
-		archivePath, err := compress(workdir, archiveDir)
-		if err != nil {
-			return err
-		}
-		archives = append(archives, archivePath)
-	}
-
-	return nil
+	return archiveDir, nil
 }
 
 func compress(workdir string, dir string) (string, error) {
@@ -238,8 +230,18 @@ func compress(workdir string, dir string) (string, error) {
 	return absoluteArchivePath, cmd.Run()
 }
 
+func hash(filepath string) (string, error) {
+	bs, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", sha256.Sum256(bs)), nil
+}
+
 // Build binary release archives for all targets
 func releases(dir string, OSesByArch map[string][]string) error {
+	archives := make([]string, 0)
 	for arch, OSes := range OSesByArch {
 		for _, OS := range OSes {
 			env := []string{
@@ -247,13 +249,53 @@ func releases(dir string, OSesByArch map[string][]string) error {
 				fmt.Sprintf("GOARCH=%s", arch),
 			}
 
-			if err := build(buildDirectory, env, true); err != nil {
+			archiveDir, err := build(dir, env)
+			if err != nil {
 				return err
 			}
+
+			archivePath, err := compress(dir, archiveDir)
+			if err != nil {
+				return err
+			}
+			archives = append(archives, archivePath)
 		}
 	}
 
-	return nil
+	return releaseNotes(dir, archives)
+}
+
+func releaseNotes(dir string, archives []string) error {
+	notes := path.Join(dir, "notes.md")
+	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", notes))
+
+	changelog, err := ioutil.ReadFile("CHANGELOG.md")
+	if err != nil {
+		return err
+	}
+	content := strings.Builder{}
+	// Extract content between first and second occurrence of "## "
+	delimiter := "## "
+	parts := strings.SplitN(string(changelog), delimiter, 3)
+	if len(parts) >= 2 {
+		sectionWithHeader := parts[1]
+		lines := strings.SplitN(sectionWithHeader, "\n", 2)
+		changes := lines[len(lines)-1]
+		content.WriteString("# Changes:\n")
+		content.WriteString(changes)
+	}
+
+	content.WriteString("# Checksums")
+	content.WriteString("\n\nfile | sha256sum\n---|---\n")
+	for _, archive := range archives {
+		h, err := hash(archive)
+		if err != nil {
+			return err
+		}
+		content.WriteString(fmt.Sprintf("%s | %s\n", path.Base(archive), h))
+	}
+
+	return ioutil.WriteFile(notes, []byte(content.String()), os.ModePerm)
 }
 
 func main() {
@@ -264,7 +306,7 @@ func main() {
 
 	var err error
 	if len(os.Args) == 1 {
-		err = build(buildDirectory, nil, false)
+		_, err = build(buildDirectory, nil)
 	} else {
 		switch os.Args[1] {
 		case "releases":
