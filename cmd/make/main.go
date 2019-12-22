@@ -189,13 +189,16 @@ func GoOsAndArch(env []string) (string, string, error) {
 	return GoOS, GoArch, nil
 }
 
-func build(workdir string, env []string) (string, error) {
+func build(workdir string, env []string, versionnedDir bool) (string, error) {
 	version, err := version(env)
 	if err != nil {
 		return "", err
 	}
-	archiveDir := version
-	dir := path.Join(workdir, archiveDir)
+
+	dir := workdir
+	if versionnedDir {
+		dir = path.Join(workdir, version)
+	}
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 		return "", err
 	}
@@ -209,7 +212,7 @@ func build(workdir string, env []string) (string, error) {
 		return "", err
 	}
 
-	return archiveDir, nil
+	return dir, nil
 }
 
 func compress(workdir string, dir string) (string, error) {
@@ -236,12 +239,12 @@ func releases(dir string, env []string, OSesByArch map[string][]string) error {
 	for arch, OSes := range OSesByArch {
 		for _, OS := range OSes {
 			targetEnv := append(env, fmt.Sprintf("GOOS=%s", OS), fmt.Sprintf("GOARCH=%s", arch))
-			archiveDir, err := build(dir, targetEnv)
+			archiveDir, err := build(dir, targetEnv, true)
 			if err != nil {
 				return err
 			}
 
-			archivePath, err := compress(dir, archiveDir)
+			archivePath, err := compress(dir, path.Base(archiveDir))
 			if err != nil {
 				return err
 			}
@@ -332,7 +335,7 @@ func main() {
 	case "usage":
 		fmt.Fprint(os.Stderr, usage)
 	case "citop":
-		_, err = build(buildDirectory, env)
+		_, err = build(buildDirectory, env, false)
 	case "release", "releases":
 		err = releases(buildDirectory, env, OSesByArch)
 	case "man.go":

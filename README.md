@@ -50,25 +50,28 @@ in HTML and roff format and a copy of the license.
 
 ## Building from source
 ### Building automatically from source (recommended)
-This method requires a UNIX system with `make`, `pandoc` and golang >= 1.11.
+This method requires a UNIX system with golang >= 1.11, git and pandoc.
 ```shell
-git clone git@github.com:nbedos/citop.git && cd citop
-make citop
+git clone git@github.com:nbedos/citop.git
+cd citop
+# Compile and run build script
+go run ./cmd/make citop
 ```
 
-At this point you should find the executable located at `./build/citop` as well as two versions
+If all went well you should find the executable located at `./build/citop` as well as two versions
 of the manual page:
 * `./build/citop.man.1` (roff format)
 * `./build/citop.man.html`
 
 ### Building manually from source
-This method requires golang >= 1.11 and a UNIX system.
+This method requires a UNIX system with golang >= 1.11 and git.
 ```shell
-git clone git@github.com:nbedos/citop.git && cd citop
+git clone git@github.com:nbedos/citop.git
+cd citop
 mkdir build
 BUILD_VERSION="$(git describe --tags --dirty)_$(go env GOOS)/$(go env GOARCH)" && \
 GO111MODULE=on && \
-go build -ldflags "-X main.Version=$BUILD_VERSION" -o build/citop
+go build -ldflags "-X main.Version=$BUILD_VERSION" -o build/citop cmd/citop/
 ```
 
 At this point you should find the executable located at `./build/citop`.
@@ -80,7 +83,8 @@ the manual page is made available for each [release](https://github.com/nbedos/c
 ### Building a Docker image
 This method requires access to Docker 17.05 or higher since it relies on a multi-stage build.
 ```shell
-git clone git@github.com:nbedos/citop.git && cd citop
+git clone git@github.com:nbedos/citop.git
+cd citop
 export CITOP_DOCKER_IMAGE="citop:$(git describe --tags --dirty)"
 docker build -t "$CITOP_DOCKER_IMAGE" .
 

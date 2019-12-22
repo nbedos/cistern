@@ -2,7 +2,7 @@ FROM golang:1.13 AS builder
 WORKDIR /citop/
 RUN apt-get update && yes | apt-get install pandoc
 COPY . .
-RUN make citop
+RUN go run ./cmd/make citop
 
 FROM alpine:latest
 WORKDIR /citop
