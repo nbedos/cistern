@@ -29,13 +29,6 @@ stages:
          echo '##vso[task.prependpath]$(GOROOT)/bin'
        displayName: 'Set up the Go workspace'
 
-     - script: |
-         go version
-         go get -v -t -d ./...
-         go build -v .
-       workingDirectory: '$(modulePath)'
-       displayName: 'Build'
-
      - script: go run ./cmd/make test
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
@@ -54,13 +47,6 @@ stages:
          echo '##vso[task.prependpath]$(GOBIN)'
          echo '##vso[task.prependpath]$(GOROOT)/bin'
        displayName: 'Set up the Go workspace'
-
-     - script: |
-         go version
-         go get -v -t -d ./...
-         go build -v .
-       workingDirectory: '$(modulePath)'
-       displayName: 'Build'
 
      - script: go run ./cmd/make test
        workingDirectory: '$(modulePath)'
