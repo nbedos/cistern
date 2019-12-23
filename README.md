@@ -55,7 +55,7 @@ This method requires a UNIX system with golang >= 1.11, git and pandoc.
 git clone git@github.com:nbedos/citop.git
 cd citop
 # Compile and run build script
-go run ./cmd/make citop
+GO111MODULE=on go run ./cmd/make citop
 ```
 
 If all went well you should find the executable located at `./build/citop` as well as two versions
