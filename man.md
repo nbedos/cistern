@@ -56,23 +56,25 @@ citop feature/doc
 
 # OPTIONS
 ## `-r=REPOSITORY, --repository=REPOSITORY`
-Specify the git repository to work with. REPOSITORY can be either a path to a local git repository,
-or the URL of an online repository hosted at GitHub or GitLab. Both web URLs and git URLs are
-accepted.
+Specify the git repository to monitor. If REPOSITORY is the path of a local repository, citop
+will monitor all the associated remotes. If REPOSITORY is a URL, citop will monitor the
+corresponding online repository. 
 
-In the absence of this option, citop will work with the git repository located in the current 
-directory. If there is no such repository, citop will fail.
+If this option is not set, citop will behave as if it had been set to the path of the current
+directory.
+
+Note that citop will only monitor repositories hosted on GitLab or GitHub.
 
 Examples:
 ```shell
-# Work with the git repository in the current directory
+# Monitor pipelines of the git repository in the current directory
 citop
-# Work with the repository specified by a web URL
+# Monitor pipelines of the repository specified by a web URL
 citop -r https://gitlab.com/nbedos/citop
 citop -r github.com/nbedos/citop
 # Git URLs are accepted
 citop -r git@github.com:nbedos/citop.git
-# Paths to a local repository are accepted too
+# A path referring to a local repository is valid too
 citop -r /home/user/repos/myrepo
 ```
 

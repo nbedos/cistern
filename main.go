@@ -235,14 +235,14 @@ Positional arguments:
 
 Options:
   -r REPOSITORY, --repository REPOSITORY
-                Specify the git repository to work with. REPOSITORY can
-                be either a path to a local git repository, or the URL
-                of an online repository hosted at GitHub or GitLab.
-                Both web URLs and git URLs are accepted.
-
-                In the absence of this option, citop will work with the
-                git repository located in the current directory. If
-                there is no such repository, citop will fail.
+                Specify the git repository to monitor. If REPOSITORY is
+                the path of a local repository, citop will monitor all
+                the associated remotes. If REPOSITORY is a URL, citop
+                will monitor the corresponding online repository.
+                If this option is not set, citop will behave as if it
+                had been set to the path of the current directory.
+                Note that citop will only monitor repositories hosted
+                on GitLab or GitHub.
 
   -h, --help    Show usage
 
