@@ -65,7 +65,7 @@ func version(env []string) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("citop-%s-%s-%s", gitVersion, goOs, goArch), nil
+	return fmt.Sprintf("%s-%s-%s", gitVersion, goOs, goArch), nil
 }
 
 // Build version number from last git tag
@@ -346,6 +346,7 @@ func main() {
 		cmd := exec.Command("go", "test", "-v", "./...")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+		cmd.Env = append(os.Environ(), env...)
 		err = cmd.Run()
 	default:
 		fmt.Fprint(os.Stderr, fmt.Sprintf("unknow command: %q\n", os.Args[1]))

@@ -8,5 +8,5 @@ environment:
         - stack: go 1.12
 
 test_script:
-  - go test ./...
+  - go run ./cmd/make test
 

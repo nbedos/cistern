@@ -35,7 +35,7 @@ stages:
        workingDirectory: '$(modulePath)'
        displayName: 'Build'
 
-     - script: go run cmd/make test
+     - script: go run ./cmd/make test
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
 
@@ -61,7 +61,7 @@ stages:
        workingDirectory: '$(modulePath)'
        displayName: 'Build'
 
-     - script: go run cmd/make test
+     - script: go run ./cmd/make test
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
 

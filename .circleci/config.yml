@@ -11,7 +11,7 @@ jobs:
             - go-mod-v4-{{ checksum "go.sum" }}
       - run:
           name: Run unit tests
-          command: go run cmd/make test
+          command: go run ./cmd/make test
       - save_cache:
           key: go-mod-v4-{{ checksum "go.sum" }}
           paths:
