@@ -1,4 +1,8 @@
 language: go
+
+env:
+  - GO111MODULE=on
+
 jobs:
   include:
   - stage: Tests

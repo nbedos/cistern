@@ -107,7 +107,7 @@ func man(dir string, version string) error {
 		return err
 	}
 
-	markdown := strings.ReplaceAll(string(bs), "\\<version\\>", version)
+	markdown := strings.Replace(string(bs), "\\<version\\>", version, 1)
 
 	output := path.Join(dir, "citop.man.html")
 	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", output))
@@ -301,7 +301,7 @@ func manGo() error {
 	// Ideally man.go would be a temporary build artifact but this has the
 	// downside of requiring everyone to install pandoc to be able to compile
 	// citop.
-	markdown := strings.ReplaceAll(string(bs), "version \\<version\\>", "")
+	markdown := strings.Replace(string(bs), "version \\<version\\>", "", 1)
 
 	stdout := &bytes.Buffer{}
 	// FIXME Move this out of here and parametrize the path
@@ -314,7 +314,7 @@ func manGo() error {
 		return err
 	}
 
-	manGo := fmt.Sprintf(manGoTemplate, strings.ReplaceAll(stdout.String(), "`", "\"` + \"`\" + `\""))
+	manGo := fmt.Sprintf(manGoTemplate, strings.Replace(stdout.String(), "`", "\"` + \"`\" + `\"", -1))
 	if err := ioutil.WriteFile("cmd/citop/man.go", []byte(manGo), os.ModePerm); err != nil {
 		return err
 	}
