@@ -272,7 +272,7 @@ func releaseNotes(dir string, archives []string) error {
 		sectionWithHeader := parts[1]
 		lines := strings.SplitN(sectionWithHeader, "\n", 2)
 		changes := lines[len(lines)-1]
-		content.WriteString("# Changes:\n")
+		content.WriteString("# Changes\n")
 		content.WriteString(changes + "\n")
 	}
 
