@@ -120,7 +120,7 @@ b          Open with default web browser
 
 q          Quit
 
-?          View manual page
+?              View manual page
 
 ----------------------------------------------------------
 

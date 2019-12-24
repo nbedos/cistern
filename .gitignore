@@ -1,2 +1,6 @@
+.idea
 build/
 citop
+citop.exe
+make
+make.exe

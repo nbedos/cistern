@@ -6,5 +6,5 @@ golang 1.13:
   image: golang:1.13
   script:
     - cd "$CI_PROJECT_DIR"
-    - make tests
+    - go run ./cmd/make test
 

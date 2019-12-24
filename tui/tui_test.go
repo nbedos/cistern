@@ -82,7 +82,7 @@ func TestTUI_Exec(t *testing.T) {
 			tui.Finish()
 		}()
 
-		if err = tui.Exec(context.Background(), "date", nil, nil); err != nil {
+		if err = tui.Exec(context.Background(), "more", nil, nil); err != nil {
 			t.Fatalf("expected nil but got %v", err)
 		}
 

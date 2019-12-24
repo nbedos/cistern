@@ -9,10 +9,8 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
-	"os/signal"
 	"path"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -94,7 +92,7 @@ func ConfigFromPaths(paths ...string) (Configuration, error) {
 		c = Configuration{}
 		bs, err := ioutil.ReadFile(p)
 		if err != nil {
-			if err, ok := err.(*os.PathError); ok && err.Err == syscall.ENOENT {
+			if os.IsNotExist(err) {
 				// No config file at this location, try the next one
 				continue
 			}
@@ -249,9 +247,7 @@ Options:
   --version     Print the version of citop being run`
 
 func main() {
-	signal.Ignore(syscall.SIGINT)
-	// FIXME Do not ignore SIGTSTP/SIGCONT
-	signal.Ignore(syscall.SIGTSTP)
+	SetupSignalHandlers()
 
 	f := flag.NewFlagSet("citop", flag.ContinueOnError)
 	null := bytes.NewBuffer(nil)
@@ -329,7 +325,7 @@ To lift these restrictions, create a configuration file containing your credenti
 		fmt.Fprintln(os.Stderr, fmt.Sprintf("configuration error: %s", err.Error()))
 		os.Exit(1)
 	}
-	if err := tui.RunApplication(ctx, tcell.NewScreen, repo, sha, ciProviders, sourceProviders, time.Local, manualPage()); err != nil {
+	if err := tui.RunApplication(ctx, tcell.NewScreen, repo, sha, ciProviders, sourceProviders, time.Local, manualPage); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}

@@ -1,70 +1,90 @@
-language: go
+
+env:
+  - GO111MODULE=on
+
 jobs:
   include:
   - stage: Tests
     name: GoLang 1.11 on Ubuntu Trusty
+    language: go
     os: linux
     dist: trusty
     go: 1.11.x
     script:
-    - make tests
+    - go run ./cmd/make test
 
   - stage: Tests
     name: GoLang 1.12 on Ubuntu Trusty
+    language: go
     os: linux
     dist: trusty
     go: 1.12.x
     script:
-    - make tests
+    - go run ./cmd/make test
 
   - stage: Tests
     name: GoLang 1.13 on Ubuntu Bionic
+    language: go
     os: linux
     dist: bionic
     go: 1.13.x
     script:
-    - make tests
+    - go run ./cmd/make test
 
   - stage: Tests
     name: GoLang 1.12 on macOS 10.13
+    language: go
     os: osx
     osx_image: xcode9.4
     go: 1.12.x
     script:
-    - make tests
+    - go run ./cmd/make test
 
   - stage: Tests
     name: GoLang 1.13 on macOS 10.14
+    language: go
     os: osx
     osx_image: xcode11.2
     go: 1.13.x
     script:
-    - make tests
+    - go run ./cmd/make test
+
+  - stage: Tests
+    name: Docker image
+    os: linux
+    dist: bionic
+    services:
+        - docker
+    script:
+    - docker build -t "citop:latest" .
+    - docker run -it "citop:latest" --version
 
   - stage: Deployment
     name: GitHub release
     if: tag IS present
     os: linux
     dist: bionic
+    language: go
     go: 1.13.x
     addons:
       apt_packages:
       - pandoc
     script:
-    - make releases
+    - go run ./cmd/make releases
     deploy:
       provider: releases
       api_key:
         secure: CMifYQYqnO+tmMnNi0uAhI+Cpnwrnq8WI9Eoi9QskUcAyA0ttXLDJdF2wAWjWVFKyHFXLcWxtxPi0fZkJXJo2VVLh4PQWdBLJNDA7zWq3qB8D4bquzx1g9+wBRKm+B417c6XrE6JRdyu17TIhPYvW4SO24+dDWwiHcxLs+cJUcX5XTzv87wE3OTdbj8aRmhktyKe5mp19K2ryABs4iUB04oy0eoDbh+VfUq3/21K0+fIqm52+28IDzpk3+UKJV/OrfBlBmTkdKRb135M95NuZ2k9OqE2l+gRBLFhGmjf6Z0+npFPqf50jJ72hjRFcCdcv0vPnzyaAgZAOgmkqIVNXIlVm4Cb1FtL22hvRcVWu5UTD0QFFsObi51q+rbKdc9WQ18A0bxbtmExaNhXgAMc9tfYm9UtS5mtdarN6yntcqYauIUNdXwaz2pplzUM6+kHtXrlftDTxEDF0OlPrLv08rrcqqerBa3k1CAC8Md/ZJw3ls/T1Glg8a+qZSFHEnq2RoW79xzT7yWCVrjkOWEK4mhmNUKmzQhfFyrCeOLarUQNo+k0spi5FUZxkwWqQaYvRgfQmc9tcHjE03WYYZJYBYO+fro8/8x+1lrBmAzQK2Vq8qsmPxJjFYXVulRGrgFGxVxHMsvL7gXFtXNzClLD619Ox7I0hsM+7pEIDFHRveI=
       skip_cleanup: true
+      edge: true
+      tag_name: $TRAVIS_TAG
       name: $TRAVIS_TAG
+      draft: true
       file_glob: true
       file: 
         - build/*.tar.gz
         - build/citop.man.1
         - build/citop.man.html
-      draft: true
-      edge: true
       release_notes_file: "build/notes.md"
       on:
           tags: true

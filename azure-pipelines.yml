@@ -9,6 +9,7 @@ variables:
   GOROOT: '/usr/local/go1.12' # Go installation path
   GOPATH: '$(system.defaultWorkingDirectory)/gopath' # Go workspace path
   modulePath: '$(GOPATH)/src/github.com/$(build.repository.name)' # Path to the module's code
+  GO111MODULE: 'on'
 
 stages:
  - stage: tests
@@ -28,14 +29,7 @@ stages:
          echo '##vso[task.prependpath]$(GOROOT)/bin'
        displayName: 'Set up the Go workspace'
 
-     - script: |
-         go version
-         go get -v -t -d ./...
-         go build -v .
-       workingDirectory: '$(modulePath)'
-       displayName: 'Build'
-
-     - script: make tests
+     - script: go run ./cmd/make test
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
 
@@ -54,14 +48,7 @@ stages:
          echo '##vso[task.prependpath]$(GOROOT)/bin'
        displayName: 'Set up the Go workspace'
 
-     - script: |
-         go version
-         go get -v -t -d ./...
-         go build -v .
-       workingDirectory: '$(modulePath)'
-       displayName: 'Build'
-
-     - script: make tests
+     - script: go run ./cmd/make test
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
 
