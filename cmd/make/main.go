@@ -1,4 +1,4 @@
-// This is the build script for citop. It replaces an older
+// This is the build script for cistern. It replaces an older
 // Makefile that was harder to keep compatible with all
 // target platforms without relying on specific building tools
 // (e.g. GNU make).
@@ -36,7 +36,7 @@ const usage = `Usage:
         make test        # Run unit tests
 
     Compile and release:
-        make citop       # Build executable and manual pages for host machine
+        make cistern       # Build executable and manual pages for host machine
         make releases    # Build all release archives and release notes
         make clean       # Remove build directory
 
@@ -83,13 +83,13 @@ func gitDescribe() (string, error) {
 
 func goBuild(version string, dir string, env []string) error {
 	version = fmt.Sprintf("-X main.Version=%s", version)
-	executable := path.Join(dir, "citop")
+	executable := path.Join(dir, "cistern")
 	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", executable))
 	wd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command("go", buildDirectory, "-ldflags", version, "-o", executable, path.Join(wd, "cmd", "citop"))
+	cmd := exec.Command("go", buildDirectory, "-ldflags", version, "-o", executable, path.Join(wd, "cmd", "cistern"))
 	cmd.Env = append(os.Environ(), env...)
 	_, err = cmd.Output()
 	return err
@@ -109,7 +109,7 @@ func man(dir string, version string) error {
 
 	markdown := strings.Replace(string(bs), "\\<version\\>", version, 1)
 
-	output := path.Join(dir, "citop.man.html")
+	output := path.Join(dir, "cistern.man.html")
 	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", output))
 	mdToHTML := exec.Command("pandoc", "-s", "-t", "html5", "--template", "pandoc_template.html", "-o", output)
 	mdToHTML.Stdin = bytes.NewBufferString(markdown)
@@ -117,7 +117,7 @@ func man(dir string, version string) error {
 		return err
 	}
 
-	output = path.Join(dir, "citop.man.1")
+	output = path.Join(dir, "cistern.man.1")
 	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", output))
 	mdToRoff := exec.Command("pandoc", "-s", "-t", "man", "-o", output)
 	mdToRoff.Stdin = bytes.NewBufferString(markdown)
@@ -126,10 +126,10 @@ func man(dir string, version string) error {
 	return err
 }
 
-const licenseHeader = `Below is the license of citop and of every package it uses
+const licenseHeader = `Below is the license of cistern and of every package it uses
 
 
-===== github.com/nbedos/citop =====
+===== github.com/nbedos/cistern =====
 `
 
 func license(dir string) error {
@@ -151,7 +151,7 @@ func license(dir string) error {
 	}
 
 	for _, pkgPath := range strings.Split(string(bs), "\n") {
-		if !strings.Contains(pkgPath, "citop") {
+		if !strings.Contains(pkgPath, "cistern") {
 			licensePath := path.Join(pkgPath, "LICENSE")
 			if bs, err = ioutil.ReadFile(licensePath); err == nil {
 				b.WriteString("\n\n")
@@ -300,12 +300,12 @@ func manGo() error {
 	// itself contains the version number which...
 	// Ideally man.go would be a temporary build artifact but this has the
 	// downside of requiring everyone to install pandoc to be able to compile
-	// citop.
+	// cistern.
 	markdown := strings.Replace(string(bs), "version \\<version\\>", "", 1)
 
 	stdout := &bytes.Buffer{}
 	// FIXME Move this out of here and parametrize the path
-	fmt.Fprint(os.Stderr, "Building cmd/citop/man.go...\n")
+	fmt.Fprint(os.Stderr, "Building cmd/cistern/man.go...\n")
 	mdToGo := exec.Command("pandoc", "-s", "-t", "man")
 	mdToGo.Stdin = bytes.NewBufferString(markdown)
 	mdToGo.Stdout = stdout
@@ -315,7 +315,7 @@ func manGo() error {
 	}
 
 	manGo := fmt.Sprintf(manGoTemplate, strings.Replace(stdout.String(), "`", "\"` + \"`\" + `\"", -1))
-	if err := ioutil.WriteFile("cmd/citop/man.go", []byte(manGo), os.ModePerm); err != nil {
+	if err := ioutil.WriteFile("cmd/cistern/man.go", []byte(manGo), os.ModePerm); err != nil {
 		return err
 	}
 
@@ -334,7 +334,7 @@ func main() {
 	switch os.Args[1] {
 	case "usage":
 		fmt.Fprint(os.Stderr, usage)
-	case "citop":
+	case "cistern":
 		_, err = build(buildDirectory, env, false)
 	case "release", "releases":
 		err = releases(buildDirectory, env, OSesByArch)

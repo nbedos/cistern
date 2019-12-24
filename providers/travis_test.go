@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/utils"
 )
 
 func TestTravisClientfetchPipeline(t *testing.T) {
@@ -74,7 +74,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 				Duration: 114 * time.Second,
 			},
 			WebURL: utils.NullString{
-				String: fmt.Sprintf("%s/nbedos/citop/builds/609256446", ts.URL),
+				String: fmt.Sprintf("%s/nbedos/cistern/builds/609256446", ts.URL),
 				Valid:  true,
 			},
 		},
@@ -104,7 +104,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			},
 			WebURL: utils.NullString{
 				Valid:  true,
-				String: fmt.Sprintf("%s/nbedos/citop/builds/609256446", ts.URL),
+				String: fmt.Sprintf("%s/nbedos/cistern/builds/609256446", ts.URL),
 			},
 		},
 	}
@@ -132,7 +132,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			},
 			Log: cache.Log{},
 			WebURL: utils.NullString{
-				String: fmt.Sprintf("%s/nbedos/citop/jobs/609256447", ts.URL),
+				String: fmt.Sprintf("%s/nbedos/cistern/jobs/609256447", ts.URL),
 				Valid:  true,
 			},
 			AllowFailure: false,
@@ -160,7 +160,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			},
 			Log: cache.Log{},
 			WebURL: utils.NullString{
-				String: fmt.Sprintf("%s/nbedos/citop/jobs/609256448", ts.URL),
+				String: fmt.Sprintf("%s/nbedos/cistern/jobs/609256448", ts.URL),
 				Valid:  true,
 			},
 			AllowFailure: false,
@@ -188,7 +188,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			},
 			Log: cache.Log{},
 			WebURL: utils.NullString{
-				String: fmt.Sprintf("%s/nbedos/citop/jobs/609256449", ts.URL),
+				String: fmt.Sprintf("%s/nbedos/cistern/jobs/609256449", ts.URL),
 				Valid:  true,
 			},
 			AllowFailure: false,
@@ -216,14 +216,14 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			},
 			Log: cache.Log{},
 			WebURL: utils.NullString{
-				String: fmt.Sprintf("%s/nbedos/citop/jobs/609256450", ts.URL),
+				String: fmt.Sprintf("%s/nbedos/cistern/jobs/609256450", ts.URL),
 				Valid:  true,
 			},
 			AllowFailure: false,
 		},
 	}
 
-	pipeline, err := client.fetchPipeline(context.Background(), "nbedos/citop", "609256446")
+	pipeline, err := client.fetchPipeline(context.Background(), "nbedos/cistern", "609256446")
 	if err != nil {
 		t.Fatal(err)
 	}

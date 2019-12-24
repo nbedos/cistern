@@ -1,4 +1,4 @@
-module github.com/nbedos/citop
+module github.com/nbedos/cistern
 
 go 1.12
 

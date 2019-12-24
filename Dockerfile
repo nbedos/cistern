@@ -1,13 +1,13 @@
 FROM golang:1.13 AS builder
-WORKDIR /citop/
+WORKDIR /cistern/
 RUN apt-get update && yes | apt-get install pandoc
 COPY . .
-RUN go run ./cmd/make citop
+RUN go run ./cmd/make cistern
 
 FROM alpine:latest
-WORKDIR /citop
+WORKDIR /cistern
 RUN apk add man ca-certificates less
 ENV PAGER less
-COPY --from=builder /citop/build/citop /bin
+COPY --from=builder /cistern/build/cistern /bin
 CMD []
-ENTRYPOINT ["citop"]
+ENTRYPOINT ["cistern"]

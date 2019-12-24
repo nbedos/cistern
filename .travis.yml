@@ -56,8 +56,8 @@ jobs:
     services:
         - docker
     script:
-    - docker build -t "citop:latest" .
-    - docker run -it "citop:latest" --version
+    - docker build -t "cistern:latest" .
+    - docker run -it "cistern:latest" --version
 
   - stage: Deployment
     name: GitHub release
@@ -83,8 +83,8 @@ jobs:
       file_glob: true
       file: 
         - build/*.tar.gz
-        - build/citop.man.1
-        - build/citop.man.html
+        - build/cistern.man.1
+        - build/cistern.man.html
       release_notes_file: "build/notes.md"
       on:
           tags: true

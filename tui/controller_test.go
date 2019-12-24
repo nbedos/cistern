@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell"
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/text"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/text"
 )
 
 func TestController_resize(t *testing.T) {

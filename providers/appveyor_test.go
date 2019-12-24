@@ -11,17 +11,17 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/utils"
 )
 
 func TestParseAppVeyorURL(t *testing.T) {
-	u := "https://ci.appveyor.com/project/nbedos/citop/builds/29070120"
+	u := "https://ci.appveyor.com/project/nbedos/cistern/builds/29070120"
 	owner, repo, id, err := parseAppVeyorURL(u)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if owner != "nbedos" || repo != "citop" || id != 29070120 {
+	if owner != "nbedos" || repo != "cistern" || id != 29070120 {
 		t.Fail()
 	}
 }
@@ -162,9 +162,9 @@ func TestAppVeyorClient_BuildFromURL(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filename := ""
 		switch {
-		case r.Method == "GET" && r.URL.Path == "/api/projects/nbedos/citop/history":
+		case r.Method == "GET" && r.URL.Path == "/api/projects/nbedos/cistern/history":
 			filename = "appveyor/appveyor_history_29070120.json"
-		case r.Method == "GET" && r.URL.Path == "/api/projects/nbedos/citop/build/1.0.22":
+		case r.Method == "GET" && r.URL.Path == "/api/projects/nbedos/cistern/build/1.0.22":
 			filename = "appveyor/appveyor_build_1_0_22.json"
 		default:
 			w.WriteHeader(404)
@@ -199,7 +199,7 @@ func TestAppVeyorClient_BuildFromURL(t *testing.T) {
 		},
 	}
 
-	buildURL := "https://ci.appveyor.com/project/nbedos/citop/builds/29070120"
+	buildURL := "https://ci.appveyor.com/project/nbedos/cistern/builds/29070120"
 	build, err := client.BuildFromURL(context.Background(), buildURL)
 	if err != nil {
 		t.Fatal(err)

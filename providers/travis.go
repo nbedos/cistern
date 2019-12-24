@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/utils"
 )
 
 func fromTravisState(s string) cache.State {

@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v28/github"
-	"github.com/nbedos/citop/cache"
+	"github.com/nbedos/cistern/cache"
 )
 
 func setupGitHubTestServer() (*http.Client, string, func()) {
@@ -70,11 +70,11 @@ func TestRefStatuses(t *testing.T) {
 	}
 
 	expectedURLs := []string{
-		"https://circleci.com/gh/nbedos/citop/36",
-		"https://ci.appveyor.com/project/nbedos/citop/builds/29024796",
+		"https://circleci.com/gh/nbedos/cistern/36",
+		"https://ci.appveyor.com/project/nbedos/cistern/builds/29024796",
 		"https://travis-ci.com/owner/repository/builds/123654789",
-		"https://travis-ci.org/nbedos/citop/builds/615087280",
-		"https://gitlab.com/nbedos/citop/pipelines/97604657",
+		"https://travis-ci.org/nbedos/cistern/builds/615087280",
+		"https://gitlab.com/nbedos/cistern/pipelines/97604657",
 	}
 
 	sort.Strings(urls)

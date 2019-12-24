@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/nbedos/citop/text"
+import "github.com/nbedos/cistern/text"
 
 type Widget interface {
 	Resize(width int, height int)

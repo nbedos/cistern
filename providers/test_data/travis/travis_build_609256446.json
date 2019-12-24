@@ -23,8 +23,8 @@
     "@href": "/repo/25564643",
     "@representation": "minimal",
     "id": 25564643,
-    "name": "citop",
-    "slug": "nbedos/citop"
+    "name": "cistern",
+    "slug": "nbedos/cistern"
   },
   "branch": {
     "@type": "branch",
@@ -40,7 +40,7 @@
     "sha": "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
     "ref": "refs/heads/feature/travis_improvements",
     "message": "Order builds unambiguously",
-    "compare_url": "https://github.com/nbedos/citop/compare/57451bfb6139...c824642cc7c3",
+    "compare_url": "https://github.com/nbedos/cistern/compare/57451bfb6139...c824642cc7c3",
     "committed_at": "2019-11-08T14:26:18Z",
     "committer": {
       "name": "nbedos",
@@ -78,8 +78,8 @@
         "@href": "/repo/25564643",
         "@representation": "minimal",
         "id": 25564643,
-        "name": "citop",
-        "slug": "nbedos/citop"
+        "name": "cistern",
+        "slug": "nbedos/cistern"
       },
       "commit": {
         "@type": "commit",
@@ -88,7 +88,7 @@
         "sha": "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
         "ref": "refs/heads/feature/travis_improvements",
         "message": "Order builds unambiguously",
-        "compare_url": "https://github.com/nbedos/citop/compare/57451bfb6139...c824642cc7c3",
+        "compare_url": "https://github.com/nbedos/cistern/compare/57451bfb6139...c824642cc7c3",
         "committed_at": "2019-11-08T14:26:18Z"
       },
       "owner": {
@@ -152,8 +152,8 @@
         "@href": "/repo/25564643",
         "@representation": "minimal",
         "id": 25564643,
-        "name": "citop",
-        "slug": "nbedos/citop"
+        "name": "cistern",
+        "slug": "nbedos/cistern"
       },
       "commit": {
         "@type": "commit",
@@ -162,7 +162,7 @@
         "sha": "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
         "ref": "refs/heads/feature/travis_improvements",
         "message": "Order builds unambiguously",
-        "compare_url": "https://github.com/nbedos/citop/compare/57451bfb6139...c824642cc7c3",
+        "compare_url": "https://github.com/nbedos/cistern/compare/57451bfb6139...c824642cc7c3",
         "committed_at": "2019-11-08T14:26:18Z"
       },
       "owner": {
@@ -226,8 +226,8 @@
         "@href": "/repo/25564643",
         "@representation": "minimal",
         "id": 25564643,
-        "name": "citop",
-        "slug": "nbedos/citop"
+        "name": "cistern",
+        "slug": "nbedos/cistern"
       },
       "commit": {
         "@type": "commit",
@@ -236,7 +236,7 @@
         "sha": "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
         "ref": "refs/heads/feature/travis_improvements",
         "message": "Order builds unambiguously",
-        "compare_url": "https://github.com/nbedos/citop/compare/57451bfb6139...c824642cc7c3",
+        "compare_url": "https://github.com/nbedos/cistern/compare/57451bfb6139...c824642cc7c3",
         "committed_at": "2019-11-08T14:26:18Z"
       },
       "owner": {
@@ -299,8 +299,8 @@
         "@href": "/repo/25564643",
         "@representation": "minimal",
         "id": 25564643,
-        "name": "citop",
-        "slug": "nbedos/citop"
+        "name": "cistern",
+        "slug": "nbedos/cistern"
       },
       "commit": {
         "@type": "commit",
@@ -309,7 +309,7 @@
         "sha": "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
         "ref": "refs/heads/feature/travis_improvements",
         "message": "Order builds unambiguously",
-        "compare_url": "https://github.com/nbedos/citop/compare/57451bfb6139...c824642cc7c3",
+        "compare_url": "https://github.com/nbedos/cistern/compare/57451bfb6139...c824642cc7c3",
         "committed_at": "2019-11-08T14:26:18Z"
       },
       "owner": {

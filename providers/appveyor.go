@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/utils"
 )
 
 type AppVeyorClient struct {
@@ -205,7 +205,7 @@ func parseAppVeyorURL(u string) (string, string, int, error) {
 		return "", "", 0, cache.ErrUnknownPipelineURL
 	}
 
-	// URL format: https://ci.appveyor.com/project/nbedos/citop/builds/29070120
+	// URL format: https://ci.appveyor.com/project/nbedos/cistern/builds/29070120
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 6 || cs[1] != "project" || cs[4] != "builds" {
 		return "", "", 0, cache.ErrUnknownPipelineURL

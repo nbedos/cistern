@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/utils"
 )
 
 type CircleCIClient struct {
@@ -143,7 +143,7 @@ func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, int, error
 		return "", "", 0, cache.ErrUnknownPipelineURL
 	}
 
-	// URL format: https://circleci.com/gh/nbedos/citop/36
+	// URL format: https://circleci.com/gh/nbedos/cistern/36
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 5 {
 		return "", "", 0, cache.ErrUnknownPipelineURL

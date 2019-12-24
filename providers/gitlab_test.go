@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/utils"
 	"github.com/xanzy/go-gitlab"
 )
 
@@ -23,12 +23,12 @@ func TestParsePipelineURL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	slug, id, err := c.parsePipelineURL("https://gitlab.com/nbedos/citop/pipelines/97604657")
+	slug, id, err := c.parsePipelineURL("https://gitlab.com/nbedos/cistern/pipelines/97604657")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if slug != "nbedos/citop" || id != 97604657 {
+	if slug != "nbedos/cistern" || id != 97604657 {
 		t.Fail()
 	}
 }
@@ -37,20 +37,20 @@ func setupGitLabTestServer(t *testing.T) (GitLabClient, string, func()) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filename := ""
 		switch r.URL.Path {
-		case "/api/v4/projects/nbedos/citop/pipelines/103230300":
+		case "/api/v4/projects/nbedos/cistern/pipelines/103230300":
 			filename = "gitlab_pipeline.json"
-		case "/api/v4/projects/nbedos/citop/pipelines/103230300/jobs":
+		case "/api/v4/projects/nbedos/cistern/pipelines/103230300/jobs":
 			w.Header().Add("X-Total-Pages", "1")
 			filename = "gitlab_jobs.json"
-		case "/api/v4/projects/nbedos/citop/jobs/42/trace":
+		case "/api/v4/projects/nbedos/cistern/jobs/42/trace":
 			filename = "gitlab_log"
 		case "/api/v4/projects/owner/repo/repository/commits/master":
 			filename = "gitlab_commit.json"
 		case "/api/v4/projects/owner/repo/repository/commits/a24840cf94b395af69da4a1001d32e3694637e20/refs":
 			filename = "gitlab_refs.json"
-		case "/api/v4/projects/nbedos/citop/pipelines":
+		case "/api/v4/projects/nbedos/cistern/pipelines":
 			filename = "gitlab_pipelines.json"
-		case "/api/v4/projects/nbedos/citop/repository/commits/a24840cf94b395af69da4a1001d32e3694637e20/statuses":
+		case "/api/v4/projects/nbedos/cistern/repository/commits/a24840cf94b395af69da4a1001d32e3694637e20/statuses":
 		default:
 			w.WriteHeader(404)
 			return
@@ -86,7 +86,7 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 	client, testURL, teardown := setupGitLabTestServer(t)
 	defer teardown()
 
-	pipelineURL := testURL + "/nbedos/citop/pipelines/103230300"
+	pipelineURL := testURL + "/nbedos/cistern/pipelines/103230300"
 	pipeline, err := client.BuildFromURL(context.Background(), pipelineURL)
 	if err != nil {
 		t.Fatal(err)
@@ -121,7 +121,7 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 			},
 			WebURL: utils.NullString{
 				Valid:  true,
-				String: "https://gitlab.com/nbedos/citop/pipelines/103230300",
+				String: "https://gitlab.com/nbedos/cistern/pipelines/103230300",
 			},
 			Children: []cache.Step{
 				{
@@ -167,8 +167,8 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 								Valid:    true,
 								Duration: time.Minute + 31*time.Second,
 							},
-							WebURL: utils.NullString{Valid: true, String: "https://gitlab.com/nbedos/citop/-/jobs/379869167"},
-							Log:    cache.Log{Key: "nbedos/citop"},
+							WebURL: utils.NullString{Valid: true, String: "https://gitlab.com/nbedos/cistern/-/jobs/379869167"},
+							Log:    cache.Log{Key: "nbedos/cistern"},
 						},
 					},
 				},
@@ -187,7 +187,7 @@ func TestGitLabClient_Log(t *testing.T) {
 	step := cache.Step{
 		ID: "42",
 		Log: cache.Log{
-			Key: "nbedos/citop",
+			Key: "nbedos/cistern",
 		},
 	}
 	log, err := client.Log(context.Background(), step)
@@ -241,13 +241,13 @@ func TestGitLabClient_RefStatuses(t *testing.T) {
 	client, testURL, teardown := setupGitLabTestServer(t)
 	defer teardown()
 
-	statuses, err := client.RefStatuses(context.Background(), testURL+"/nbedos/citop", "", "a24840cf94b395af69da4a1001d32e3694637e20")
+	statuses, err := client.RefStatuses(context.Background(), testURL+"/nbedos/cistern", "", "a24840cf94b395af69da4a1001d32e3694637e20")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	expectedStatuses := []string{
-		"https://gitlab.com/nbedos/citop/pipelines/103494597",
+		"https://gitlab.com/nbedos/cistern/pipelines/103494597",
 	}
 	sort.Strings(expectedStatuses)
 	sort.Strings(statuses)
