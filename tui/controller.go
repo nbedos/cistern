@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell"
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/text"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/text"
+	"github.com/nbedos/cistern/utils"
 )
 
 type inputDestination int
@@ -263,7 +263,7 @@ func (c *Controller) viewHelp(ctx context.Context) error {
 	// There is no standard way to make 'man' read from stdin
 	// so instead we write the man page to disk and invoke
 	// man with the '-l' option.
-	file, err := ioutil.TempFile("", "citop_*.man.1")
+	file, err := ioutil.TempFile("", "cistern_*.man.1")
 	if err != nil {
 		return err
 	}

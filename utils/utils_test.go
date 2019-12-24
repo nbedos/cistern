@@ -104,21 +104,21 @@ func TestDepthFirstTraversal(t *testing.T) {
 func TestRepositorySlugFromURL(t *testing.T) {
 	urls := []string{
 		// SSH git URL
-		"git@github.com:nbedos/citop.git",
-		"git@github.com:nbedos/citop",
+		"git@github.com:nbedos/cistern.git",
+		"git@github.com:nbedos/cistern",
 		// HTTPS git URL
-		"https://github.com/nbedos/citop.git",
+		"https://github.com/nbedos/cistern.git",
 		// Host shouldn't matter
-		"git@gitlab.com:nbedos/citop.git",
+		"git@gitlab.com:nbedos/cistern.git",
 		// Web URLs should work too
-		"https://gitlab.com/nbedos/citop",
+		"https://gitlab.com/nbedos/cistern",
 		// Extraneous path components should be ignored
-		"https://gitlab.com/nbedos/citop/tree/master/cache",
+		"https://gitlab.com/nbedos/cistern/tree/master/cache",
 		// URL scheme shouldn't matter
-		"http://gitlab.com/nbedos/citop",
-		"gitlab.com/nbedos/citop",
+		"http://gitlab.com/nbedos/cistern",
+		"gitlab.com/nbedos/cistern",
 	}
-	expectedOwner, expectedRepo := "nbedos", "citop"
+	expectedOwner, expectedRepo := "nbedos", "cistern"
 
 	for _, u := range urls {
 		t.Run(fmt.Sprintf("URL: %v", u), func(t *testing.T) {
@@ -136,7 +136,7 @@ func TestRepositorySlugFromURL(t *testing.T) {
 		// Missing 1 path component
 		"git@github.com:nbedos.git",
 		// Invalid URL (colon)
-		"https://github.com:nbedos/citop.git",
+		"https://github.com:nbedos/cistern.git",
 	}
 
 	for _, u := range urls {

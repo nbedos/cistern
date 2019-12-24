@@ -12,8 +12,8 @@ import (
 
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/encoding"
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/text"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/text"
 )
 
 var ErrNoProvider = errors.New("list of providers must not be empty")

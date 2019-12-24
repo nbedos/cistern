@@ -5,7 +5,7 @@
     "status": "success",
     "created_at": "2019-12-15T21:46:40.694Z",
     "updated_at": "2019-12-15T21:48:13.077Z",
-    "web_url": "https://gitlab.com/nbedos/citop/pipelines/103230300",
+    "web_url": "https://gitlab.com/nbedos/cistern/pipelines/103230300",
     "before_sha": "0e04997502c99369e87b7822ffcc2f744cc7b5bb",
     "tag": false,
     "yaml_errors": null,
@@ -29,7 +29,7 @@
         "group": "success",
         "tooltip": "passed",
         "has_details": true,
-        "details_path": "/nbedos/citop/pipelines/103230300",
+        "details_path": "/nbedos/cistern/pipelines/103230300",
         "illustration": null,
         "favicon": "https://gitlab.com/assets/ci_favicons/favicon_status_success-8451333011eee8ce9f2ab25dc487fe24a8758c694827a582f17f42b0a90446a2.png"
     }

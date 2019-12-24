@@ -1,20 +1,20 @@
-% CITOP(1) | version \<version\>
+% CISTERN(1) | version \<version\>
 % Nicolas Bedos
 
 # NAME
-**citop** – Continuous Integration Table Of Pipelines
+**cistern** – Continuous Integration Table Of Pipelines
 
 # SYNOPSIS
-`citop [-r REPOSITORY | --repository REPOSITORY] [COMMIT]`
+`cistern [-r REPOSITORY | --repository REPOSITORY] [COMMIT]`
 
-`citop -h | --help`
+`cistern -h | --help`
 
-`citop --version`
+`cistern --version`
 
 # DESCRIPTION
-citop monitors the CI pipelines associated to a specific commit of a git repository.
+cistern monitors the CI pipelines associated to a specific commit of a git repository.
 
-citop currently integrates with the following online services. Each of the service is one or both
+cistern currently integrates with the following online services. Each of the service is one or both
 of the following:
 
 * A "source provider" that is used to list the pipelines associated to a given commit of an online repository
@@ -41,51 +41,51 @@ Azure Devops   no       yes     [https://dev.azure.com](https://dev.azure.com)
 # POSITIONAL ARGUMENTS
 ## `COMMIT`
 Specify the commit to monitor. COMMIT is expected to be the SHA identifier of a commit, or the
-name of a tag or a branch. If this option is missing citop will monitor the commit referenced by
+name of a tag or a branch. If this option is missing cistern will monitor the commit referenced by
 HEAD.
 
 Example:
 ```shell
 # Show pipelines for commit 64be3c6
-citop 64be3c6
+cistern 64be3c6
 # Show pipelines for the commit referenced by the tag '0.9.0'
-citop 0.9.0
+cistern 0.9.0
 # Show pipelines for the commit at the tip of a branch
-citop feature/doc
+cistern feature/doc
 ```
 
 # OPTIONS
 ## `-r=REPOSITORY, --repository=REPOSITORY`
-Specify the git repository to monitor. If REPOSITORY is the path of a local repository, citop
-will monitor all the associated remotes. If REPOSITORY is a URL, citop will monitor the
+Specify the git repository to monitor. If REPOSITORY is the path of a local repository, cistern
+will monitor all the associated remotes. If REPOSITORY is a URL, cistern will monitor the
 corresponding online repository. 
 
-If this option is not set, citop will behave as if it had been set to the path of the current
+If this option is not set, cistern will behave as if it had been set to the path of the current
 directory.
 
-Note that citop will only monitor repositories hosted on GitLab or GitHub.
+Note that cistern will only monitor repositories hosted on GitLab or GitHub.
 
 Examples:
 ```shell
 # Monitor pipelines of the git repository in the current directory
-citop
+cistern
 # Monitor pipelines of the repository specified by a web URL
-citop -r https://gitlab.com/nbedos/citop
-citop -r github.com/nbedos/citop
+cistern -r https://gitlab.com/nbedos/cistern
+cistern -r github.com/nbedos/cistern
 # Git URLs are accepted
-citop -r git@github.com:nbedos/citop.git
+cistern -r git@github.com:nbedos/cistern.git
 # A path referring to a local repository is valid too
-citop -r /home/user/repos/myrepo
+cistern -r /home/user/repos/myrepo
 ```
 
 ## `-h, --help`
-Show usage of citop
+Show usage of cistern
 
 ## `--version`
-Print the version of citop being run
+Print the version of cistern being run
 
 # INTERACTIVE COMMANDS
-Below are the default commands for interacting with citop.
+Below are the default commands for interacting with cistern.
 
 ----------------------------------------------------------
 Key        Action
@@ -129,19 +129,19 @@ q          Quit
 
 # CONFIGURATION FILE
 ## Location
-citop follows the XDG base directory specification \[2\] and expects to find the configuration file
+cistern follows the XDG base directory specification \[2\] and expects to find the configuration file
 at one of the following locations depending on the value of the two environment variables
 `XDG_CONFIG_HOME` and `XDG_CONFIG_DIRS`:
 
-1. `"$XDG_CONFIG_HOME/citop/citop.toml"`
-2. `"$DIR/citop/citop.toml"` for every directory `DIR` in the comma-separated list `"$XDG_CONFIG_DIRS"`
+1. `"$XDG_CONFIG_HOME/cistern/cistern.toml"`
+2. `"$DIR/cistern/cistern.toml"` for every directory `DIR` in the comma-separated list `"$XDG_CONFIG_DIRS"`
 
-If `XDG_CONFIG_HOME` (resp. `XDG_CONFIG_DIRS`) is not set, citop uses the default value
+If `XDG_CONFIG_HOME` (resp. `XDG_CONFIG_DIRS`) is not set, cistern uses the default value
 `"$HOME/.config"` (resp. `"/etc/xdg"`) instead.
 
 
 ## Format
-citop uses a configuration file in [TOML version v0.5.0](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md)
+cistern uses a configuration file in [TOML version v0.5.0](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md)
 format. The configuration file is made of keys grouped together in tables. The specification of
 each table is given in the example below.
 
@@ -149,15 +149,15 @@ each table is given in the example below.
 This example describes and uses all existing configuration options.
 
 ```toml
-#### CITOP CONFIGURATION FILE ####
-# This file is a complete, valid configuration file for citop
-# and should be located at $XDG_CONFIG_HOME/citop/citop.toml
+#### CISTERN CONFIGURATION FILE ####
+# This file is a complete, valid configuration file for cistern
+# and should be located at $XDG_CONFIG_HOME/cistern/cistern.toml
 # 
 
 ## PROVIDERS ##
 [providers]
 # The 'providers' table is used to define credentials for 
-# accessing online services. citop relies on two types of
+# accessing online services. cistern relies on two types of
 # providers:
 #
 #    - 'source providers' are used for listing the CI pipelines
@@ -167,7 +167,7 @@ This example describes and uses all existing configuration options.
 #    CI pipelines (GitLab, AppVeyor, CircleCI, Travis and Azure
 #    Devops are CI providers)
 #
-# citop requires credentials for at least one source provider and
+# cistern requires credentials for at least one source provider and
 # one CI provider to run. Feel free to remove sections below 
 # as long as this rule is met.
 #
@@ -184,7 +184,7 @@ This example describes and uses all existing configuration options.
 # GitHub (60 requests per hour and per IP address) whereas 
 # authenticated clients benefit from a rate of 5000 requests per
 # hour. Providing an  API token is strongly encouraged: without
-# one, citop will likely reach the rate limit in a matter of
+# one, cistern will likely reach the rate limit in a matter of
 # minutes.
 #
 # GitHub token management: https://github.com/settings/tokens
@@ -193,7 +193,7 @@ token = ""
 
 ### GITLAB ###
 [[providers.gitlab]]
-# Name shown by citop for this provider
+# Name shown by cistern for this provider
 # (optional, string, default: "gitlab")
 name = "gitlab"
 
@@ -204,7 +204,7 @@ url = "https://gitlab.com"
 # GitLab API token (optional, string)
 #
 # Note: GitLab prevents access to pipeline jobs for 
-# unauthenticated users meaning if you wish to use citop
+# unauthenticated users meaning if you wish to use cistern
 # to view GitLab pipelines you will have to provide
 # appropriate credentials. This is true even for pipelines
 # of public repositories.
@@ -216,7 +216,7 @@ token = ""
 
 ### TRAVIS CI ###
 [[providers.travis]]
-# Name shown by citop for this provider
+# Name shown by cistern for this provider
 # (optional, string, default: "travis")
 name = "travis"
 
@@ -241,7 +241,7 @@ token = ""
 
 ### APPVEYOR ###
 [[providers.appveyor]]
-# Name shown by citop for this provider
+# Name shown by cistern for this provider
 # (optional, string, default: "appveyor")
 name = "appveyor"
 
@@ -252,7 +252,7 @@ token = ""
 
 ### CIRCLECI ###
 [[providers.circleci]]
-# Name shown by citop for this provider
+# Name shown by cistern for this provider
 # (optional, string, default: "circleci")
 name = "circleci"
 
@@ -263,7 +263,7 @@ token = ""
 
 ### AZURE DEVOPS ###
 [[providers.azure]]
-# Name shown by citop for this provider
+# Name shown by cistern for this provider
 # (optional, string, default: "azure")
 name = "azure"
 
@@ -278,12 +278,12 @@ token = ""
 ## ENVIRONMENT VARIABLES
 
 * `BROWSER` is used to find the path of the default web browser
-* `PAGER` is used to view log files. If the variable is not set, citop will call `less`
+* `PAGER` is used to view log files. If the variable is not set, cistern will call `less`
 * `HOME`, `XDG_CONFIG_HOME` and `XDG_CONFIG_DIRS` are used to locate the configuration file
 
 ## LOCAL PROGRAMS
 
-citop relies on the following local executables:
+cistern relies on the following local executables:
 
 * `git` to translate the abbreviated SHA identifier of a commit into a non-abbreviated SHA
 * `less` to view log files, unless `PAGER` is set
@@ -294,35 +294,35 @@ citop relies on the following local executables:
 Monitor pipelines of the current git repository
 ```shell
 # Move to a directory containing a git repository of your choosing
-git clone git@github.com:nbedos/citop.git && cd citop
-# Run citop to list the pipelines associated to the last commit of the repository 
-citop
+git clone git@github.com:nbedos/cistern.git && cd cistern
+# Run cistern to list the pipelines associated to the last commit of the repository 
+cistern
 
 # Show pipelines associated to a specific commit, tag or branch
-citop a24840c
-citop 0.1.0
-citop master
+cistern a24840c
+cistern 0.1.0
+cistern master
 ```
 
 Monitor pipelines of other repositories
 ```shell
 # Show pipelines of a repository identified by a URL or path
-citop -r https://gitlab.com/nbedos/citop        # Web URL
-citop -r git@github.com:nbedos/citop.git        # Git URL
-citop -r github.com/nbedos/citop                # URL without scheme
-citop -r /home/user/repos/repo                  # Path to a repository
+cistern -r https://gitlab.com/nbedos/cistern        # Web URL
+cistern -r git@github.com:nbedos/cistern.git        # Git URL
+cistern -r github.com/nbedos/cistern                # URL without scheme
+cistern -r /home/user/repos/repo                  # Path to a repository
 
 # Specify both repository and git reference
-citop -r github.com/nbedos/citop master
+cistern -r github.com/nbedos/cistern master
 ```
 
 # BUGS
 Questions, bug reports and feature requests are welcome and should be submitted
-on [GitHub](https://github.com/nbedos/citop/issues).
+on [GitHub](https://github.com/nbedos/cistern/issues).
 
 # NOTES
-1. **citop repository**
-    * [https://github.com/nbedos/citop](https://github.com/nbedos/citop)
+1. **cistern repository**
+    * [https://github.com/nbedos/cistern](https://github.com/nbedos/cistern)
 2. **XDG base directory specification**
     * [https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html)
 

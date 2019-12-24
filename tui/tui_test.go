@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell"
-	"github.com/nbedos/citop/text"
+	"github.com/nbedos/cistern/text"
 )
 
 var newScreen = func() (tcell.Screen, error) {

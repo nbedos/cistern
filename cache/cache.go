@@ -13,8 +13,8 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/google/go-cmp/cmp"
-	"github.com/nbedos/citop/text"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/text"
+	"github.com/nbedos/cistern/utils"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 )
@@ -218,7 +218,7 @@ func (c Commit) Strings() []text.StyledString {
 func RemotesAndCommit(path string, ref string) ([]string, Commit, error) {
 	// If a path does not refer to an existing file or directory, go-git will continue
 	// running and will walk its way up the directory structure looking for a .git repository.
-	// This is not ideal for us since running 'citop -r github.com/owner/repo' from
+	// This is not ideal for us since running 'cistern -r github.com/owner/repo' from
 	// /home/user/localrepo will make go-git look for a .git repository in
 	// /home/user/localrepo/github.com/owner/repo which will inevitably lead to
 	// /home/user/localrepo which is not what the user expected since the user was

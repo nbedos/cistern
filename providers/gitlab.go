@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/utils"
 	"github.com/xanzy/go-gitlab"
 )
 
@@ -237,7 +237,7 @@ func (c GitLabClient) parsePipelineURL(u string) (string, int, error) {
 		return "", 0, cache.ErrUnknownPipelineURL
 	}
 
-	// URL format: https://gitlab.com/nbedos/citop/pipelines/97604657
+	// URL format: https://gitlab.com/nbedos/cistern/pipelines/97604657
 	pathComponents := strings.FieldsFunc(v.EscapedPath(), func(c rune) bool { return c == '/' })
 	if len(pathComponents) < 4 || pathComponents[2] != "pipelines" {
 		return "", 0, cache.ErrUnknownPipelineURL

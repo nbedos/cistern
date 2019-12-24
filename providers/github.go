@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	"github.com/google/go-github/v28/github"
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/utils"
 	"golang.org/x/oauth2"
 )
 

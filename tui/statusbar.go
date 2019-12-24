@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nbedos/citop/text"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/text"
+	"github.com/nbedos/cistern/utils"
 )
 
 type StatusBar struct {

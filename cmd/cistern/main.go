@@ -14,17 +14,17 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell"
-	"github.com/nbedos/citop/cache"
-	"github.com/nbedos/citop/providers"
-	"github.com/nbedos/citop/tui"
-	"github.com/nbedos/citop/utils"
+	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/providers"
+	"github.com/nbedos/cistern/tui"
+	"github.com/nbedos/cistern/utils"
 	"github.com/pelletier/go-toml"
 )
 
 var Version = "undefined"
 
-const ConfDir = "citop"
-const ConfFilename = "citop.toml"
+const ConfDir = "cistern"
+const ConfFilename = "cistern.toml"
 const defaultConfiguration = `
 [[providers.github]]
 
@@ -219,37 +219,37 @@ func (c ProvidersConfiguration) Providers(ctx context.Context) ([]cache.SourcePr
 	return source, ci, nil
 }
 
-const usage = `usage: citop [-r REPOSITORY | --repository REPOSITORY] [COMMIT]
-       citop -h | --help
-       citop --version
+const usage = `usage: cistern [-r REPOSITORY | --repository REPOSITORY] [COMMIT]
+       cistern -h | --help
+       cistern --version
 
 Monitor CI pipelines associated to a specific commit of a git repository
 
 Positional arguments:
   COMMIT        Specify the commit to monitor. COMMIT is expected to be
                 the SHA identifier of a commit, or the name of a tag or
-                a branch. If this option is missing citop will monitor
+                a branch. If this option is missing cistern will monitor
                 the commit referenced by HEAD.
 
 Options:
   -r REPOSITORY, --repository REPOSITORY
                 Specify the git repository to monitor. If REPOSITORY is
-                the path of a local repository, citop will monitor all
-                the associated remotes. If REPOSITORY is a URL, citop
+                the path of a local repository, cistern will monitor all
+                the associated remotes. If REPOSITORY is a URL, cistern
                 will monitor the corresponding online repository.
-                If this option is not set, citop will behave as if it
+                If this option is not set, cistern will behave as if it
                 had been set to the path of the current directory.
-                Note that citop will only monitor repositories hosted
+                Note that cistern will only monitor repositories hosted
                 on GitLab or GitHub.
 
   -h, --help    Show usage
 
-  --version     Print the version of citop being run`
+  --version     Print the version of cistern being run`
 
 func main() {
 	SetupSignalHandlers()
 
-	f := flag.NewFlagSet("citop", flag.ContinueOnError)
+	f := flag.NewFlagSet("cistern", flag.ContinueOnError)
 	null := bytes.NewBuffer(nil)
 	f.SetOutput(null)
 
@@ -272,7 +272,7 @@ func main() {
 	}
 
 	if *versionFlag {
-		fmt.Fprintf(os.Stderr, "citop %s\n", Version)
+		fmt.Fprintf(os.Stderr, "cistern %s\n", Version)
 		os.Exit(0)
 	}
 
@@ -301,15 +301,15 @@ func main() {
 	case nil:
 		for _, g := range config.Providers.GitLab {
 			if g.Token == "" {
-				fmt.Fprintln(os.Stderr, "warning: citop will not be able to access pipeline jobs on GitLab without an API access token")
+				fmt.Fprintln(os.Stderr, "warning: cistern will not be able to access pipeline jobs on GitLab without an API access token")
 				break
 			}
 		}
 	case ErrMissingConf:
 		msgFormat := `warning: No configuration file found at %s, using default configuration without credentials.
 Please note that:
-    - citop will likely reach the rate limit of the GitHub API for unauthenticated clients in a few minutes
-    - citop will not be able to access pipeline jobs on GitLab without an API access token
+    - cistern will likely reach the rate limit of the GitHub API for unauthenticated clients in a few minutes
+    - cistern will not be able to access pipeline jobs on GitLab without an API access token
 	
 To lift these restrictions, create a configuration file containing your credentials at the aforementioned location.
 `
