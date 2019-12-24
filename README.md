@@ -1,8 +1,8 @@
 # `cistern`
 A Unix program to monitor Continuous Integration pipelines from the command
-line.  Think of `cistern` as the receptacle for the result of your CI pipelines.
-`cistern` stands for **C**ontinous **I**ntegration **S**tern **Ter**minal for
-U**n**ix.
+line.  Think of `cistern` as the receptacle that holds the results of your CI
+pipelines.  `cistern` stands for **C**ontinous **I**ntegration **S**ervices
+**Ter**minal for U**n**ix.
 
 ![Animated demonstration](demo.svg)
 
