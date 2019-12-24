@@ -5,7 +5,7 @@
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <meta name="author" content="Nicolas Bedos" />
-  <title>CITOP(1) | version $(git describe –tags –dirty)</title>
+  <title>CISTERN(1) | version 0.1.3dev1-10-g5efc2a3-linux-amd64</title>
   <style>
       code{white-space: pre-wrap;}
       span.smallcaps{font-variant: small-caps;}
@@ -19,28 +19,28 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">CITOP(1) | version $(git describe –tags –dirty)</h1>
+<h1 class="title">CISTERN(1) | version 0.1.3dev1-10-g5efc2a3-linux-amd64</h1>
 <p class="author">Nicolas Bedos</p>
 </header>
 <h1 id="name">NAME</h1>
-<p><strong>citop</strong> – Continuous Integration Table Of Pipelines</p>
+<p><strong>cistern</strong> – Continuous Integration Table Of Pipelines</p>
 <h1 id="synopsis">SYNOPSIS</h1>
-<p><code>citop [-r REPOSITORY | --repository REPOSITORY] [COMMIT]</code></p>
-<p><code>citop -h | --help</code></p>
-<p><code>citop --version</code></p>
+<p><code>cistern [-r REPOSITORY | --repository REPOSITORY] [COMMIT]</code></p>
+<p><code>cistern -h | --help</code></p>
+<p><code>cistern --version</code></p>
 <h1 id="description">DESCRIPTION</h1>
-<p>citop monitors the CI pipelines associated to a specific commit of a git repository.</p>
-<p>citop currently integrates with the following online services. Each of the service is one or both of the following:</p>
+<p>cistern monitors the CI pipelines associated to a specific commit of a git repository.</p>
+<p>cistern currently integrates with the following online services. Each of the service is one or both of the following:</p>
 <ul>
-<li>A “source provider” that is used to list the pipelines associated to a given commit of an online repository</li>
-<li>A “CI provider” that is used to get detailed information about CI builds</li>
+<li>A &quot;source provider&quot; that is used to list the pipelines associated to a given commit of an online repository</li>
+<li>A &quot;CI provider&quot; that is used to get detailed information about CI builds</li>
 </ul>
-<table style="width:83%;">
+<table style="width:82%;">
 <colgroup>
 <col style="width: 20%" />
 <col style="width: 12%" />
 <col style="width: 11%" />
-<col style="width: 38%" />
+<col style="width: 37%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -55,74 +55,75 @@
 <td style="text-align: left;">GitHub</td>
 <td style="text-align: left;">yes</td>
 <td style="text-align: left;">no</td>
-<td style="text-align: left;"><a href="https://github.com/">https://github.com/</a></td>
+<td style="text-align: left;"><a href="https://github.com/" class="uri">https://github.com/</a></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GitLab</td>
 <td style="text-align: left;">yes</td>
 <td style="text-align: left;">yes</td>
-<td style="text-align: left;"><a href="https://gitlab.com/">https://gitlab.com/</a></td>
+<td style="text-align: left;"><a href="https://gitlab.com/" class="uri">https://gitlab.com/</a></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">AppVeyor</td>
 <td style="text-align: left;">no</td>
 <td style="text-align: left;">yes</td>
-<td style="text-align: left;"><a href="https://www.appveyor.com/">https://www.appveyor.com/</a></td>
+<td style="text-align: left;"><a href="https://www.appveyor.com/" class="uri">https://www.appveyor.com/</a></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">CircleCI</td>
 <td style="text-align: left;">no</td>
 <td style="text-align: left;">yes</td>
-<td style="text-align: left;"><a href="https://circleci.com/">https://circleci.com/</a></td>
+<td style="text-align: left;"><a href="https://circleci.com/" class="uri">https://circleci.com/</a></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Travis CI</td>
 <td style="text-align: left;">no</td>
 <td style="text-align: left;">yes</td>
-<td style="text-align: left;"><a href="https://travis-ci.org/">https://travis-ci.org/</a> <a href="https://travis-ci.com/">https://travis-ci.com/</a></td>
+<td style="text-align: left;"><a href="https://travis-ci.org/" class="uri">https://travis-ci.org/</a> <a href="https://travis-ci.com/" class="uri">https://travis-ci.com/</a></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Azure Devops</td>
 <td style="text-align: left;">no</td>
 <td style="text-align: left;">yes</td>
-<td style="text-align: left;"><a href="https://dev.azure.com">https://dev.azure.com</a></td>
+<td style="text-align: left;"><a href="https://dev.azure.com" class="uri">https://dev.azure.com</a></td>
 </tr>
 </tbody>
 </table>
 <h1 id="positional-arguments">POSITIONAL ARGUMENTS</h1>
 <h2 id="commit"><code>COMMIT</code></h2>
-<p>Specify the commit to monitor. COMMIT is expected to be the SHA identifier of a commit, or the name of a tag or a branch. If this option is missing citop will monitor the commit referenced by HEAD.</p>
+<p>Specify the commit to monitor. COMMIT is expected to be the SHA identifier of a commit, or the name of a tag or a branch. If this option is missing cistern will monitor the commit referenced by HEAD.</p>
 <p>Example:</p>
 <pre class="shell"><code># Show pipelines for commit 64be3c6
-citop 64be3c6
+cistern 64be3c6
 # Show pipelines for the commit referenced by the tag &#39;0.9.0&#39;
-citop 0.9.0
+cistern 0.9.0
 # Show pipelines for the commit at the tip of a branch
-citop feature/doc</code></pre>
+cistern feature/doc</code></pre>
 <h1 id="options">OPTIONS</h1>
 <h2 id="rrepository---repositoryrepository"><code>-r=REPOSITORY, --repository=REPOSITORY</code></h2>
-<p>Specify the git repository to monitor. REPOSITORY can be either a path to a local git repository, or the URL of an online repository hosted at GitHub or GitLab. Both web URLs and git URLs are accepted.</p>
-<p>In the absence of this option, citop will monitor the git repository located in the current directory. If there is no such repository, citop will fail.</p>
+<p>Specify the git repository to monitor. If REPOSITORY is the path of a local repository, cistern will monitor all the associated remotes. If REPOSITORY is a URL, cistern will monitor the corresponding online repository.</p>
+<p>If this option is not set, cistern will behave as if it had been set to the path of the current directory.</p>
+<p>Note that cistern will only monitor repositories hosted on GitLab or GitHub.</p>
 <p>Examples:</p>
-<pre class="shell"><code># Work with the git repository in the current directory
-citop
-# Work with the repository specified by a web URL
-citop -r https://gitlab.com/nbedos/citop
-citop -r github.com/nbedos/citop
+<pre class="shell"><code># Monitor pipelines of the git repository in the current directory
+cistern
+# Monitor pipelines of the repository specified by a web URL
+cistern -r https://gitlab.com/nbedos/cistern
+cistern -r github.com/nbedos/cistern
 # Git URLs are accepted
-citop -r git@github.com:nbedos/citop.git
-# Paths to a local repository are accepted too
-citop -r /home/user/repos/myrepo</code></pre>
+cistern -r git@github.com:nbedos/cistern.git
+# A path referring to a local repository is valid too
+cistern -r /home/user/repos/myrepo</code></pre>
 <h2 id="h---help"><code>-h, --help</code></h2>
-<p>Show usage of citop</p>
+<p>Show usage of cistern</p>
 <h2 id="version"><code>--version</code></h2>
-<p>Print the version of citop being run</p>
+<p>Print the version of cistern being run</p>
 <h1 id="interactive-commands">INTERACTIVE COMMANDS</h1>
-<p>Below are the default commands for interacting with citop.</p>
-<table style="width:82%;">
+<p>Below are the default commands for interacting with cistern.</p>
+<table style="width:81%;">
 <colgroup>
 <col style="width: 15%" />
-<col style="width: 66%" />
+<col style="width: 65%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -202,25 +203,25 @@ citop -r /home/user/repos/myrepo</code></pre>
 </ul>
 <h1 id="configuration-file">CONFIGURATION FILE</h1>
 <h2 id="location">Location</h2>
-<p>citop follows the XDG base directory specification [2] and expects to find the configuration file at one of the following locations depending on the value of the two environment variables <code>XDG_CONFIG_HOME</code> and <code>XDG_CONFIG_DIRS</code>:</p>
+<p>cistern follows the XDG base directory specification [2] and expects to find the configuration file at one of the following locations depending on the value of the two environment variables <code>XDG_CONFIG_HOME</code> and <code>XDG_CONFIG_DIRS</code>:</p>
 <ol type="1">
-<li><code>"$XDG_CONFIG_HOME/citop/citop.toml"</code></li>
-<li><code>"$DIR/citop/citop.toml"</code> for every directory <code>DIR</code> in the comma-separated list <code>"$XDG_CONFIG_DIRS"</code></li>
+<li><code>&quot;$XDG_CONFIG_HOME/cistern/cistern.toml&quot;</code></li>
+<li><code>&quot;$DIR/cistern/cistern.toml&quot;</code> for every directory <code>DIR</code> in the comma-separated list <code>&quot;$XDG_CONFIG_DIRS&quot;</code></li>
 </ol>
-<p>If <code>XDG_CONFIG_HOME</code> (resp. <code>XDG_CONFIG_DIRS</code>) is not set, citop uses the default value <code>"$HOME/.config"</code> (resp. <code>"/etc/xdg"</code>) instead.</p>
+<p>If <code>XDG_CONFIG_HOME</code> (resp. <code>XDG_CONFIG_DIRS</code>) is not set, cistern uses the default value <code>&quot;$HOME/.config&quot;</code> (resp. <code>&quot;/etc/xdg&quot;</code>) instead.</p>
 <h2 id="format">Format</h2>
-<p>citop uses a configuration file in <a href="https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md">TOML version v0.5.0</a> format. The configuration file is made of keys grouped together in tables. The specification of each table is given in the example below.</p>
+<p>cistern uses a configuration file in <a href="https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md">TOML version v0.5.0</a> format. The configuration file is made of keys grouped together in tables. The specification of each table is given in the example below.</p>
 <h2 id="example">Example</h2>
 <p>This example describes and uses all existing configuration options.</p>
-<pre class="toml"><code>#### CITOP CONFIGURATION FILE ####
-# This file is a complete, valid configuration file for citop
-# and should be located at $XDG_CONFIG_HOME/citop/citop.toml
+<pre class="toml"><code>#### CISTERN CONFIGURATION FILE ####
+# This file is a complete, valid configuration file for cistern
+# and should be located at $XDG_CONFIG_HOME/cistern/cistern.toml
 # 
 
 ## PROVIDERS ##
 [providers]
 # The &#39;providers&#39; table is used to define credentials for 
-# accessing online services. citop relies on two types of
+# accessing online services. cistern relies on two types of
 # providers:
 #
 #    - &#39;source providers&#39; are used for listing the CI pipelines
@@ -230,7 +231,7 @@ citop -r /home/user/repos/myrepo</code></pre>
 #    CI pipelines (GitLab, AppVeyor, CircleCI, Travis and Azure
 #    Devops are CI providers)
 #
-# citop requires credentials for at least one source provider and
+# cistern requires credentials for at least one source provider and
 # one CI provider to run. Feel free to remove sections below 
 # as long as this rule is met.
 #
@@ -247,7 +248,7 @@ citop -r /home/user/repos/myrepo</code></pre>
 # GitHub (60 requests per hour and per IP address) whereas 
 # authenticated clients benefit from a rate of 5000 requests per
 # hour. Providing an  API token is strongly encouraged: without
-# one, citop will likely reach the rate limit in a matter of
+# one, cistern will likely reach the rate limit in a matter of
 # minutes.
 #
 # GitHub token management: https://github.com/settings/tokens
@@ -256,7 +257,7 @@ token = &quot;&quot;
 
 ### GITLAB ###
 [[providers.gitlab]]
-# Name shown by citop for this provider
+# Name shown by cistern for this provider
 # (optional, string, default: &quot;gitlab&quot;)
 name = &quot;gitlab&quot;
 
@@ -267,7 +268,7 @@ url = &quot;https://gitlab.com&quot;
 # GitLab API token (optional, string)
 #
 # Note: GitLab prevents access to pipeline jobs for 
-# unauthenticated users meaning if you wish to use citop
+# unauthenticated users meaning if you wish to use cistern
 # to view GitLab pipelines you will have to provide
 # appropriate credentials. This is true even for pipelines
 # of public repositories.
@@ -279,7 +280,7 @@ token = &quot;&quot;
 
 ### TRAVIS CI ###
 [[providers.travis]]
-# Name shown by citop for this provider
+# Name shown by cistern for this provider
 # (optional, string, default: &quot;travis&quot;)
 name = &quot;travis&quot;
 
@@ -304,7 +305,7 @@ token = &quot;&quot;
 
 ### APPVEYOR ###
 [[providers.appveyor]]
-# Name shown by citop for this provider
+# Name shown by cistern for this provider
 # (optional, string, default: &quot;appveyor&quot;)
 name = &quot;appveyor&quot;
 
@@ -315,7 +316,7 @@ token = &quot;&quot;
 
 ### CIRCLECI ###
 [[providers.circleci]]
-# Name shown by citop for this provider
+# Name shown by cistern for this provider
 # (optional, string, default: &quot;circleci&quot;)
 name = &quot;circleci&quot;
 
@@ -326,7 +327,7 @@ token = &quot;&quot;
 
 ### AZURE DEVOPS ###
 [[providers.azure]]
-# Name shown by citop for this provider
+# Name shown by cistern for this provider
 # (optional, string, default: &quot;azure&quot;)
 name = &quot;azure&quot;
 
@@ -339,11 +340,11 @@ token = &quot;&quot;
 <h2 id="environment-variables">ENVIRONMENT VARIABLES</h2>
 <ul>
 <li><code>BROWSER</code> is used to find the path of the default web browser</li>
-<li><code>PAGER</code> is used to view log files. If the variable is not set, citop will call <code>less</code></li>
+<li><code>PAGER</code> is used to view log files. If the variable is not set, cistern will call <code>less</code></li>
 <li><code>HOME</code>, <code>XDG_CONFIG_HOME</code> and <code>XDG_CONFIG_DIRS</code> are used to locate the configuration file</li>
 </ul>
 <h2 id="local-programs">LOCAL PROGRAMS</h2>
-<p>citop relies on the following local executables:</p>
+<p>cistern relies on the following local executables:</p>
 <ul>
 <li><code>git</code> to translate the abbreviated SHA identifier of a commit into a non-abbreviated SHA</li>
 <li><code>less</code> to view log files, unless <code>PAGER</code> is set</li>
@@ -352,34 +353,34 @@ token = &quot;&quot;
 <h1 id="examples">EXAMPLES</h1>
 <p>Monitor pipelines of the current git repository</p>
 <pre class="shell"><code># Move to a directory containing a git repository of your choosing
-git clone git@github.com:nbedos/citop.git &amp;&amp; cd citop
-# Run citop to list the pipelines associated to the last commit of the repository 
-citop
+git clone git@github.com:nbedos/cistern.git &amp;&amp; cd cistern
+# Run cistern to list the pipelines associated to the last commit of the repository 
+cistern
 
 # Show pipelines associated to a specific commit, tag or branch
-citop a24840c
-citop 0.1.0
-citop master</code></pre>
+cistern a24840c
+cistern 0.1.0
+cistern master</code></pre>
 <p>Monitor pipelines of other repositories</p>
 <pre class="shell"><code># Show pipelines of a repository identified by a URL or path
-citop -r https://gitlab.com/nbedos/citop        # Web URL
-citop -r git@github.com:nbedos/citop.git        # Git URL
-citop -r github.com/nbedos/citop                # URL without scheme
-citop -r /home/user/repos/repo                  # Path to a repository
+cistern -r https://gitlab.com/nbedos/cistern        # Web URL
+cistern -r git@github.com:nbedos/cistern.git        # Git URL
+cistern -r github.com/nbedos/cistern                # URL without scheme
+cistern -r /home/user/repos/repo                  # Path to a repository
 
 # Specify both repository and git reference
-citop -r github.com/nbedos/citop master</code></pre>
+cistern -r github.com/nbedos/cistern master</code></pre>
 <h1 id="bugs">BUGS</h1>
-<p>Questions, bug reports and feature requests are welcome and should be submitted on <a href="https://github.com/nbedos/citop/issues">GitHub</a>.</p>
+<p>Questions, bug reports and feature requests are welcome and should be submitted on <a href="https://github.com/nbedos/cistern/issues">GitHub</a>.</p>
 <h1 id="notes">NOTES</h1>
 <ol type="1">
-<li><strong>citop repository</strong>
+<li><strong>cistern repository</strong>
 <ul>
-<li><a href="https://github.com/nbedos/citop">https://github.com/nbedos/citop</a></li>
+<li><a href="https://github.com/nbedos/cistern" class="uri">https://github.com/nbedos/cistern</a></li>
 </ul></li>
 <li><strong>XDG base directory specification</strong>
 <ul>
-<li><a href="https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html">https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html</a></li>
+<li><a href="https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html" class="uri">https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html</a></li>
 </ul></li>
 </ol>
 </body>
