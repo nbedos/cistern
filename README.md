@@ -1,5 +1,5 @@
 # cistern
-A top-like utilitry for Unix to monitor Continuous Integration pipelines from
+A top-like utility for Unix to monitor Continuous Integration pipelines from
 the command line. Current integrations include GitLab, Azure DevOps, Travis CI,
 AppVeyor and CircleCI. Think of `cistern` as the receptacle that holds the
 results of your CI pipelines.  `cistern` stands for **C**ontinous
