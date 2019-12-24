@@ -3,6 +3,8 @@
 ## Next version
 
 * Feature: Monitor all remotes of local repositories instead of just 'origin' ([issue #3](https://github.com/nbedos/cistern/issues/3))
+* Chore: Rewrite build script in go for improved maintainability
+* Chore: Rename repository
 
 
 ## Version 0.1.2 (2019-12-20)
