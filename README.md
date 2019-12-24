@@ -1,7 +1,8 @@
-# `cistern`
+# cistern
 A Unix program to monitor Continuous Integration pipelines from the command
-line.  Think of `cistern` as the receptacle that holds the results of your CI
-pipelines.  `cistern` stands for **C**ontinous **I**ntegration **S**ervices
+line that integrates with GitLab, Azure DevOps, Travis CI, AppVeyor and
+CircleCI. Think of `cistern` as the receptacle that holds the results of your
+CI pipelines.  `cistern` stands for **C**ontinous **I**ntegration **S**ervices
 **Ter**minal for U**n**ix.
 
 ![Animated demonstration](demo.svg)
@@ -159,7 +160,7 @@ Monitor pipelines of other repositories
 cistern -r https://gitlab.com/nbedos/cistern        # Web URL
 cistern -r git@github.com:nbedos/cistern.git        # Git URL
 cistern -r github.com/nbedos/cistern                # URL without scheme
-cistern -r /home/user/repos/repo                  # Path to a repository
+cistern -r /home/user/repos/repo                    # Path to a repository
 
 # Specify both repository and git reference
 cistern -r github.com/nbedos/cistern master
