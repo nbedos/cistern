@@ -147,3 +147,9 @@ func TestRepositorySlugFromURL(t *testing.T) {
 		})
 	}
 }
+
+func TestStartAndRelease(t *testing.T) {
+	if err := StartAndRelease("go", []string{"--version"}); err != nil {
+		t.Fatal(err)
+	}
+}

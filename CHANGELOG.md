@@ -3,6 +3,7 @@
 ## Next version
 
 * Feature: Monitor all remotes of local repositories instead of just 'origin' ([issue #3](https://github.com/nbedos/cistern/issues/3))
+* Bugfix: Lookup path if BROWSER is not a path itself ([issue #8](https://github.com/nbedos/cistern/issues/8))
 * Chore: Rewrite build script in go for improved maintainability
 * Chore: Rename repository
 
