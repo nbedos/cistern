@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sync"
 	"time"
@@ -283,17 +285,21 @@ func (c Controller) openWebBrowser(url string) error {
 		return errors.New("BROWSER environment variable not set")
 	}
 
+	if filepath.Base(browser) == browser {
+		lp, err := exec.LookPath(browser)
+		if err != nil {
+			return err
+		}
+		browser = lp
+	}
+
 	argv := []string{path.Base(browser), url}
 	process, err := os.StartProcess(browser, argv, &os.ProcAttr{})
 	if err != nil {
 		return err
 	}
 
-	if err := process.Release(); err != nil {
-		return err
-	}
-
-	return nil
+	return process.Release()
 }
 
 func (c *Controller) draw() {
