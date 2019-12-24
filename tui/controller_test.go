@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -9,14 +8,6 @@ import (
 	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/text"
 )
-
-func TestController_openWebBrowser(t *testing.T) {
-	c := Controller{}
-	os.Setenv("BROWSER", "go")
-	if err := c.openWebBrowser("--version"); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestController_resize(t *testing.T) {
 	t.Run("resize to (0, 0) should not cause any error", func(t *testing.T) {
