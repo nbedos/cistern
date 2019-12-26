@@ -135,3 +135,14 @@ stages:
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
 
+   - job: Docker_image
+     displayName: 'Test Docker image'
+     pool:
+       vmImage: 'ubuntu-latest'
+     steps:
+     - script: docker build -t "cistern:latest" .
+       displayName: 'Build Docker image'
+
+     - script: docker run "cistern:latest" --version
+       displayName: 'Run Docker image'
+
