@@ -3,6 +3,13 @@
 # Add steps that test, save build artifacts, deploy, and more:
 # https://docs.microsoft.com/azure/devops/pipelines/languages/go
 
+trigger:
+  branches:
+    include:
+      - '*'
+  tags:
+    include:
+      - '*'
 
 
 stages:
@@ -50,7 +57,7 @@ stages:
 
 
    - job: unit_tests_macOS
-     displayName: 'Unit tests '
+     displayName: 'Unit tests on '
      strategy:
        matrix:
          macOS_10_13:
@@ -75,4 +82,28 @@ stages:
 
      - script: docker run "cistern:latest" --version
        displayName: 'Run Docker image'
+
+ - stage: deploy
+   displayName: 'Deployment'
+   jobs:
+   - job: github_release
+     displayName: 'GitHub Release'
+     condition: startsWith(variables['Build.SourceBranch'], 'refs/tags/') 
+     pool:
+       vmImage: 'ubuntu-latest'
+     steps:
+      - script: |
+          apt-get update && yes | apt-get install pandoc
+          go run ./cmd/make release
+        displayName: 'Build release archives'
+      - task: GitHubRelease@0
+        displayName: 'Create GitHub release'
+        inputs:
+           gitHubConnection: release
+           repositoryName: '$(Build.Repository.Name)' 
+           isDraft: true
+           isPreRelease: true
+           releaseNotesFile: 'build/notes.md'
+           assets: build/*.tar.gz
+         
 
