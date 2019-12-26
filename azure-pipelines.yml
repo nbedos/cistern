@@ -101,9 +101,11 @@ stages:
         inputs:
            gitHubConnection: release
            repositoryName: '$(Build.Repository.Name)' 
+           title: '$Build.SourceBranch'
            isDraft: true
            isPreRelease: true
            releaseNotesFile: 'build/notes.md'
            assets: build/*.tar.gz
+           addChangeLog: false
          
 
