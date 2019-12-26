@@ -93,7 +93,7 @@ stages:
        vmImage: 'ubuntu-latest'
      steps:
       - script: |
-          apt-get update && yes | apt-get install pandoc
+          sudo apt-get update && yes | sudo apt-get install pandoc
           go run ./cmd/make release
         displayName: 'Build release archives'
       - task: GitHubRelease@0
