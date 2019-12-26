@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"sort"
 	"strings"
@@ -532,7 +533,7 @@ func createRepository(t *testing.T, remotes []config.RemoteConfig) (string, stri
 	return tmpDir, sha.String()
 }
 
-func TestGitOriginURL(t *testing.T) {
+func TestRemotesAndCommit(t *testing.T) {
 	t.Run("invalid path", func(t *testing.T) {
 		_, _, err := RemotesAndCommit("invalid path", "HEAD")
 		if err != ErrUnknownRepositoryURL {
@@ -554,25 +555,57 @@ func TestGitOriginURL(t *testing.T) {
 		remotes := []config.RemoteConfig{
 			{
 				Name:  "origin",
-				URLs:  []string{"url1", "url2"},
+				URLs:  []string{"pushfetch1"},
 				Fetch: nil,
 			},
 			{
-				Name:  "other",
-				URLs:  []string{"url3", "url4"},
+				Name:  "other1",
+				URLs:  []string{"pushfetch2", "push1"},
+				Fetch: nil,
+			},
+			{
+				Name:  "other2",
+				URLs:  []string{"pushfetch3", "push2", "push3"},
+				Fetch: nil,
+			},
+			{
+				Name:  "other3",
+				URLs:  []string{"pushfetch3", "push4"},
 				Fetch: nil,
 			},
 		}
 		repositoryPath, _ := createRepository(t, remotes)
-		defer os.RemoveAll(repositoryPath)
+		//defer os.RemoveAll(repositoryPath)
+
+		// Setup insteadOf configuration
+		cmd := exec.Command("git", "config", "url.push5.insteadOf", "push3")
+		cmd.Dir = repositoryPath
+		if _, err := cmd.Output(); err != nil {
+			t.Fatal(err)
+		}
+		cmd = exec.Command("git", "config", "url.push6.pushInsteadOf", "push4")
+		cmd.Dir = repositoryPath
+		if _, err := cmd.Output(); err != nil {
+			t.Fatal(err)
+		}
 
 		urls, _, err := RemotesAndCommit(repositoryPath, "HEAD")
 		if err != nil {
 			t.Fatal(err)
 		}
 
+		expectedURLs := []string{
+			"push1",
+			"push2",
+			"push5",
+			"push6",
+			"pushfetch1",
+			"pushfetch2",
+			"pushfetch3",
+		}
 		sort.Strings(urls)
-		if diff := cmp.Diff(urls, []string{"url1", "url2", "url3", "url4"}); len(diff) > 0 {
+		sort.Strings(expectedURLs)
+		if diff := cmp.Diff(expectedURLs, urls); len(diff) > 0 {
 			t.Fatal(diff)
 		}
 	})
@@ -696,6 +729,7 @@ func TestCache_broadcastMonitorRefStatus(t *testing.T) {
 			URLs: []string{"other1"},
 		},
 	})
+	defer os.RemoveAll(repositoryPath)
 
 	commitc := make(chan Commit)
 	errc := make(chan error)

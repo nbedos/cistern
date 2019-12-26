@@ -285,9 +285,11 @@ token = ""
 
 cistern relies on the following local executables:
 
-* `git` to translate the abbreviated SHA identifier of a commit into a non-abbreviated SHA
 * `less` to view log files, unless `PAGER` is set
 * `man` to show the manual page
+* `git` (optional) to translate the abbreviated SHA identifier of a commit into
+a non-abbreviated SHA and also to support 'insteadOf' and 'pushInsteadOf'
+configuration options for remote URLs
 
 # EXAMPLES
 

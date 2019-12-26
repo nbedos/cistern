@@ -311,9 +311,26 @@ func RemotesAndCommit(path string, ref string) ([]string, Commit, error) {
 	if err != nil {
 		return nil, Commit{}, err
 	}
-	remoteURLs := make([]string, 0, len(remotes))
+	remoteURLs := make([]string, 0)
 	for _, remote := range remotes {
-		remoteURLs = append(remoteURLs, remote.Config().URLs...)
+		// Try calling the local git binary to get the list of push URLs for
+		// this remote.  For now this is better than what go-git offers since
+		// it takes into account insteadOf and pushInsteadOf configuration
+		// options. If it fails, use the URL list provided by go-git.
+		//
+		// Remove this once the following issue is fixed:
+		//    https://github.com/src-d/go-git/issues/1266/
+		cmd := exec.Command("git", "remote", "get-url", "--push", "--all", remote.Config().Name)
+		cmd.Dir = path
+		if bs, err := cmd.Output(); err == nil {
+			for _, u := range strings.Split(string(bs), "\n") {
+				if u = strings.TrimSuffix(u, "\r"); u != "" {
+					remoteURLs = append(remoteURLs, u)
+				}
+			}
+		} else {
+			remoteURLs = append(remoteURLs, remote.Config().URLs...)
+		}
 	}
 
 	return remoteURLs, c, nil
@@ -657,6 +674,7 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref 
 	ctx, cancel := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
 	requestCount := 0
+	// FIXME Deduplicate repositoryURLs
 	for _, u := range repositoryURLs {
 		for _, p := range c.sourceProviders {
 			requestCount++
