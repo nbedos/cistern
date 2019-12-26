@@ -36,7 +36,7 @@ const usage = `Usage:
         make test        # Run unit tests
 
     Compile and release:
-        make cistern       # Build executable and manual pages for host machine
+        make cistern     # Build executable and manual pages for host machine
         make releases    # Build all release archives and release notes
         make clean       # Remove build directory
 
@@ -48,6 +48,8 @@ Note: This script relies on the following local executables: go, git, tar and pa
 
 // Location of the directory where build artifacts are stored
 const buildDirectory = "build"
+// Name or path for the go executable
+var goBin = "go"
 
 // List of OS + architecture targets for releases
 var OSesByArch = map[string][]string{
@@ -90,7 +92,7 @@ func goBuild(version string, dir string, env []string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command("go", buildDirectory, "-ldflags", version, "-o", executable, path.Join(wd, "cmd", "cistern"))
+	cmd := exec.Command(goBin, buildDirectory, "-ldflags", version, "-o", executable, path.Join(wd, "cmd", "cistern"))
 	cmd.Env = append(os.Environ(), env...)
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -146,7 +148,7 @@ func license(dir string) error {
 		return err
 	}
 
-	goList := exec.Command("go", "list", "-f", "{{.Dir}}", "-m", "all")
+	goList := exec.Command(goBin, "list", "-f", "{{.Dir}}", "-m", "all")
 	goList.Stderr = os.Stderr
 	if bs, err = goList.Output(); err != nil {
 		return err
@@ -157,7 +159,7 @@ func license(dir string) error {
 			licensePath := path.Join(pkgPath, "LICENSE")
 			if bs, err = ioutil.ReadFile(licensePath); err == nil {
 				b.WriteString("\n\n")
-				s := path.Join("go", "pkg", "mod") + string([]rune{os.PathSeparator})
+				s := path.Join(goBin, "pkg", "mod") + string([]rune{os.PathSeparator})
 				if n := strings.Index(pkgPath, s); n >= 0 {
 					pkgPath = pkgPath[n+len(s):]
 				}
@@ -172,7 +174,7 @@ func license(dir string) error {
 
 func GoOsAndArch(env []string) (string, string, error) {
 	env = append(os.Environ(), env...)
-	goEnvGOOS := exec.Command("go", "env", "GOOS")
+	goEnvGOOS := exec.Command(goBin, "env", "GOOS")
 	goEnvGOOS.Stderr = os.Stderr
 	goEnvGOOS.Env = env
 	bs, err := goEnvGOOS.Output()
@@ -181,7 +183,7 @@ func GoOsAndArch(env []string) (string, string, error) {
 	}
 	GoOS := strings.Trim(string(bs), "\r\n")
 
-	goEnvGOARCH := exec.Command("go", "env", "GOARCH")
+	goEnvGOARCH := exec.Command(goBin, "env", "GOARCH")
 	goEnvGOARCH.Stderr = os.Stderr
 	goEnvGOARCH.Env = env
 	bs, err = goEnvGOARCH.Output()
@@ -347,7 +349,7 @@ func main() {
 	case "clean":
 		err = os.RemoveAll(buildDirectory)
 	case "test", "tests":
-		cmd := exec.Command("go", "test", "-v", "./...")
+		cmd := exec.Command(goBin, "test", "-v", "./...")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Env = append(os.Environ(), env...)
