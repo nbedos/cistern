@@ -306,6 +306,11 @@ func (c AzurePipelinesClient) fetchStages(ctx context.Context, u string, webURL 
 		}
 	}
 
+	// Sort stages
+	sort.Slice(topLevelRecords, func(i, j int) bool {
+		return topLevelRecords[i].Order < topLevelRecords[j].Order
+	})
+	// Sort jobs and tasks
 	for _, record := range recordsByID {
 		sort.Slice(record.children, func(i, j int) bool {
 			return record.children[i].Order < record.children[j].Order
