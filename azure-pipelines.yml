@@ -3,20 +3,40 @@
 # Add steps that test, save build artifacts, deploy, and more:
 # https://docs.microsoft.com/azure/devops/pipelines/languages/go
 
+trigger:
+  branches:
+    include:
+      - '*'
+  tags:
+    include:
+      - '*'
 
-variables:
-  GOBIN:  '$(GOPATH)/bin' # Go binaries path
-  GOROOT: '/usr/local/go1.12' # Go installation path
-  GOPATH: '$(system.defaultWorkingDirectory)/gopath' # Go workspace path
-  modulePath: '$(GOPATH)/src/github.com/$(build.repository.name)' # Path to the module's code
-  GO111MODULE: 'on'
 
 stages:
  - stage: tests
+   displayName: 'Tests'
    jobs:
-   - job: Ubuntu_16_04
+   - job: unit_tests_linux
+     displayName: 'Unit tests on Ubuntu with'
+     strategy:
+       matrix:
+         Go_1_11:
+           imageName: 'ubuntu-16.04'
+           goroot: '/usr/local/go1.11'
+         Go_1_12:
+           imageName: 'ubuntu-18.04'
+           goroot: '/usr/local/go1.12'
+         Go_1_13:
+           imageName: 'ubuntu-18.04'
+           goroot: '/usr/local/go1.13'
      pool:
-       vmImage: 'ubuntu-16.04'
+       vmImage: '$(imageName)'
+     variables:
+       GOBIN:  '$(GOPATH)/bin' # Go binaries path
+       GOROOT: '$(goroot)' # Go installation path
+       GOPATH: '$(system.defaultWorkingDirectory)/gopath' # Go workspace path
+       modulePath: '$(GOPATH)/src/github.com/$(build.repository.name)' # Path to the module's code
+       GO111MODULE: 'on'
      steps:
      - script: |
          mkdir -p '$(GOBIN)'
@@ -29,26 +49,63 @@ stages:
          echo '##vso[task.prependpath]$(GOROOT)/bin'
        displayName: 'Set up the Go workspace'
 
-     - script: go run ./cmd/make test
+     - script: |
+        go version
+        go run ./cmd/make test
        workingDirectory: '$(modulePath)'
        displayName: 'Run unit tests'
 
-   - job: Ubuntu_18_04
+
+   - job: unit_tests_macOS
+     displayName: 'Unit tests on '
+     strategy:
+       matrix:
+         macOS_10_13:
+           imageName: 'macos-10.13'
+         macOS_10_14:
+           imageName: 'macos-10.14'
      pool:
-       vmImage: 'ubuntu-18.04'
+       vmImage: '$(imageName)'
      steps:
      - script: |
-         mkdir -p '$(GOBIN)'
-         mkdir -p '$(GOPATH)/pkg'
-         mkdir -p '$(modulePath)'
-         shopt -s extglob
-         shopt -s dotglob
-         mv !(gopath) '$(modulePath)'
-         echo '##vso[task.prependpath]$(GOBIN)'
-         echo '##vso[task.prependpath]$(GOROOT)/bin'
-       displayName: 'Set up the Go workspace'
-
-     - script: go run ./cmd/make test
-       workingDirectory: '$(modulePath)'
+        go version
+        go run ./cmd/make test
        displayName: 'Run unit tests'
+
+   - job: Docker_image
+     displayName: 'Test Docker image'
+     pool:
+       vmImage: 'ubuntu-latest'
+     steps:
+     - script: docker build -t "cistern:latest" .
+       displayName: 'Build Docker image'
+
+     - script: docker run "cistern:latest" --version
+       displayName: 'Run Docker image'
+
+ - stage: deploy
+   displayName: 'Deployment'
+   jobs:
+   - job: github_release
+     displayName: 'GitHub Release'
+     condition: startsWith(variables['Build.SourceBranch'], 'refs/tags/') 
+     pool:
+       vmImage: 'ubuntu-latest'
+     steps:
+      - script: |
+          sudo apt-get update && yes | sudo apt-get install pandoc
+          go run ./cmd/make release
+        displayName: 'Build release archives'
+      - task: GitHubRelease@0
+        displayName: 'Create GitHub release'
+        inputs:
+           gitHubConnection: release
+           repositoryName: '$(Build.Repository.Name)' 
+           title: '$(Build.SourceBranch)'
+           isDraft: true
+           isPreRelease: true
+           releaseNotesFile: 'build/notes.md'
+           assets: build/*.tar.gz
+           addChangeLog: false
+         
 

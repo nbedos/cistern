@@ -123,16 +123,17 @@ func (c AzurePipelinesClient) Log(ctx context.Context, step cache.Step) (string,
 }
 
 type azureBuild struct {
-	ID            int    `json:"id"`
-	Number        string `json:"buildNumber"`
-	SourceBranch  string `json:"sourceBranch"`
-	SourceVersion string `json:"sourceVersion"`
-	Status        string `json:"status"`
-	Result        string `json:"result"`
-	QueueTime     string `json:"queuetime"`
-	StartTime     string `json:"startTime"`
-	FinishTime    string `json:"finishTime"`
-	Definition    struct {
+	ID                int        `json:"id"`
+	Number            string     `json:"buildNumber"`
+	SourceBranch      string     `json:"sourceBranch"`
+	SourceVersion     string     `json:"sourceVersion"`
+	ValidationResults []struct{} `json:"validationResults`
+	Status            string     `json:"status"`
+	Result            string     `json:"result"`
+	QueueTime         string     `json:"queuetime"`
+	StartTime         string     `json:"startTime"`
+	FinishTime        string     `json:"finishTime"`
+	Definition        struct {
 		Name string `json:"name"`
 	} `json:"definition"`
 	Links struct {
@@ -229,6 +230,12 @@ func (c AzurePipelinesClient) fetchPipeline(ctx context.Context, owner string, r
 	pipeline, err := azureBuild.toPipeline()
 	if err != nil {
 		return cache.Pipeline{}, err
+	}
+	// FIXME Show the error message to the user
+	// Fetching the timeline of a pipeline that was misconfigured will
+	// return EOF so check ValidationResults first
+	if len(azureBuild.ValidationResults) > 0 {
+		return pipeline, nil
 	}
 
 	stages, err := c.fetchStages(ctx, azureBuild.Links.Timeline.Href, pipeline.WebURL)
