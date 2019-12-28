@@ -279,7 +279,7 @@ func (c Controller) openWebBrowser(url string) error {
 	// FIXME Move this to the configuration
 	browser := os.Getenv("BROWSER")
 	if browser == "" {
-		return errors.New("BROWSER environment variable not set")
+		return errors.New(fmt.Sprintf("BROWSER environment variable not set. You can instead open %s in your browser.", url))
 	}
 
 	return utils.StartAndRelease(browser, []string{url})
