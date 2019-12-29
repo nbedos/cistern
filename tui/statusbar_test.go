@@ -63,7 +63,7 @@ func TestStatusBar_Text(t *testing.T) {
 			t.Fatalf("expected len(texts) == %d but got %d", 1, len(texts))
 		}
 
-		if input := texts[0].S.String(); input != s.inputPrefix+message {
+		if input := texts[0].S.String(); input != s.InputPrefix+message {
 			t.Fatalf("expected %q but got %q", message, input)
 		}
 	})

@@ -3,14 +3,13 @@ package tui
 import (
 	"errors"
 
-	"github.com/nbedos/cistern/text"
 	"github.com/nbedos/cistern/utils"
 )
 
 type TextArea struct {
 	width   int
 	height  int
-	content []text.StyledString
+	Content []StyledString
 }
 
 func NewTextArea(width, height int) (TextArea, error) {
@@ -24,8 +23,8 @@ func NewTextArea(width, height int) (TextArea, error) {
 	}, nil
 }
 
-func (s *TextArea) Write(lines ...text.StyledString) {
-	s.content = lines
+func (s *TextArea) Write(lines ...StyledString) {
+	s.Content = lines
 }
 
 func (s TextArea) Size() (int, int) {
@@ -37,10 +36,10 @@ func (s *TextArea) Resize(width int, height int) {
 	s.height = utils.MaxInt(0, height)
 }
 
-func (s TextArea) Text() []text.LocalizedStyledString {
-	texts := make([]text.LocalizedStyledString, 0)
-	for i, line := range s.content {
-		texts = append(texts, text.LocalizedStyledString{
+func (s TextArea) Text() []LocalizedStyledString {
+	texts := make([]LocalizedStyledString, 0)
+	for i, line := range s.Content {
+		texts = append(texts, LocalizedStyledString{
 			X: 0,
 			Y: i,
 			S: line,

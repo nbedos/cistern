@@ -194,7 +194,7 @@ func (c AppVeyorClient) fetchPipeline(ctx context.Context, owner string, repoNam
 	return bVersion.Build.toCachePipeline(b.Project.Owner, b.Project.Name)
 }
 
-// Extract owner, repository and build ID from web URL of build
+// Extract owner, repository and build ID from web url of build
 func parseAppVeyorURL(u string) (string, string, int, error) {
 	v, err := url.Parse(u)
 	if err != nil {
@@ -205,7 +205,7 @@ func parseAppVeyorURL(u string) (string, string, int, error) {
 		return "", "", 0, cache.ErrUnknownPipelineURL
 	}
 
-	// URL format: https://ci.appveyor.com/project/nbedos/cistern/builds/29070120
+	// url format: https://ci.appveyor.com/project/nbedos/cistern/builds/29070120
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 6 || cs[1] != "project" || cs[4] != "builds" {
 		return "", "", 0, cache.ErrUnknownPipelineURL
@@ -288,7 +288,7 @@ func (b appVeyorBuild) toCachePipeline(owner string, repository string) (cache.P
 		return pipeline, err
 	}
 	if pipeline.UpdatedAt, err = time.Parse(time.RFC3339, b.UpdatedAt); err != nil {
-		// Best effort since it sometimes happens that UpdatedAt is null but another date is
+		// Best effort since it sometimes happens that updatedAt is null but another date is
 		// available
 		nullUpdateAt := utils.MinNullTime(pipeline.CreatedAt, pipeline.StartedAt, pipeline.FinishedAt)
 		if !nullUpdateAt.Valid {

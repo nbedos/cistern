@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nbedos/cistern/text"
 	"github.com/nbedos/cistern/utils"
 )
 
@@ -14,7 +13,7 @@ type StatusBar struct {
 	outputBuffer []string
 	InputBuffer  string
 	ShowInput    bool
-	inputPrefix  string
+	InputPrefix  string
 }
 
 func NewStatusBar(width, height int) (StatusBar, error) {
@@ -27,7 +26,7 @@ func NewStatusBar(width, height int) (StatusBar, error) {
 		height:       height,
 		outputBuffer: make([]string, 0),
 		InputBuffer:  "",
-		inputPrefix:  "/",
+		InputPrefix:  "/",
 	}, nil
 }
 
@@ -47,22 +46,22 @@ func (s *StatusBar) Resize(width int, height int) {
 	s.height = utils.MaxInt(0, height)
 }
 
-func (s StatusBar) Text() []text.LocalizedStyledString {
+func (s StatusBar) Text() []LocalizedStyledString {
 	if s.ShowInput {
-		return []text.LocalizedStyledString{{
+		return []LocalizedStyledString{{
 			X: 0,
 			Y: utils.MaxInt(s.height-1, 0),
-			S: text.NewStyledString(fmt.Sprintf("%s%s", s.inputPrefix, s.InputBuffer)),
+			S: NewStyledString(fmt.Sprintf("%s%s", s.InputPrefix, s.InputBuffer)),
 		}}
 	}
 
-	texts := make([]text.LocalizedStyledString, 0)
+	texts := make([]LocalizedStyledString, 0)
 	startRow := utils.MaxInt(0, len(s.outputBuffer)-s.height)
 	for i := startRow; i < len(s.outputBuffer); i++ {
-		texts = append(texts, text.LocalizedStyledString{
+		texts = append(texts, LocalizedStyledString{
 			X: 0,
 			Y: i - startRow,
-			S: text.NewStyledString(s.outputBuffer[i]),
+			S: NewStyledString(s.outputBuffer[i]),
 		})
 	}
 	return texts

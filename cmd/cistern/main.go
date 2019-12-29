@@ -16,7 +16,6 @@ import (
 	"github.com/gdamore/tcell"
 	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/providers"
-	"github.com/nbedos/cistern/tui"
 	"github.com/nbedos/cistern/utils"
 	"github.com/pelletier/go-toml"
 )
@@ -235,7 +234,7 @@ Options:
   -r REPOSITORY, --repository REPOSITORY
                 Specify the git repository to monitor. If REPOSITORY is
                 the path of a local repository, cistern will monitor all
-                the associated remotes. If REPOSITORY is a URL, cistern
+                the associated remotes. If REPOSITORY is a url, cistern
                 will monitor the corresponding online repository.
                 If this option is not set, cistern will behave as if it
                 had been set to the path of the current directory.
@@ -325,7 +324,7 @@ To lift these restrictions, create a configuration file containing your credenti
 		fmt.Fprintln(os.Stderr, fmt.Sprintf("configuration error: %s", err.Error()))
 		os.Exit(1)
 	}
-	if err := tui.RunApplication(ctx, tcell.NewScreen, repo, sha, ciProviders, sourceProviders, time.Local, manualPage); err != nil {
+	if err := RunApplication(ctx, tcell.NewScreen, repo, sha, ciProviders, sourceProviders, time.Local, manualPage); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}

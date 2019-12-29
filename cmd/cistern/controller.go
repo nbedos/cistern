@@ -1,4 +1,4 @@
-package tui
+package main
 
 import (
 	"bytes"
@@ -6,16 +6,20 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"regexp"
 	"sync"
 	"time"
 
 	"github.com/gdamore/tcell"
+	"github.com/gdamore/tcell/encoding"
 	"github.com/nbedos/cistern/cache"
-	"github.com/nbedos/cistern/text"
+	"github.com/nbedos/cistern/tui"
 	"github.com/nbedos/cistern/utils"
 )
+
+var ErrNoProvider = errors.New("list of providers must not be empty")
 
 type inputDestination int
 
@@ -26,15 +30,15 @@ const (
 )
 
 type Controller struct {
-	tui              *TUI
+	tui              *tui.TUI
 	cache            cache.Cache
 	ref              string
 	width            int
 	height           int
-	header           *TextArea
-	table            *Table
+	header           *tui.TextArea
+	table            *tui.HierarchicalTable
 	tableSearch      string
-	status           *StatusBar
+	status           *tui.StatusBar
 	inputDestination inputDestination
 	defaultStatus    string
 	help             string
@@ -42,29 +46,27 @@ type Controller struct {
 
 var ErrExit = errors.New("exit")
 
-type SourceFromRef = func(ref string) cache.HierarchicalTabularDataSource
-
-func NewController(tui *TUI, ref string, c cache.Cache, loc *time.Location, defaultStatus string, help string) (Controller, error) {
+func NewController(ui *tui.TUI, conf tui.ColumnConfiguration, ref string, c cache.Cache, loc *time.Location, defaultStatus string, help string) (Controller, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
-	width, height := tui.Size()
-	header, err := NewTextArea(width, height)
+	width, height := ui.Size()
+	header, err := tui.NewTextArea(width, height)
 	if err != nil {
 		return Controller{}, err
 	}
 
-	table, err := NewTable(c.BuildsOfRef(ref), width, height, loc)
+	table, err := tui.NewHierarchicalTable(conf, nil, width, height, loc)
 	if err != nil {
 		return Controller{}, err
 	}
 
-	status, err := NewStatusBar(width, height)
+	status, err := tui.NewStatusBar(width, height)
 	if err != nil {
 		return Controller{}, err
 	}
 	status.Write(defaultStatus)
 
 	return Controller{
-		tui:           tui,
+		tui:           ui,
 		ref:           ref,
 		cache:         c,
 		width:         width,
@@ -77,17 +79,13 @@ func NewController(tui *TUI, ref string, c cache.Cache, loc *time.Location, defa
 	}, nil
 }
 
-func (c *Controller) setRef(ref string) error {
-	if ref != c.ref {
-		// TODO Preserve traversable state across calls to setRef()
-		table, err := NewTable(c.cache.BuildsOfRef(ref), c.table.width, c.table.height, c.table.location)
-		if err != nil {
-			return err
-		}
-		c.table, c.ref = &table, ref
+func (c *Controller) setRef(ref string) {
+	pipelines := make([]tui.TableNode, 0)
+	for _, pipeline := range c.cache.Pipelines(c.ref) {
+		pipelines = append(pipelines, pipeline)
 	}
-
-	return nil
+	c.table.Replace(pipelines)
+	c.ref = ref
 }
 
 func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
@@ -131,9 +129,7 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 			// Update the controller once we receive an update, meaning the reference exists at
 			// least locally or remotely
 			mux.Lock()
-			if err := c.setRef(tmpRef); err != nil {
-				return err
-			}
+			c.setRef(tmpRef)
 			mux.Unlock()
 			c.refresh()
 			c.draw()
@@ -149,7 +145,7 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 				err = e
 			}
 
-		case event := <-c.tui.eventc:
+		case event := <-c.tui.Eventc:
 			err = c.process(ctx, event, refc)
 
 		case <-ctx.Done():
@@ -163,7 +159,7 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 	return err
 }
 
-func (c *Controller) SetHeader(lines []text.StyledString) {
+func (c *Controller) SetHeader(lines []tui.StyledString) {
 	c.header.Write(lines...)
 }
 
@@ -178,15 +174,19 @@ func (c *Controller) writeDefaultStatus() {
 func (c *Controller) refresh() {
 	commit, _ := c.cache.Commit(c.ref)
 	c.header.Write(commit.Strings()...)
-	c.table.Refresh()
+	pipelines := make([]tui.TableNode, 0)
+	for _, pipeline := range c.cache.Pipelines(c.ref) {
+		pipelines = append(pipelines, pipeline)
+	}
+	c.table.Replace(pipelines)
 	c.resize(c.width, c.height)
 }
 
-func (c Controller) text() []text.LocalizedStyledString {
-	texts := make([]text.LocalizedStyledString, 0)
+func (c Controller) text() []tui.LocalizedStyledString {
+	texts := make([]tui.LocalizedStyledString, 0)
 	yOffset := 0
 
-	for _, child := range []Widget{c.header, c.table, c.status} {
+	for _, child := range []tui.Widget{c.header, c.table, c.status} {
 		for _, line := range child.Text() {
 			line.Y += yOffset
 			texts = append(texts, line)
@@ -200,7 +200,7 @@ func (c Controller) text() []text.LocalizedStyledString {
 
 func (c *Controller) nextMatch() {
 	if c.tableSearch != "" {
-		found := c.table.NextMatch(c.tableSearch, true)
+		found := c.table.ScrollToMatch(c.tableSearch, true)
 		if !found {
 			c.writeStatus(fmt.Sprintf("No match found for %#v", c.tableSearch))
 		}
@@ -210,7 +210,7 @@ func (c *Controller) nextMatch() {
 func (c *Controller) resize(width int, height int) {
 	width = utils.MaxInt(width, 0)
 	height = utils.MaxInt(height, 0)
-	headerHeight := utils.MinInt(utils.MinInt(len(c.header.content)+2, 9), height)
+	headerHeight := utils.MinInt(utils.MinInt(len(c.header.Content)+2, 9), height)
 	tableHeight := utils.MaxInt(0, height-headerHeight-1)
 	statusHeight := height - headerHeight - tableHeight
 
@@ -234,8 +234,12 @@ func (c *Controller) viewLog(ctx context.Context) error {
 		c.writeDefaultStatus()
 		c.draw()
 	}()
+	key, ids, exists := c.activeStepPath()
+	if !exists {
+		return cache.ErrNoLogHere
+	}
 
-	log, err := c.table.ActiveRowLog(ctx)
+	log, err := c.cache.Log(ctx, key, ids)
 	if err != nil {
 		if err == cache.ErrNoLogHere {
 			return nil
@@ -275,14 +279,43 @@ func (c *Controller) viewHelp(ctx context.Context) error {
 	return c.tui.Exec(ctx, "man", []string{"-l", file.Name()}, nil)
 }
 
-func (c Controller) openWebBrowser(url string) error {
-	// FIXME Move this to the configuration
-	browser := os.Getenv("BROWSER")
-	if browser == "" {
-		return errors.New(fmt.Sprintf("BROWSER environment variable not set. You can instead open %s in your browser.", url))
+func (c Controller) activeStepPath() (cache.PipelineKey, []string, bool) {
+	if stepPath := c.table.ActiveNodePath(); len(stepPath) > 0 {
+		key, ok := stepPath[0].(cache.PipelineKey)
+		if !ok {
+			return cache.PipelineKey{}, nil, false
+		}
+
+		stepIDs := make([]string, 0)
+		for _, id := range stepPath[1:] {
+			s, ok := id.(string)
+			if !ok {
+				return cache.PipelineKey{}, nil, false
+			}
+			stepIDs = append(stepIDs, s)
+		}
+
+		return key, stepIDs, true
 	}
 
-	return utils.StartAndRelease(browser, []string{url})
+	return cache.PipelineKey{}, nil, false
+}
+
+func (c Controller) openActiveRowInBrowser() error {
+	if key, ids, exists := c.activeStepPath(); exists {
+		step, exists := c.cache.Step(key, ids)
+		if exists && step.WebURL.Valid {
+			// TODO Move this to configuration file
+			browser := os.Getenv("BROWSER")
+			if browser == "" {
+				return errors.New(fmt.Sprintf("BROWSER environment variable not set. You can instead open %s in your browser.", step.WebURL.String))
+			}
+
+			return utils.StartAndRelease(browser, []string{step.WebURL.String})
+		}
+	}
+
+	return nil
 }
 
 func (c *Controller) draw() {
@@ -302,9 +335,9 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 		case tcell.KeyUp:
 			c.table.Scroll(-1)
 		case tcell.KeyPgDn:
-			c.table.Scroll(c.table.NbrRows())
+			c.table.Scroll(c.table.PageSize())
 		case tcell.KeyPgUp:
-			c.table.Scroll(-c.table.NbrRows())
+			c.table.Scroll(-c.table.PageSize())
 		case tcell.KeyHome:
 			c.table.Top()
 		case tcell.KeyEnd:
@@ -353,10 +386,8 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 			}
 			switch keyRune := ev.Rune(); keyRune {
 			case 'b':
-				if u := c.table.ActiveRowURL(); u.Valid {
-					if err := c.openWebBrowser(u.String); err != nil {
-						return err
-					}
+				if err := c.openActiveRowInBrowser(); err != nil {
+					return err
 				}
 			case 'j':
 				c.table.Scroll(+1)
@@ -372,20 +403,20 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 				c.table.SetTraversable(true, true)
 			case 'n', 'N':
 				if c.status.InputBuffer != "" {
-					_ = c.table.NextMatch(c.status.InputBuffer, ev.Rune() == 'n')
+					_ = c.table.ScrollToMatch(c.status.InputBuffer, ev.Rune() == 'n')
 				}
 			case 'q':
 				return ErrExit
 			case '/':
 				c.inputDestination = inputSearch
 				c.status.ShowInput = true
-				c.status.inputPrefix = "/"
+				c.status.InputPrefix = "/"
 				c.status.InputBuffer = ""
 			case 'r':
 				c.inputDestination = inputRef
 				c.status.ShowInput = true
 				c.status.InputBuffer = ""
-				c.status.inputPrefix = "ref: "
+				c.status.InputPrefix = "ref: "
 			case 'u':
 				// TODO Fix controller.setRef to preserve traversable state
 				go func() {
@@ -409,4 +440,120 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 
 	c.draw()
 	return nil
+}
+
+func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, ref string, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location, help string) (err error) {
+	if len(CIProviders) == 0 || len(SourceProviders) == 0 {
+		return ErrNoProvider
+	}
+	// FIXME Discard log until the status bar is implemented in order to hide the "Unsolicited response received on
+	//  idle HTTP channel" from GitLab's HTTP client
+	log.SetOutput(ioutil.Discard)
+	encoding.Register()
+
+	defaultStyle := tcell.StyleDefault
+	styleSheet := tui.StyleSheet{
+		tui.TableHeader: func(s tcell.Style) tcell.Style {
+			return s.Bold(true).Reverse(true)
+		},
+		tui.ActiveRow: func(s tcell.Style) tcell.Style {
+			return s.Background(tcell.ColorSilver).Foreground(tcell.ColorBlack).Bold(false).Underline(false).Blink(false)
+		},
+		tui.Provider: func(s tcell.Style) tcell.Style {
+			return s.Bold(true)
+		},
+		tui.StatusFailed: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorMaroon).Bold(false)
+		},
+		tui.StatusPassed: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorGreen).Bold(false)
+		},
+		tui.StatusRunning: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorOlive).Bold(false)
+		},
+		tui.StatusSkipped: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorGray).Bold(false)
+		},
+		tui.GitSha: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorOlive)
+		},
+		tui.GitBranch: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorTeal).Bold(false)
+		},
+		tui.GitTag: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorYellow).Bold(false)
+		},
+		tui.GitHead: func(s tcell.Style) tcell.Style {
+			return s.Foreground(tcell.ColorAqua)
+		},
+	}
+	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  v:Logs  b:Browser  ?:Help  q:Quit"
+
+	const maxWidth = 999
+
+	tableConfig := map[tui.ColumnID]*tui.Column{
+		cache.ColumnRef: {
+			Header:    "REF",
+			Order:     1,
+			MaxWidth:  maxWidth,
+			Alignment: tui.Left,
+		},
+		cache.ColumnPipeline: {
+			Order:     2,
+			Header:    "PIPELINE",
+			MaxWidth:  maxWidth,
+			Alignment: tui.Right,
+		},
+		cache.ColumnType: {
+			Order:     3,
+			Header:    "TYPE",
+			MaxWidth:  maxWidth,
+			Alignment: tui.Right,
+		},
+		cache.ColumnState: {
+			Order:     4,
+			Header:    "STATE",
+			MaxWidth:  maxWidth,
+			Alignment: tui.Left,
+		},
+		cache.ColumnStarted: {
+			Order:     5,
+			Header:    "STARTED",
+			MaxWidth:  maxWidth,
+			Alignment: tui.Left,
+		},
+		cache.ColumnDuration: {
+			Order:     6,
+			Header:    "DURATION",
+			MaxWidth:  maxWidth,
+			Alignment: tui.Right,
+		},
+		cache.ColumnName: {
+			Order:      7,
+			Header:     "NAME",
+			MaxWidth:   maxWidth,
+			Alignment:  tui.Left,
+			TreePrefix: true,
+		},
+	}
+
+	ui, err := tui.NewTUI(newScreen, defaultStyle, styleSheet)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// If another goroutine panicked this wouldn't run so we'd be left with a garbled screen.
+		// The alternative would be to defer a call to recover for every goroutine that we launch
+		// in order to have them return an error in case of a panic.
+		ui.Finish()
+	}()
+
+	cacheDB := cache.NewCache(CIProviders, SourceProviders)
+
+	controller, err := NewController(&ui, tableConfig, ref, cacheDB, loc, defaultStatus, help)
+	if err != nil {
+		return err
+	}
+
+	return controller.Run(ctx, repo)
 }

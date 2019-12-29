@@ -237,7 +237,7 @@ func (c GitLabClient) parsePipelineURL(u string) (string, int, error) {
 		return "", 0, cache.ErrUnknownPipelineURL
 	}
 
-	// URL format: https://gitlab.com/nbedos/cistern/pipelines/97604657
+	// url format: https://gitlab.com/nbedos/cistern/pipelines/97604657
 	pathComponents := strings.FieldsFunc(v.EscapedPath(), func(c rune) bool { return c == '/' })
 	if len(pathComponents) < 4 || pathComponents[2] != "pipelines" {
 		return "", 0, cache.ErrUnknownPipelineURL
@@ -379,7 +379,7 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 	}
 
 	if gitlabPipeline.UpdatedAt == nil {
-		return pipeline, fmt.Errorf("missing UpdatedAt data for pipeline #%d", gitlabPipeline.ID)
+		return pipeline, fmt.Errorf("missing updatedAt data for pipeline #%d", gitlabPipeline.ID)
 	}
 
 	pipeline = cache.Pipeline{

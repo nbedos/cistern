@@ -84,7 +84,7 @@ func (c CircleCIClient) get(ctx context.Context, resourceURL url.URL) (*bytes.Bu
 			message = errorBody.Message
 		}
 
-		// Remove the authentication token from the URL so that it's not leaked in logs
+		// Remove the authentication token from the url so that it's not leaked in logs
 		noTokenURL := req.URL
 		parameters := noTokenURL.Query()
 		parameters.Del("circle-token")
@@ -132,7 +132,7 @@ func (c CircleCIClient) BuildFromURL(ctx context.Context, u string) (cache.Pipel
 	return c.fetchPipeline(ctx, endPoint, id)
 }
 
-// Extract owner, repository and build ID from web URL of build
+// Extract owner, repository and build ID from web url of build
 func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, int, error) {
 	v, err := url.Parse(u)
 	if err != nil {
@@ -143,7 +143,7 @@ func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, int, error
 		return "", "", 0, cache.ErrUnknownPipelineURL
 	}
 
-	// URL format: https://circleci.com/gh/nbedos/cistern/36
+	// url format: https://circleci.com/gh/nbedos/cistern/36
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 5 {
 		return "", "", 0, cache.ErrUnknownPipelineURL

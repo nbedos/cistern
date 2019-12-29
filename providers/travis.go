@@ -306,7 +306,7 @@ func (c TravisClient) BuildFromURL(ctx context.Context, u string) (cache.Pipelin
 	return c.fetchPipeline(ctx, slug, id)
 }
 
-// Extract owner, repository and build ID from web URL of build
+// Extract owner, repository and build ID from web url of build
 func parseTravisWebURL(baseURL *url.URL, u string) (string, string, string, error) {
 	v, err := url.Parse(u)
 	if err != nil {
@@ -317,7 +317,7 @@ func parseTravisWebURL(baseURL *url.URL, u string) (string, string, string, erro
 		return "", "", "", cache.ErrUnknownPipelineURL
 	}
 
-	// URL format: https://travis-ci.org/nbedos/termtosvg/builds/612815758
+	// url format: https://travis-ci.org/nbedos/termtosvg/builds/612815758
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 5 || cs[3] != "builds" {
 		return "", "", "", cache.ErrUnknownPipelineURL

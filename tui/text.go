@@ -1,4 +1,4 @@
-package text
+package tui
 
 import (
 	"bytes"
@@ -56,12 +56,46 @@ func (s *StyledString) Append(content string, classes ...Class) {
 	})
 }
 
+func (s *StyledString) AppendString(other StyledString) {
+	s.components = append(s.components, other.components...)
+}
+
 func (s StyledString) Length() int {
 	l := 0
 	for _, c := range s.components {
 		l += runewidth.StringWidth(c.Content)
 	}
 	return l
+}
+
+func (s *StyledString) Truncate(width int) {
+	for i, c := range s.components {
+		runes := []rune(c.Content)
+		for j, r := range runes {
+			width -= runewidth.RuneWidth(r)
+			if width < 0 {
+				s.components[i].Content = string(runes[:j])
+				s.components = s.components[:i+1]
+				return
+			}
+		}
+	}
+}
+
+func (s *StyledString) TruncateLeft(width int) {
+	for i := len(s.components) - 1; i >= 0; i-- {
+		c := s.components[i]
+		runes := []rune(c.Content)
+		for j := len(runes) - 1; j >= 0; j-- {
+			r := runes[j]
+			width -= runewidth.RuneWidth(r)
+			if width < 0 {
+				s.components[i].Content = string(runes[j+1:])
+				s.components = s.components[i:]
+				return
+			}
+		}
+	}
 }
 
 func Join(ss []StyledString, sep StyledString) StyledString {
@@ -83,15 +117,31 @@ func Join(ss []StyledString, sep StyledString) StyledString {
 	return joined
 }
 
-func (s *StyledString) Align(alignment Alignment, width int) {
-	if paddingWidth := width - s.Length(); paddingWidth > 0 && len(s.components) > 0 {
-		switch padding := strings.Repeat(" ", paddingWidth); alignment {
+func (s *StyledString) Fit(alignment Alignment, width int) {
+	if s.Length() > width {
+		switch alignment {
 		case Left:
-			c := &s.components[len(s.components)-1].Content
-			*c = *c + padding
+			s.Truncate(width)
 		case Right:
-			c := &s.components[0].Content
-			*c = padding + *c
+			s.TruncateLeft(width)
+		}
+		// Truncation may leave us with a string slightly shorter than 'width' characters
+		// so do not return yet and continue with padding
+		// (for example truncating "abcX" to a length of 4 where X is a rune with a width > 1
+		// would return "abc" which must be padded to either "abc " or " abc")
+	}
+
+	if paddingWidth := width - s.Length(); paddingWidth > 0 {
+		if len(s.components) > 0 {
+			padding := strings.Repeat(" ", paddingWidth)
+			switch alignment {
+			case Left:
+				c := &s.components[len(s.components)-1].Content
+				*c = *c + padding
+			case Right:
+				c := &s.components[0].Content
+				*c = padding + *c
+			}
 		}
 	}
 }

@@ -317,9 +317,9 @@ func (c AzurePipelinesClient) fetchStages(ctx context.Context, u string, webURL 
 		})
 	}
 
-	// At this point we have a tree structure with the following hierarchy of record.Type :
+	// At this point we have a tree structure with the following hierarchy of record.type_ :
 	//    Stage -> Phase -> Job -> Task
-	// For now we ignore Tasks. Phases that contain jobs are redundant with the jobs themselves
+	// For now we ignore tasks. Phases that contain jobs are redundant with the jobs themselves
 	// so we ignore them too. Phase that have no child are turned into a cache.Job.
 	// (this is consistent with the way jobs are shown on the Azure website)
 	steps := make([]cache.Step, 0, len(topLevelRecords))
@@ -440,7 +440,7 @@ func (c AzurePipelinesClient) getJSON(ctx context.Context, u url.URL, v interfac
 
 func (c AzurePipelinesClient) get(ctx context.Context, u url.URL) (io.ReadCloser, error) {
 	if u.Hostname() != c.baseURL.Hostname() {
-		return nil, fmt.Errorf("expected URL host to be %q but got %q", u.Hostname(), c.baseURL.Hostname())
+		return nil, fmt.Errorf("expected url host to be %q but got %q", u.Hostname(), c.baseURL.Hostname())
 	}
 	params := u.Query()
 	params.Add("api-version", c.version)
