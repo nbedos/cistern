@@ -47,14 +47,12 @@ func (c GitLabClient) Commit(ctx context.Context, repo string, ref string) (cach
 		return cache.Commit{}, cache.ErrUnknownRepositoryURL
 	}
 
-	ref = url.PathEscape(ref)
-
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
 		return cache.Commit{}, ctx.Err()
 	}
-	gitlabCommit, _, err := c.remote.Commits.GetCommit(slug, url.PathEscape(ref), gitlab.WithContext(ctx))
+	gitlabCommit, _, err := c.remote.Commits.GetCommit(slug, ref, gitlab.WithContext(ctx))
 	if err != nil {
 		if err, ok := err.(*gitlab.ErrorResponse); ok {
 			switch err.Response.StatusCode {
@@ -223,7 +221,7 @@ func (c GitLabClient) parseRepositoryURL(u string) (string, error) {
 		return "", cache.ErrUnknownRepositoryURL
 	}
 
-	slug := fmt.Sprintf("%s/%s", url.PathEscape(owner), url.PathEscape(repo))
+	slug := fmt.Sprintf("%s/%s", owner, repo)
 	return slug, nil
 }
 
