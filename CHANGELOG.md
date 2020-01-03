@@ -6,7 +6,7 @@
 * Bugfix: Lookup path if BROWSER is not a path itself ([issue #8](https://github.com/nbedos/cistern/issues/8))
 * Bugfix: Add support for 'insteadOf' and 'pushInsteadOf' configuration for remote URLs  ([issue #7](https://github.com/nbedos/cistern/issues/7))
 * Bugfix: Stages of Azure pipelines are now ordered
-* Bugfix: Leave URL encoding to go-gitlab ([issue #16](https://github.com/nbedos/cistern/issues/16))
+* Bugfix: Properly handle arbitrary long GitLab namespaces ([issue #16](https://github.com/nbedos/cistern/issues/16))
 * Chore: Rewrite build script in go for improved maintainability
 * Chore: Rename repository
 

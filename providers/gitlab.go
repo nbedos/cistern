@@ -216,12 +216,11 @@ func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (cache.Pipelin
 }
 
 func (c GitLabClient) parseRepositoryURL(u string) (string, error) {
-	host, owner, repo, err := utils.RepoHostOwnerAndName(u)
+	host, slug, err := utils.RepositoryHostAndSlug(u)
 	if err != nil || host != c.remote.BaseURL().Hostname() {
 		return "", cache.ErrUnknownRepositoryURL
 	}
 
-	slug := fmt.Sprintf("%s/%s", owner, repo)
 	return slug, nil
 }
 
@@ -235,14 +234,16 @@ func (c GitLabClient) parsePipelineURL(u string) (string, int, error) {
 		return "", 0, cache.ErrUnknownPipelineURL
 	}
 
-	// URL format: https://gitlab.com/nbedos/cistern/pipelines/97604657
+	// URL format:
+	//    https://gitlab.com/nbedos/cistern/pipelines/97604657
+	// OR https://gitlab.com/namespace/nbedos/cistern/pipelines/97604657
 	pathComponents := strings.FieldsFunc(v.EscapedPath(), func(c rune) bool { return c == '/' })
-	if len(pathComponents) < 4 || pathComponents[2] != "pipelines" {
+	if len(pathComponents) < 4 || pathComponents[len(pathComponents)-2] != "pipelines" {
 		return "", 0, cache.ErrUnknownPipelineURL
 	}
 
-	slug := fmt.Sprintf("%s/%s", pathComponents[0], pathComponents[1])
-	id, err := strconv.Atoi(pathComponents[3])
+	slug := strings.Join(pathComponents[:len(pathComponents)-2], "/")
+	id, err := strconv.Atoi(pathComponents[len(pathComponents)-1])
 	if err != nil {
 		return "", 0, err
 	}

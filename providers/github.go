@@ -40,11 +40,18 @@ func (c GitHubClient) ID() string {
 }
 
 func (c GitHubClient) parseRepositoryURL(url string) (string, string, error) {
-	host, owner, repo, err := utils.RepoHostOwnerAndName(url)
+	host, slug, err := utils.RepositoryHostAndSlug(url)
 	expectedHost := strings.TrimPrefix(c.client.BaseURL.Hostname(), "api.")
 	if err != nil || !strings.Contains(host, expectedHost) {
 		return "", "", cache.ErrUnknownRepositoryURL
 	}
+
+	components := strings.FieldsFunc(slug, func(c rune) bool { return c == '/' })
+	if len(components) < 2 {
+		return "", "", fmt.Errorf("invalid repository path: %q (expected at least two components)", slug)
+	}
+	owner := components[0]
+	repo := components[1]
 
 	return owner, repo, nil
 }
