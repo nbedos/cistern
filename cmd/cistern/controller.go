@@ -562,7 +562,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 			Order:     3,
 			Header:    "TYPE",
 			MaxWidth:  maxWidth,
-			Alignment: tui.Right,
+			Alignment: tui.Left,
 			// The following sorting function has no effect on the table since all Pipelines
 			// have the same type. We just include it for consistency.
 			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
@@ -639,20 +639,23 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 			Alignment: tui.Left,
 			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
 				return func(i, j int) bool {
-					ni := nodes[i].(cache.Pipeline)
-					nj := nodes[j].(cache.Pipeline)
+					ti := nodes[i].(cache.Pipeline).StartedAt.Time
+					tj := nodes[j].(cache.Pipeline).StartedAt.Time
 
-					if !ni.StartedAt.Valid {
-						if !nj.StartedAt.Valid {
-							return false
-						}
-						return !asc
+					// Assume that Null values are attributed to events that will occur in the
+					// future, so give them a maximal value
+					if !nodes[i].(cache.Pipeline).StartedAt.Valid {
+						ti = time.Unix(1<<62, 0)
+					}
+
+					if !nodes[j].(cache.Pipeline).StartedAt.Valid {
+						tj = time.Unix(1<<62, 0)
 					}
 
 					if asc {
-						return ni.StartedAt.Time.Before(nj.StartedAt.Time)
+						return ti.Before(tj)
 					} else {
-						return ni.StartedAt.Time.After(nj.StartedAt.Time)
+						return ti.After(tj)
 					}
 				}
 			},
@@ -664,20 +667,21 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 			Alignment: tui.Left,
 			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
 				return func(i, j int) bool {
-					ni := nodes[i].(cache.Pipeline)
-					nj := nodes[j].(cache.Pipeline)
+					ti := nodes[i].(cache.Pipeline).FinishedAt.Time
+					tj := nodes[j].(cache.Pipeline).FinishedAt.Time
 
-					if !ni.StartedAt.Valid {
-						if !nj.StartedAt.Valid {
-							return false
-						}
-						return !asc
+					if !nodes[i].(cache.Pipeline).FinishedAt.Valid {
+						ti = time.Unix(1<<62, 0)
+					}
+
+					if !nodes[j].(cache.Pipeline).FinishedAt.Valid {
+						tj = time.Unix(1<<62, 0)
 					}
 
 					if asc {
-						return ni.StartedAt.Time.Before(nj.StartedAt.Time)
+						return ti.Before(tj)
 					} else {
-						return ni.StartedAt.Time.After(nj.StartedAt.Time)
+						return ti.After(tj)
 					}
 				}
 			},
