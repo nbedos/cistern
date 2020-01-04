@@ -109,6 +109,7 @@ var expectedPipeline = cache.Pipeline{
 				Type:  cache.StepStage,
 				Name:  "tests",
 				State: "failed",
+				CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 				StartedAt: utils.NullTime{
 					Valid: true,
 					Time:  time.Date(2019, 12, 4, 13, 9, 56, 653333300, time.UTC),
@@ -200,6 +201,7 @@ var expectedPipeline = cache.Pipeline{
 								Name:  "Set up the Go workspace",
 								Type:  cache.StepTask,
 								State: "passed",
+								CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 								StartedAt: utils.NullTime{
 									Valid: true,
 									Time:  time.Date(2019, 12, 4, 13, 10, 3, 153333300, time.UTC),
@@ -222,6 +224,7 @@ var expectedPipeline = cache.Pipeline{
 								Name:  "Build",
 								Type:  cache.StepTask,
 								State: "failed",
+								CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 								StartedAt: utils.NullTime{
 									Valid: true,
 									Time:  time.Date(2019, 12, 4, 13, 10, 3, 870000000, time.UTC),

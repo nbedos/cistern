@@ -141,7 +141,7 @@ func Aggregate(steps []Step) Step {
 	}
 
 	s := Step{
-		State: first.State.merge(last.State),
+		State:      first.State.merge(last.State),
 		StartedAt:  utils.MinNullTime(first.StartedAt, last.StartedAt),
 		FinishedAt: utils.MaxNullTime(first.FinishedAt, last.FinishedAt),
 		Children:   steps,
@@ -395,6 +395,8 @@ const (
 	ColumnUpdated
 	ColumnDuration
 	ColumnName
+	ColumnWebURL
+	ColumnAllowedFailure
 )
 
 func (s Step) NodeID() interface{} {
@@ -451,15 +453,26 @@ func (s Step) Values(loc *time.Location) map[tui.ColumnID]tui.StyledString {
 		state.Add(tui.StatusSkipped)
 	}
 
+	webURL := "-"
+	if s.WebURL.Valid {
+		webURL = s.WebURL.String
+	}
+
+	allowedFailure := "no"
+	if s.AllowFailure {
+		allowedFailure = "yes"
+	}
 	return map[tui.ColumnID]tui.StyledString{
-		ColumnType:     tui.NewStyledString(typeChar),
-		ColumnState:    state,
-		ColumnCreated:  tui.NewStyledString(timeToString(s.CreatedAt)),
-		ColumnStarted:  nullTimeToString(s.StartedAt),
-		ColumnFinished: nullTimeToString(s.FinishedAt),
-		ColumnUpdated:  tui.NewStyledString(timeToString(s.UpdatedAt)),
-		ColumnDuration: tui.NewStyledString(s.Duration.String()),
-		ColumnName:     tui.NewStyledString(s.Name),
+		ColumnType:           tui.NewStyledString(typeChar),
+		ColumnState:          state,
+		ColumnAllowedFailure: tui.NewStyledString(allowedFailure),
+		ColumnCreated:        tui.NewStyledString(timeToString(s.CreatedAt)),
+		ColumnStarted:        nullTimeToString(s.StartedAt),
+		ColumnFinished:       nullTimeToString(s.FinishedAt),
+		ColumnUpdated:        tui.NewStyledString(timeToString(s.UpdatedAt)),
+		ColumnDuration:       tui.NewStyledString(s.Duration.String()),
+		ColumnName:           tui.NewStyledString(s.Name),
+		ColumnWebURL:         tui.NewStyledString(webURL),
 	}
 }
 

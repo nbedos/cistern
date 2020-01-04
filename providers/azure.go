@@ -244,8 +244,12 @@ func (c AzurePipelinesClient) fetchPipeline(ctx context.Context, owner string, r
 	}
 
 	for i := range stages {
+		stages[i].CreatedAt = pipeline.CreatedAt
 		for j := range stages[i].Children {
 			stages[i].Children[j].CreatedAt = pipeline.CreatedAt
+			for k := range stages[i].Children[j].Children {
+				stages[i].Children[j].Children[k].CreatedAt = pipeline.CreatedAt
+			}
 		}
 	}
 

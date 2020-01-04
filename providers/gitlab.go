@@ -484,6 +484,7 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 		pipeline.Children[i].FinishedAt = aggregate.FinishedAt
 		pipeline.Children[i].UpdatedAt = aggregate.UpdatedAt
 		pipeline.Children[i].Duration = aggregate.Duration
+		pipeline.Children[i].WebURL = pipeline.WebURL
 	}
 
 	return pipeline, nil

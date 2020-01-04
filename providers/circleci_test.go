@@ -120,6 +120,7 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 					Name:  "Spin up Environment",
 					Type:  3,
 					State: "passed",
+					CreatedAt: time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
 					StartedAt: utils.NullTime{
 						Valid: true,
 						Time:  time.Date(2019, 11, 21, 14, 40, 32, 620000000, time.UTC),

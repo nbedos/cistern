@@ -139,6 +139,10 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 						Valid:    true,
 						Duration: time.Minute + 31*time.Second,
 					},
+					WebURL: utils.NullString{
+						Valid:  true,
+						String: "https://gitlab.com/nbedos/cistern/pipelines/103230300",
+					},
 					Children: []cache.Step{
 						{
 							ID:    "379869167",

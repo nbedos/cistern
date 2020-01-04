@@ -596,8 +596,44 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 				}
 			},
 		},
-		cache.ColumnStarted: {
+		cache.ColumnAllowedFailure: {
 			Order:     5,
+			Header:    "XFAIL",
+			MaxWidth:  maxWidth,
+			Alignment: tui.Left,
+			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					faili := nodes[i].(cache.Pipeline).Values(loc)[cache.ColumnAllowedFailure]
+					failj := nodes[j].(cache.Pipeline).Values(loc)[cache.ColumnAllowedFailure]
+
+					if asc {
+						return faili.String() < failj.String()
+					} else {
+						return faili.String() > failj.String()
+					}
+				}
+			},
+		},
+		cache.ColumnCreated: {
+			Order:     6,
+			Header:    "CREATED",
+			MaxWidth:  maxWidth,
+			Alignment: tui.Left,
+			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					ni := nodes[i].(cache.Pipeline)
+					nj := nodes[j].(cache.Pipeline)
+
+					if asc {
+						return ni.CreatedAt.Before(nj.CreatedAt)
+					} else {
+						return ni.CreatedAt.After(nj.CreatedAt)
+					}
+				}
+			},
+		},
+		cache.ColumnStarted: {
+			Order:     7,
 			Header:    "STARTED",
 			MaxWidth:  maxWidth,
 			Alignment: tui.Left,
@@ -621,8 +657,33 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 				}
 			},
 		},
+		cache.ColumnFinished: {
+			Order:     8,
+			Header:    "FINISHED",
+			MaxWidth:  maxWidth,
+			Alignment: tui.Left,
+			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					ni := nodes[i].(cache.Pipeline)
+					nj := nodes[j].(cache.Pipeline)
+
+					if !ni.StartedAt.Valid {
+						if !nj.StartedAt.Valid {
+							return false
+						}
+						return !asc
+					}
+
+					if asc {
+						return ni.StartedAt.Time.Before(nj.StartedAt.Time)
+					} else {
+						return ni.StartedAt.Time.After(nj.StartedAt.Time)
+					}
+				}
+			},
+		},
 		cache.ColumnDuration: {
-			Order:     6,
+			Order:     10,
 			Header:    "DURATION",
 			MaxWidth:  maxWidth,
 			Alignment: tui.Right,
@@ -647,7 +708,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 			},
 		},
 		cache.ColumnName: {
-			Order:      7,
+			Order:      11,
 			Header:     "NAME",
 			MaxWidth:   maxWidth,
 			Alignment:  tui.Left,
@@ -661,6 +722,24 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 						return namei.String() < namej.String()
 					} else {
 						return namei.String() > namej.String()
+					}
+				}
+			},
+		},
+		cache.ColumnWebURL: {
+			Order:     12,
+			Header:    "URL",
+			MaxWidth:  maxWidth,
+			Alignment: tui.Left,
+			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					urli := nodes[i].(cache.Pipeline).Values(loc)[cache.ColumnWebURL]
+					urlj := nodes[j].(cache.Pipeline).Values(loc)[cache.ColumnWebURL]
+
+					if asc {
+						return urli.String() < urlj.String()
+					} else {
+						return urli.String() > urlj.String()
 					}
 				}
 			},

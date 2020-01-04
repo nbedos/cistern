@@ -352,6 +352,7 @@ func (b circleCIBuild) toPipeline() (cache.Pipeline, error) {
 				return pipeline, err
 			}
 			task.ID = fmt.Sprintf("%d.%d", i, j)
+			task.CreatedAt = pipeline.CreatedAt
 			pipeline.Children = append(pipeline.Children, task)
 		}
 	}
