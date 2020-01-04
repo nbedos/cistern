@@ -58,6 +58,7 @@ func NewController(ui *tui.TUI, conf tui.ColumnConfiguration, ref string, c cach
 	if err != nil {
 		return Controller{}, err
 	}
+	table.SortBy(cache.ColumnStarted, false)
 
 	status, err := tui.NewStatusBar(width, height)
 	if err != nil {
@@ -203,6 +204,29 @@ func (c *Controller) nextMatch() {
 		found := c.table.ScrollToNextMatch(c.tableSearch, true)
 		if !found {
 			c.writeStatus(fmt.Sprintf("No match found for %#v", c.tableSearch))
+		}
+	}
+}
+
+func (c *Controller) ReverseSortOrder() {
+	if order := c.table.Order(); order.Valid {
+		c.table.SortBy(order.ID, !order.Ascending)
+	}
+}
+
+func (c *Controller) SortByNextColumn(reverse bool) {
+	if order := c.table.Order(); order.Valid {
+		ids := c.table.Configuration().ColumnIDs()
+		for i, id := range ids {
+			if id == order.ID {
+				j := i + 1
+				if reverse {
+					j = i - 1
+				}
+				nextID := ids[utils.Modulo(j, len(ids))]
+				c.table.SortBy(nextID, order.Ascending)
+				return
+			}
 		}
 	}
 }
@@ -434,6 +458,12 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 				if err := c.viewLog(ctx); err != nil {
 					return err
 				}
+			case '>':
+				c.SortByNextColumn(false)
+			case '<':
+				c.SortByNextColumn(true)
+			case '!':
+				c.ReverseSortOrder()
 			}
 		}
 	}
@@ -491,42 +521,130 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 
 	const maxWidth = 999
 
-	tableConfig := map[tui.ColumnID]*tui.Column{
+	tableConfig := map[tui.ColumnID]tui.Column{
 		cache.ColumnRef: {
 			Header:    "REF",
 			Order:     1,
 			MaxWidth:  maxWidth,
 			Alignment: tui.Left,
+			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					refi := nodes[i].(cache.Pipeline).Values(loc)[cache.ColumnRef]
+					refj := nodes[j].(cache.Pipeline).Values(loc)[cache.ColumnRef]
+
+					if asc {
+						return refi.String() < refj.String()
+					} else {
+						return refj.String() > refi.String()
+					}
+				}
+			},
 		},
 		cache.ColumnPipeline: {
 			Order:     2,
 			Header:    "PIPELINE",
 			MaxWidth:  maxWidth,
 			Alignment: tui.Right,
+			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					ni := nodes[i].(cache.Pipeline)
+					nj := nodes[j].(cache.Pipeline)
+
+					if asc {
+						return ni.ID < nj.ID
+					} else {
+						return ni.ID > nj.ID
+					}
+				}
+			},
 		},
 		cache.ColumnType: {
 			Order:     3,
 			Header:    "TYPE",
 			MaxWidth:  maxWidth,
 			Alignment: tui.Right,
+			// The following sorting function has no effect on the table since all Pipelines
+			// have the same type. We just include it for consistency.
+			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					ni := nodes[i].(cache.Pipeline)
+					nj := nodes[j].(cache.Pipeline)
+
+					if asc {
+						return ni.Type < nj.Type
+					} else {
+						return ni.Type > nj.Type
+					}
+				}
+			},
 		},
 		cache.ColumnState: {
 			Order:     4,
 			Header:    "STATE",
 			MaxWidth:  maxWidth,
 			Alignment: tui.Left,
+			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					ni := nodes[i].(cache.Pipeline)
+					nj := nodes[j].(cache.Pipeline)
+
+					if asc {
+						return ni.State < nj.State
+					} else {
+						return ni.State > nj.State
+					}
+				}
+			},
 		},
 		cache.ColumnStarted: {
 			Order:     5,
 			Header:    "STARTED",
 			MaxWidth:  maxWidth,
 			Alignment: tui.Left,
+			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					ni := nodes[i].(cache.Pipeline)
+					nj := nodes[j].(cache.Pipeline)
+
+					if !ni.StartedAt.Valid {
+						if !nj.StartedAt.Valid {
+							return false
+						}
+						return asc
+					}
+
+					if asc {
+						return ni.StartedAt.Time.Before(nj.StartedAt.Time)
+					} else {
+						return ni.StartedAt.Time.After(nj.StartedAt.Time)
+					}
+				}
+			},
 		},
 		cache.ColumnDuration: {
 			Order:     6,
 			Header:    "DURATION",
 			MaxWidth:  maxWidth,
 			Alignment: tui.Right,
+			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					ni := nodes[i].(cache.Pipeline)
+					nj := nodes[j].(cache.Pipeline)
+
+					if !ni.Duration.Valid {
+						if !nj.Duration.Valid {
+							return false
+						}
+						return asc
+					}
+
+					if asc {
+						return ni.Duration.Duration < nj.Duration.Duration
+					} else {
+						return ni.Duration.Duration > nj.Duration.Duration
+					}
+				}
+			},
 		},
 		cache.ColumnName: {
 			Order:      7,
@@ -534,6 +652,18 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 			MaxWidth:   maxWidth,
 			Alignment:  tui.Left,
 			TreePrefix: true,
+			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					namei := nodes[i].(cache.Pipeline).Values(loc)[cache.ColumnName]
+					namej := nodes[j].(cache.Pipeline).Values(loc)[cache.ColumnName]
+
+					if asc {
+						return namei.String() < namej.String()
+					} else {
+						return namei.String() > namej.String()
+					}
+				}
+			},
 		},
 	}
 

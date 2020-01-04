@@ -69,9 +69,9 @@ type Column struct {
 
 type ColumnID int
 
-type ColumnConfiguration map[ColumnID]*Column
+type ColumnConfiguration map[ColumnID]Column
 
-func (c ColumnConfiguration) columnIDs() []ColumnID {
+func (c ColumnConfiguration) ColumnIDs() []ColumnID {
 	ids := make([]ColumnID, 0, len(c))
 	for id := range c {
 		ids = append(ids, id)
@@ -193,6 +193,12 @@ pathLoop:
 	return nil
 }
 
+type Order struct {
+	Valid     bool
+	ID        ColumnID
+	Ascending bool
+}
+
 type HierarchicalTable struct {
 	outterNodes []TableNode
 	// List of the top-level innerNodes
@@ -209,11 +215,8 @@ type HierarchicalTable struct {
 	location    *time.Location
 	conf        ColumnConfiguration
 	columnWidth map[ColumnID]int
-	orderedBy   struct {
-		Valid     bool
-		ID        ColumnID
-		Ascending bool
-	}
+	order       Order
+	scrolled    bool
 }
 
 func NewHierarchicalTable(conf ColumnConfiguration, nodes []TableNode, width int, height int, loc *time.Location) (HierarchicalTable, error) {
@@ -233,6 +236,14 @@ func NewHierarchicalTable(conf ColumnConfiguration, nodes []TableNode, width int
 	table.Replace(nodes)
 
 	return table, nil
+}
+
+func (t HierarchicalTable) Configuration() ColumnConfiguration {
+	return t.conf
+}
+
+func (t HierarchicalTable) Order() Order {
+	return t.order
 }
 
 func (t HierarchicalTable) depthFirstTraversal(traverseAll bool) []*innerTableNode {
@@ -256,6 +267,7 @@ func (t *HierarchicalTable) computeTraversal() {
 		pageNodePath = t.rows[t.pageIndex.Int].path
 	}
 
+	cursorIndex := t.cursorIndex
 	var cursorNodePath nodePath
 	if t.cursorIndex.Valid {
 		cursorNodePath = t.rows[t.cursorIndex.Int].path
@@ -280,7 +292,11 @@ func (t *HierarchicalTable) computeTraversal() {
 				Int:   i,
 			}
 		}
-		if row.path == cursorNodePath {
+
+		// Track the row the cursor was on, unless it was on the first row and the user never
+		// scrolled. This prevents the cursor from moving around when increasingly more rows are
+		// loaded into the table but the user has not interacted with the table yet.
+		if row.path == cursorNodePath && (t.scrolled || (cursorIndex.Valid && cursorIndex.Int > 0)) {
 			t.cursorIndex = nullInt{
 				Valid: true,
 				Int:   i,
@@ -288,19 +304,19 @@ func (t *HierarchicalTable) computeTraversal() {
 		}
 	}
 
-	// If no match was found, default to the first row
 	if len(t.rows) > 0 {
-		if !t.pageIndex.Valid {
+		// If no matching row was found or if all rows fit on screen, move the top page to the
+		// first row
+		if !t.pageIndex.Valid || len(t.rows) <= t.PageSize() {
 			t.pageIndex = nullInt{
 				Valid: true,
 				Int:   0,
 			}
 		}
+
+		// If no matching row was found, move the cursor to the first row of the page
 		if !t.cursorIndex.Valid {
-			t.cursorIndex = nullInt{
-				Valid: true,
-				Int:   0,
-			}
+			t.cursorIndex = t.pageIndex
 		}
 	}
 
@@ -309,7 +325,7 @@ func (t *HierarchicalTable) computeTraversal() {
 	}
 
 	for _, row := range t.rows {
-		for _, id := range t.conf.columnIDs() {
+		for _, id := range t.conf.ColumnIDs() {
 			w := row.values[id].Length()
 			if t.conf[id].TreePrefix {
 				w += runewidth.StringWidth(row.prefix)
@@ -326,12 +342,18 @@ func (t *HierarchicalTable) Replace(nodes []TableNode) {
 		traversable[node.path] = node.traversable
 	}
 
+	if t.order.Valid && t.conf != nil && nodes != nil {
+		if column, exists := t.conf[t.order.ID]; exists && column.Less != nil {
+			sort.Slice(nodes, column.Less(nodes, t.order.Ascending))
+		}
+	}
 	t.outterNodes = nodes
 
 	// Copy node hierarchy and compute the path of each node along the way
-	t.innerNodes = make([]innerTableNode, 0, len(nodes))
+	t.innerNodes = make([]innerTableNode, 0, len(t.outterNodes))
 	for _, n := range nodes {
-		t.innerNodes = append(t.innerNodes, toInnerTableNode(n, innerTableNode{}, traversable, t.location))
+		innerNode := toInnerTableNode(n, innerTableNode{}, traversable, t.location)
+		t.innerNodes = append(t.innerNodes, innerNode)
 	}
 
 	t.computeTraversal()
@@ -355,6 +377,9 @@ func (t *HierarchicalTable) SetTraversable(traversable bool, recursive bool) {
 func (t *HierarchicalTable) Scroll(amount int) {
 	if !t.cursorIndex.Valid || !t.pageIndex.Valid {
 		return
+	}
+	if amount != 0 {
+		t.scrolled = true
 	}
 
 	t.cursorIndex.Int = utils.Bounded(t.cursorIndex.Int+amount, 0, len(t.rows)-1)
@@ -408,12 +433,12 @@ func (t *HierarchicalTable) ScrollToNextMatch(s string, ascending bool) bool {
 func (t HierarchicalTable) headers() map[ColumnID]StyledString {
 	values := make(map[ColumnID]StyledString)
 	for id, column := range t.conf {
-		suffix := ""
-		if t.orderedBy.Valid && t.orderedBy.ID == id {
-			if t.orderedBy.Ascending {
-				suffix = "+"
+		suffix := " "
+		if t.order.Valid && t.order.ID == id {
+			if t.order.Ascending {
+				suffix = "▲"
 			} else {
-				suffix = "-"
+				suffix = "▼"
 			}
 		}
 		values[id] = NewStyledString(column.Header + suffix)
@@ -423,7 +448,7 @@ func (t HierarchicalTable) headers() map[ColumnID]StyledString {
 
 func (t HierarchicalTable) styledString(values map[ColumnID]StyledString, prefix string) StyledString {
 	paddedColumns := make([]StyledString, 0)
-	for _, id := range t.conf.columnIDs() {
+	for _, id := range t.conf.ColumnIDs() {
 		alignment := t.conf[id].Alignment
 		v := values[id]
 		if t.conf[id].TreePrefix {
@@ -517,11 +542,8 @@ func (t *HierarchicalTable) ActiveNodePath() []interface{} {
 }
 
 func (t *HierarchicalTable) SortBy(id ColumnID, ascending bool) {
-	if less := t.conf[id].Less; less != nil {
-		sort.Slice(t.outterNodes, less(t.outterNodes, ascending))
-		t.orderedBy.Valid = true
-		t.orderedBy.ID = id
-		t.orderedBy.Ascending = ascending
-		t.Replace(t.outterNodes)
-	}
+	t.order.Valid = true
+	t.order.ID = id
+	t.order.Ascending = ascending
+	t.Replace(t.outterNodes)
 }

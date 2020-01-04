@@ -260,6 +260,60 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 			t.Fatal("table.pageIndex and table.cursorIndex must both have .Valid=false")
 		}
 	})
+
+	t.Run("if the cursor was on the first row and the table was never scrolled the cursor must not move", func(t *testing.T) {
+		table := HierarchicalTable{
+			height:      10,
+			columnWidth: make(map[ColumnID]int),
+		}
+
+		table.Replace([]TableNode{
+			testNode{id: 1},
+			testNode{id: 2},
+		})
+
+		table.Replace([]TableNode{
+			testNode{id: 0},
+			testNode{id: 1},
+			testNode{id: 2},
+		})
+
+		expectedCursorIndex := nullInt{
+			Valid: true,
+			Int:   0,
+		}
+		if diff := cmp.Diff(expectedCursorIndex, table.cursorIndex); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
+	t.Run("if the cursor was not on the first row it must follow the row", func(t *testing.T) {
+		table := HierarchicalTable{
+			height:      10,
+			columnWidth: make(map[ColumnID]int),
+		}
+
+		table.Replace([]TableNode{
+			testNode{id: 1},
+			testNode{id: 2},
+		})
+
+		table.Scroll(1)
+
+		table.Replace([]TableNode{
+			testNode{id: 0},
+			testNode{id: 1},
+			testNode{id: 2},
+		})
+
+		expectedCursorIndex := nullInt{
+			Valid: true,
+			Int:   2,
+		}
+		if diff := cmp.Diff(expectedCursorIndex, table.cursorIndex); diff != "" {
+			t.Fatal(diff)
+		}
+	})
 }
 
 func TestHierarchicalTable_SetTraversable(t *testing.T) {
@@ -605,7 +659,7 @@ func TestHierarchicalTable_headers(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedHeader := strings.Join([]string{"column1", "column2", "column", "olumn4"}, table.sep)
+		expectedHeader := strings.Join([]string{"column1 ", "column2 ", "column", "lumn4 "}, table.sep)
 		table.Resize(runewidth.StringWidth(expectedHeader), table.height)
 
 		header := table.styledString(table.headers(), "").String()
@@ -759,10 +813,34 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 		table.SortBy(column1, false)
 
 		header := table.headers()[column1].String()
-		expectedHeader := "column1-"
+		expectedHeader := "column1▼"
 
 		if header != expectedHeader {
 			t.Fatalf("expected header %q but got %q", expectedHeader, header)
+		}
+	})
+
+	t.Run("sort order must be preserved across Replace calls", func(t *testing.T) {
+		table, err := NewHierarchicalTable(conf, nodes, 10, 10, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		table.SortBy(column1, false)
+
+		expectedPaths := []nodePath{
+			nodePathFromIDs(4),
+			nodePathFromIDs(3),
+			nodePathFromIDs(2),
+			nodePathFromIDs(1),
+		}
+		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
+			t.Fatal(diff)
+		}
+
+		table.Replace(nodes)
+		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
+			t.Fatal(diff)
 		}
 	})
 }
