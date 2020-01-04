@@ -610,7 +610,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 						if !nj.StartedAt.Valid {
 							return false
 						}
-						return asc
+						return !asc
 					}
 
 					if asc {
