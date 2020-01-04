@@ -287,7 +287,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		}
 	})
 
-	t.Run("if the cursor was not on the first row it must follow the row", func(t *testing.T) {
+	t.Run("if the cursor was not on the first row it must track the row", func(t *testing.T) {
 		table := HierarchicalTable{
 			height:      10,
 			columnWidth: make(map[ColumnID]int),

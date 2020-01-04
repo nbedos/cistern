@@ -127,7 +127,7 @@ type azureBuild struct {
 	Number            string     `json:"buildNumber"`
 	SourceBranch      string     `json:"sourceBranch"`
 	SourceVersion     string     `json:"sourceVersion"`
-	ValidationResults []struct{} `json:"validationResults`
+	ValidationResults []struct{} `json:"validationResults"`
 	Status            string     `json:"status"`
 	Result            string     `json:"result"`
 	QueueTime         string     `json:"queuetime"`
@@ -189,7 +189,7 @@ func (b azureBuild) toPipeline() (cache.Pipeline, error) {
 	}
 
 	var err error
-	pipeline.CreatedAt, err = utils.NullTimeFromString(b.QueueTime)
+	pipeline.CreatedAt, err = time.Parse(time.RFC3339, b.QueueTime)
 	if err != nil {
 		return cache.Pipeline{}, err
 	}

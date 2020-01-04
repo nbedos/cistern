@@ -85,10 +85,7 @@ var expectedPipeline = cache.Pipeline{
 		Name:  "owner.repo (1)",
 		Type:  cache.StepPipeline,
 		State: cache.Failed,
-		CreatedAt: utils.NullTime{
-			Valid: true,
-			Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-		},
+		CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 		StartedAt: utils.NullTime{
 			Valid: true,
 			Time:  time.Date(2019, 12, 4, 13, 9, 52, 764105000, time.UTC),
@@ -134,10 +131,7 @@ var expectedPipeline = cache.Pipeline{
 						Type:  cache.StepJob,
 						State: "failed",
 						Name:  "Ubuntu_16_04",
-						CreatedAt: utils.NullTime{
-							Valid: true,
-							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-						},
+						CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 						StartedAt: utils.NullTime{
 							Valid: true,
 							Time:  time.Date(2019, 12, 4, 13, 10, 0, 713333300, time.UTC),
@@ -160,10 +154,7 @@ var expectedPipeline = cache.Pipeline{
 						Type:  cache.StepJob,
 						State: "failed",
 						Name:  "Ubuntu_18_04",
-						CreatedAt: utils.NullTime{
-							Valid: true,
-							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-						},
+						CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 						StartedAt: utils.NullTime{
 							Valid: true,
 							Time:  time.Date(2019, 12, 4, 13, 9, 56, 653333300, time.UTC),
@@ -186,10 +177,7 @@ var expectedPipeline = cache.Pipeline{
 						Type:  cache.StepJob,
 						State: "failed",
 						Name:  "macoOS_10_14",
-						CreatedAt: utils.NullTime{
-							Valid: true,
-							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-						},
+						CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 						StartedAt: utils.NullTime{
 							Valid: true,
 							Time:  time.Date(2019, 12, 4, 13, 9, 59, 943333300, time.UTC),

@@ -102,10 +102,7 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 			Type:         cache.StepPipeline,
 			State:        cache.Passed,
 			AllowFailure: false,
-			CreatedAt: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 12, 15, 21, 46, 40, 694000000, time.UTC),
-			},
+			CreatedAt: time.Date(2019, 12, 15, 21, 46, 40, 694000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 12, 15, 21, 46, 41, 214000000, time.UTC),
@@ -129,10 +126,7 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 					Name:  "test",
 					Type:  1,
 					State: "passed",
-					CreatedAt: utils.NullTime{
-						Valid: true,
-						Time:  time.Date(2019, 12, 15, 21, 46, 40, 706000000, time.UTC),
-					},
+					CreatedAt: time.Date(2019, 12, 15, 21, 46, 40, 706000000, time.UTC),
 					StartedAt: utils.NullTime{
 						Valid: true,
 						Time:  time.Date(2019, 12, 15, 21, 46, 41, 151000000, time.UTC),
@@ -151,10 +145,7 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 							Name:  "golang 1.13",
 							Type:  2,
 							State: "passed",
-							CreatedAt: utils.NullTime{
-								Valid: true,
-								Time:  time.Date(2019, 12, 15, 21, 46, 40, 706000000, time.UTC),
-							},
+							CreatedAt: time.Date(2019, 12, 15, 21, 46, 40, 706000000, time.UTC),
 							StartedAt: utils.NullTime{
 								Valid: true,
 								Time:  time.Date(2019, 12, 15, 21, 46, 41, 151000000, time.UTC),

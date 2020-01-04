@@ -319,7 +319,7 @@ func (b circleCIBuild) toPipeline() (cache.Pipeline, error) {
 	}
 
 	var err error
-	if pipeline.CreatedAt, err = utils.NullTimeFromString(b.CreatedAt); err != nil {
+	if pipeline.CreatedAt, err = time.Parse(time.RFC3339, b.CreatedAt); err != nil {
 		return pipeline, err
 	}
 	if pipeline.StartedAt, err = utils.NullTimeFromString(b.StartedAt); err != nil {
@@ -329,7 +329,10 @@ func (b circleCIBuild) toPipeline() (cache.Pipeline, error) {
 		return pipeline, err
 	}
 
-	updatedAt := utils.MaxNullTime(pipeline.FinishedAt, pipeline.StartedAt, pipeline.CreatedAt)
+	updatedAt := utils.MaxNullTime(
+		utils.NullTime{Time: pipeline.CreatedAt, Valid: true},
+		pipeline.FinishedAt,
+		pipeline.StartedAt)
 	if !updatedAt.Valid {
 		return pipeline, errors.New("updatedAt attribute cannot be null")
 	}

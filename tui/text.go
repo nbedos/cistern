@@ -15,7 +15,6 @@ const (
 	TableHeader
 	ActiveRow
 	GitSha
-	GitRef
 	GitTag
 	GitBranch
 	GitHead

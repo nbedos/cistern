@@ -95,10 +95,7 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 			Name:  "build",
 			Type:  cache.StepPipeline,
 			State: cache.Passed,
-			CreatedAt: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
-			},
+			CreatedAt: time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 21, 14, 40, 32, 555000000, time.UTC),

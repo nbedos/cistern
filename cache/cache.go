@@ -141,13 +141,16 @@ func Aggregate(steps []Step) Step {
 	}
 
 	s := Step{
-		State:      first.State.merge(last.State),
-		CreatedAt:  utils.MinNullTime(first.CreatedAt, last.CreatedAt),
+		State: first.State.merge(last.State),
 		StartedAt:  utils.MinNullTime(first.StartedAt, last.StartedAt),
 		FinishedAt: utils.MaxNullTime(first.FinishedAt, last.FinishedAt),
 		Children:   steps,
 	}
 
+	s.CreatedAt = first.CreatedAt
+	if last.CreatedAt.Before(s.CreatedAt) {
+		s.CreatedAt = last.CreatedAt
+	}
 	s.Duration = utils.NullSub(s.FinishedAt, s.StartedAt)
 	s.UpdatedAt = first.UpdatedAt
 	if last.UpdatedAt.After(s.UpdatedAt) {
@@ -357,7 +360,7 @@ type Step struct {
 	Type         StepType
 	State        State
 	AllowFailure bool
-	CreatedAt    utils.NullTime
+	CreatedAt    time.Time
 	StartedAt    utils.NullTime
 	FinishedAt   utils.NullTime
 	UpdatedAt    time.Time
@@ -451,7 +454,7 @@ func (s Step) Values(loc *time.Location) map[tui.ColumnID]tui.StyledString {
 	return map[tui.ColumnID]tui.StyledString{
 		ColumnType:     tui.NewStyledString(typeChar),
 		ColumnState:    state,
-		ColumnCreated:  nullTimeToString(s.CreatedAt),
+		ColumnCreated:  tui.NewStyledString(timeToString(s.CreatedAt)),
 		ColumnStarted:  nullTimeToString(s.StartedAt),
 		ColumnFinished: nullTimeToString(s.FinishedAt),
 		ColumnUpdated:  tui.NewStyledString(timeToString(s.UpdatedAt)),
@@ -664,24 +667,6 @@ func (c Cache) Pipelines(ref string) []Pipeline {
 	for _, p := range c.pipelineByRef[ref] {
 		pipelines = append(pipelines, *p)
 	}
-
-	// FIXME We should be able to sort on updatedAt only
-	sort.Slice(pipelines, func(i, j int) bool {
-		ri, rj := pipelines[i], pipelines[j]
-		ti := utils.MinNullTime(
-			ri.CreatedAt,
-			ri.StartedAt,
-			utils.NullTimeFromTime(&ri.UpdatedAt),
-			ri.FinishedAt)
-
-		tj := utils.MinNullTime(
-			rj.CreatedAt,
-			rj.StartedAt,
-			utils.NullTimeFromTime(&rj.UpdatedAt),
-			rj.FinishedAt)
-
-		return ti.Time.Before(tj.Time)
-	})
 
 	return pipelines
 }
@@ -988,7 +973,6 @@ func (c *Cache) Step(key PipelineKey, stepIDs []string) (Step, bool) {
 
 var ErrNoLogHere = errors.New("no log is associated to this row")
 
-
 func (c *Cache) Log(ctx context.Context, key PipelineKey, stepIDs []string) (string, error) {
 	var err error
 
@@ -1026,4 +1010,3 @@ func (c *Cache) Log(ctx context.Context, key PipelineKey, stepIDs []string) (str
 
 	return log, err
 }
-

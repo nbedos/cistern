@@ -42,10 +42,7 @@ func TestAppVeyorJob_ToCacheJob(t *testing.T) {
 		Type:  cache.StepJob,
 		State: "passed",
 		Name:  "name",
-		CreatedAt: utils.NullTime{
-			Valid: true,
-			Time:  time.Date(2019, 11, 23, 12, 24, 26, 918187100, time.UTC),
-		},
+		CreatedAt: time.Date(2019, 11, 23, 12, 24, 26, 918187100, time.UTC),
 		StartedAt: utils.NullTime{
 			Valid: true,
 			Time:  time.Date(2019, 11, 23, 12, 24, 31, 814573500, time.UTC),
@@ -104,10 +101,7 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 		Step: cache.Step{
 			ID:    "42",
 			State: "failed",
-			CreatedAt: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 23, 12, 24, 25, 590025800, time.UTC),
-			},
+			CreatedAt: time.Date(2019, 11, 23, 12, 24, 25, 590025800, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 23, 12, 24, 31, 814573500, time.UTC),

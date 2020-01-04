@@ -56,10 +56,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			ID:    "609256446",
 			Type:  cache.StepPipeline,
 			State: cache.Failed,
-			CreatedAt: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
-			},
+			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 53, 52, 0, time.UTC),
@@ -86,10 +83,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			Type:  cache.StepStage,
 			Name:  "Tests",
 			State: cache.Failed,
-			CreatedAt: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
-			},
+			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 53, 52, 0, time.UTC),
@@ -114,10 +108,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			Type:  cache.StepJob,
 			State: cache.Failed,
 			Name:  "GoLang 1.13 on Ubuntu Bionic",
-			CreatedAt: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
-			},
+			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 53, 52, 0, time.UTC),
@@ -142,10 +133,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			Type:  cache.StepJob,
 			State: cache.Failed,
 			Name:  "GoLang 1.12 on Ubuntu Trusty",
-			CreatedAt: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 8, 14, 26, 21, 509000000, time.UTC),
-			},
+			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 509000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 32, 48, 0, time.UTC),
@@ -170,10 +158,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			Type:  cache.StepJob,
 			State: cache.Failed,
 			Name:  "GoLang 1.13 on macOS 10.14",
-			CreatedAt: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 8, 14, 26, 21, 512000000, time.UTC),
-			},
+			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 512000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 33, 44, 0, time.UTC),
@@ -198,10 +183,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			Type:  cache.StepJob,
 			State: cache.Failed,
 			Name:  "GoLang 1.12 on macOS 10.13",
-			CreatedAt: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 8, 14, 26, 21, 514000000, time.UTC),
-			},
+			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 514000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 33, 39, 0, time.UTC),
