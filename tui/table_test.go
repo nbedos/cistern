@@ -287,7 +287,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		}
 	})
 
-	t.Run("if the cursor was not on the first row it must track the row", func(t *testing.T) {
+	t.Run("the cursor must move to the new location of the row", func(t *testing.T) {
 		table := HierarchicalTable{
 			height:      10,
 			columnWidth: make(map[ColumnID]int),
@@ -309,6 +309,127 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		expectedCursorIndex := nullInt{
 			Valid: true,
 			Int:   2,
+		}
+		if diff := cmp.Diff(expectedCursorIndex, table.cursorIndex); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
+
+	t.Run("the cursor must move to the new location of the row", func(t *testing.T) {
+		table := HierarchicalTable{
+			height:      3,
+			columnWidth: make(map[ColumnID]int),
+		}
+
+		table.Replace([]TableNode{
+			testNode{id: 1},
+			testNode{id: 5},
+		})
+
+		table.Scroll(1)
+
+		table.Replace([]TableNode{
+			testNode{id: 1},
+			testNode{id: 2},
+			testNode{id: 3},
+			testNode{id: 4},
+			testNode{id: 5},
+		})
+
+		expectedPageIndex := nullInt{
+			Valid: true,
+			Int:   3,
+		}
+		if diff := cmp.Diff(expectedPageIndex, table.pageIndex); diff != "" {
+			t.Fatal(diff)
+		}
+
+		expectedCursorIndex := nullInt{
+			Valid: true,
+			Int:   4,
+		}
+		if diff := cmp.Diff(expectedCursorIndex, table.cursorIndex); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
+
+	t.Run("the cursor must move to the new location of the row", func(t *testing.T) {
+		table := HierarchicalTable{
+			height:      4,
+			columnWidth: make(map[ColumnID]int),
+		}
+
+		table.Replace([]TableNode{
+			testNode{id: 1},
+			testNode{id: 5},
+		})
+
+		table.Scroll(1)
+
+		table.Replace([]TableNode{
+			testNode{id: 2},
+			testNode{id: 3},
+			testNode{id: 4},
+			testNode{id: 1},
+			testNode{id: 5},
+		})
+
+		expectedPageIndex := nullInt{
+			Valid: true,
+			Int:   2,
+		}
+		if diff := cmp.Diff(expectedPageIndex, table.pageIndex); diff != "" {
+			t.Fatal(diff)
+		}
+
+		expectedCursorIndex := nullInt{
+			Valid: true,
+			Int:   4,
+		}
+		if diff := cmp.Diff(expectedCursorIndex, table.cursorIndex); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
+
+
+	t.Run("the cursor must move to the new location of the row", func(t *testing.T) {
+		table := HierarchicalTable{
+			height:      3,
+			columnWidth: make(map[ColumnID]int),
+		}
+
+		table.Replace([]TableNode{
+			testNode{id: 1},
+			testNode{id: 2},
+			testNode{id: 3},
+			testNode{id: 4},
+			testNode{id: 5},
+		})
+
+		table.Scroll(1)
+
+		table.Replace([]TableNode{
+			testNode{id: 1},
+			testNode{id: 3},
+			testNode{id: 4},
+			testNode{id: 2},
+			testNode{id: 5},
+		})
+
+		expectedPageIndex := nullInt{
+			Valid: true,
+			Int:   2,
+		}
+		if diff := cmp.Diff(expectedPageIndex, table.pageIndex); diff != "" {
+			t.Fatal(diff)
+		}
+
+		expectedCursorIndex := nullInt{
+			Valid: true,
+			Int:   3,
 		}
 		if diff := cmp.Diff(expectedCursorIndex, table.cursorIndex); diff != "" {
 			t.Fatal(diff)

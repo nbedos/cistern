@@ -318,6 +318,15 @@ func (t *HierarchicalTable) computeTraversal() {
 		if !t.cursorIndex.Valid {
 			t.cursorIndex = t.pageIndex
 		}
+
+		// Show as many rows as possible on screen
+		if t.cursorIndex.Int-t.pageIndex.Int+1 < t.PageSize() {
+			t.pageIndex.Int = utils.MaxInt(0, t.cursorIndex.Int-t.PageSize()+1)
+		}
+
+		// Adjust pageIndex so that the cursor is always on screen
+		lowerBound := utils.Bounded(t.cursorIndex.Int-t.PageSize()+1, 0, len(t.rows)-1)
+		t.pageIndex.Int = utils.Bounded(t.pageIndex.Int, lowerBound, t.cursorIndex.Int)
 	}
 
 	for id, value := range t.headers() {
