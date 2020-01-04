@@ -64,6 +64,7 @@ type Column struct {
 	MaxWidth   int
 	Alignment  Alignment
 	TreePrefix bool
+	Less       func(nodes []TableNode, asc bool) func(i, j int) bool
 }
 
 type ColumnID int
@@ -170,9 +171,9 @@ func (n *innerTableNode) Map(f func(n *innerTableNode)) {
 }
 
 func (t *HierarchicalTable) lookup(path nodePath) *innerTableNode {
-	children := make([]*innerTableNode, 0, len(t.nodes))
-	for i := range t.nodes {
-		children = append(children, &t.nodes[i])
+	children := make([]*innerTableNode, 0, len(t.innerNodes))
+	for i := range t.innerNodes {
+		children = append(children, &t.innerNodes[i])
 	}
 
 pathLoop:
@@ -193,9 +194,10 @@ pathLoop:
 }
 
 type HierarchicalTable struct {
-	// List of the top-level nodes
-	nodes []innerTableNode
-	// Depth first traversal of all the top-level nodes. Needs updating if `nodes` or `traversable` changes
+	outterNodes []TableNode
+	// List of the top-level innerNodes
+	innerNodes []innerTableNode
+	// Depth first traversal of all the top-level innerNodes. Needs updating if `innerNodes` or `traversable` changes
 	rows []*innerTableNode
 	// Index in `rows` of the first node of the current page
 	pageIndex nullInt
@@ -207,6 +209,11 @@ type HierarchicalTable struct {
 	location    *time.Location
 	conf        ColumnConfiguration
 	columnWidth map[ColumnID]int
+	orderedBy   struct {
+		Valid     bool
+		ID        ColumnID
+		Ascending bool
+	}
 }
 
 func NewHierarchicalTable(conf ColumnConfiguration, nodes []TableNode, width int, height int, loc *time.Location) (HierarchicalTable, error) {
@@ -223,10 +230,6 @@ func NewHierarchicalTable(conf ColumnConfiguration, nodes []TableNode, width int
 		columnWidth: make(map[ColumnID]int),
 	}
 
-	for id, column := range conf {
-		table.columnWidth[id] = utils.MaxInt(table.columnWidth[id], runewidth.StringWidth(column.Header))
-	}
-
 	table.Replace(nodes)
 
 	return table, nil
@@ -234,7 +237,7 @@ func NewHierarchicalTable(conf ColumnConfiguration, nodes []TableNode, width int
 
 func (t HierarchicalTable) depthFirstTraversal(traverseAll bool) []*innerTableNode {
 	explored := make([]*innerTableNode, 0)
-	for _, n := range t.nodes {
+	for _, n := range t.innerNodes {
 		explored = append(explored, n.depthFirstTraversal(traverseAll)...)
 	}
 
@@ -259,8 +262,8 @@ func (t *HierarchicalTable) computeTraversal() {
 	}
 
 	// Update node prefixes
-	for i := range t.nodes {
-		t.nodes[i].setPrefix("", false)
+	for i := range t.innerNodes {
+		t.innerNodes[i].setPrefix("", false)
 	}
 
 	// Reset page and cursor indexes
@@ -301,6 +304,10 @@ func (t *HierarchicalTable) computeTraversal() {
 		}
 	}
 
+	for id, value := range t.headers() {
+		t.columnWidth[id] = utils.MaxInt(t.columnWidth[id], value.Length())
+	}
+
 	for _, row := range t.rows {
 		for _, id := range t.conf.columnIDs() {
 			w := row.values[id].Length()
@@ -319,10 +326,12 @@ func (t *HierarchicalTable) Replace(nodes []TableNode) {
 		traversable[node.path] = node.traversable
 	}
 
+	t.outterNodes = nodes
+
 	// Copy node hierarchy and compute the path of each node along the way
-	t.nodes = make([]innerTableNode, 0, len(nodes))
+	t.innerNodes = make([]innerTableNode, 0, len(nodes))
 	for _, n := range nodes {
-		t.nodes = append(t.nodes, toInnerTableNode(n, innerTableNode{}, traversable, t.location))
+		t.innerNodes = append(t.innerNodes, toInnerTableNode(n, innerTableNode{}, traversable, t.location))
 	}
 
 	t.computeTraversal()
@@ -370,7 +379,7 @@ func (t *HierarchicalTable) Bottom() {
 	t.Scroll(len(t.rows))
 }
 
-func (t *HierarchicalTable) ScrollToMatch(s string, ascending bool) bool {
+func (t *HierarchicalTable) ScrollToNextMatch(s string, ascending bool) bool {
 	if !t.cursorIndex.Valid {
 		return false
 	}
@@ -396,16 +405,20 @@ func (t *HierarchicalTable) ScrollToMatch(s string, ascending bool) bool {
 	return false
 }
 
-func (t HierarchicalTable) header() StyledString {
+func (t HierarchicalTable) headers() map[ColumnID]StyledString {
 	values := make(map[ColumnID]StyledString)
 	for id, column := range t.conf {
-		values[id] = NewStyledString(column.Header)
+		suffix := ""
+		if t.orderedBy.Valid && t.orderedBy.ID == id {
+			if t.orderedBy.Ascending {
+				suffix = "+"
+			} else {
+				suffix = "-"
+			}
+		}
+		values[id] = NewStyledString(column.Header + suffix)
 	}
-
-	s := t.styledString(values, "")
-	s.Add(TableHeader)
-
-	return s
+	return values
 }
 
 func (t HierarchicalTable) styledString(values map[ColumnID]StyledString, prefix string) StyledString {
@@ -458,10 +471,13 @@ func (t *HierarchicalTable) Text() []LocalizedStyledString {
 
 	y := 0
 	if t.height > 0 {
+		s := t.styledString(t.headers(), "")
+		s.Add(TableHeader)
+
 		texts = append(texts, LocalizedStyledString{
 			X: 0,
 			Y: y,
-			S: t.header(),
+			S: s,
 		})
 		y++
 	}
@@ -498,4 +514,14 @@ func (t *HierarchicalTable) ActiveNodePath() []interface{} {
 	}
 
 	return slicedPath
+}
+
+func (t *HierarchicalTable) SortBy(id ColumnID, ascending bool) {
+	if less := t.conf[id].Less; less != nil {
+		sort.Slice(t.outterNodes, less(t.outterNodes, ascending))
+		t.orderedBy.Valid = true
+		t.orderedBy.ID = id
+		t.orderedBy.Ascending = ascending
+		t.Replace(t.outterNodes)
+	}
 }

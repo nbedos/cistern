@@ -10,7 +10,7 @@ import (
 )
 
 type testNode struct {
-	id        string
+	id        int
 	values    map[ColumnID]StyledString
 	inherited []ColumnID
 	children  []*testNode
@@ -76,12 +76,12 @@ func TestHierarchicalTable_Scroll(t *testing.T) {
 
 	const pageSize = 4
 	nodes := []TableNode{
-		testNode{id: "1"},
-		testNode{id: "2"},
-		testNode{id: "3"},
-		testNode{id: "4"},
-		testNode{id: "5"},
-		testNode{id: "6"},
+		testNode{id: 1},
+		testNode{id: 2},
+		testNode{id: 3},
+		testNode{id: 4},
+		testNode{id: 5},
+		testNode{id: 6},
 	}
 
 	testCases := []struct {
@@ -188,7 +188,7 @@ func TestHierarchicalTable_Scroll(t *testing.T) {
 }
 
 func TestHierarchicalTable_Replace(t *testing.T) {
-	t.Run("traversable state of nodes must be preserved across calls to Replace()", func(t *testing.T) {
+	t.Run("traversable state of innerNodes must be preserved across calls to Replace()", func(t *testing.T) {
 		table := HierarchicalTable{
 			height:      10,
 			columnWidth: make(map[ColumnID]int),
@@ -196,28 +196,28 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 
 		nodes := []TableNode{
 			testNode{
-				id: "1",
+				id: 1,
 				children: []*testNode{
 					{
-						id: "2",
+						id: 2,
 					},
 				},
 			},
 			testNode{
-				id: "3",
+				id: 3,
 				children: []*testNode{
 					{
-						id: "4",
+						id: 4,
 					},
 				},
 			},
 		}
 
-		// Load table with nodes. Only top-level nodes are visible at this point.
+		// Load table with innerNodes. Only top-level innerNodes are visible at this point.
 		table.Replace(nodes)
 		expectedPaths := []nodePath{
-			nodePathFromIDs("1"),
-			nodePathFromIDs("3"),
+			nodePathFromIDs(1),
+			nodePathFromIDs(3),
 		}
 		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
 			t.Fatal(diff)
@@ -226,15 +226,15 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		// Open the first node, one child becomes visible
 		table.SetTraversable(true, false)
 		expectedPaths = []nodePath{
-			nodePathFromIDs("1"),
-			nodePathFromIDs("1", "2"),
-			nodePathFromIDs("3"),
+			nodePathFromIDs(1),
+			nodePathFromIDs(1, 2),
+			nodePathFromIDs(3),
 		}
 		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
 			t.Fatal(diff)
 		}
 
-		// Reload the same nodes and check that the traversable state was preserved
+		// Reload the same innerNodes and check that the traversable state was preserved
 		table.Replace(nodes)
 		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
 			t.Fatal(diff)
@@ -249,7 +249,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 
 		nodes := []TableNode{
 			testNode{
-				id: "1",
+				id: 1,
 			},
 		}
 
@@ -265,33 +265,33 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 func TestHierarchicalTable_SetTraversable(t *testing.T) {
 	nodes := []TableNode{
 		testNode{
-			id: "1",
+			id: 1,
 			children: []*testNode{
 				{
-					id: "2",
+					id: 2,
 					children: []*testNode{
 						{
-							id: "3",
+							id: 3,
 						},
 					},
 				},
 			},
 		},
 		testNode{
-			id: "4",
+			id: 4,
 			children: []*testNode{
 				{
-					id: "5",
+					id: 5,
 					children: []*testNode{
 						{
-							id: "6",
+							id: 6,
 						},
 					},
 				},
 			},
 		},
 		testNode{
-			id: "7",
+			id: 7,
 		},
 	}
 
@@ -303,10 +303,10 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 
 		table.SetTraversable(true, false)
 		expectedPaths := []nodePath{
-			nodePathFromIDs("1"),
-			nodePathFromIDs("1", "2"),
-			nodePathFromIDs("4"),
-			nodePathFromIDs("7"),
+			nodePathFromIDs(1),
+			nodePathFromIDs(1, 2),
+			nodePathFromIDs(4),
+			nodePathFromIDs(7),
 		}
 		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
 			t.Fatal(diff)
@@ -321,11 +321,11 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 
 		table.SetTraversable(true, true)
 		expectedPaths := []nodePath{
-			nodePathFromIDs("1"),
-			nodePathFromIDs("1", "2"),
-			nodePathFromIDs("1", "2", "3"),
-			nodePathFromIDs("4"),
-			nodePathFromIDs("7"),
+			nodePathFromIDs(1),
+			nodePathFromIDs(1, 2),
+			nodePathFromIDs(1, 2, 3),
+			nodePathFromIDs(4),
+			nodePathFromIDs(7),
 		}
 		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
 			t.Fatal(diff)
@@ -341,9 +341,9 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 		table.SetTraversable(true, true)
 		table.SetTraversable(false, true)
 		expectedPaths := []nodePath{
-			nodePathFromIDs("1"),
-			nodePathFromIDs("4"),
-			nodePathFromIDs("7"),
+			nodePathFromIDs(1),
+			nodePathFromIDs(4),
+			nodePathFromIDs(7),
 		}
 		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
 			t.Fatal(diff)
@@ -360,10 +360,10 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 		table.Scroll(1)
 		table.SetTraversable(false, true)
 		expectedPaths := []nodePath{
-			nodePathFromIDs("1"),
-			nodePathFromIDs("1", "2"),
-			nodePathFromIDs("4"),
-			nodePathFromIDs("7"),
+			nodePathFromIDs(1),
+			nodePathFromIDs(1, 2),
+			nodePathFromIDs(4),
+			nodePathFromIDs(7),
 		}
 		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
 			t.Fatal(diff)
@@ -393,13 +393,13 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 	nodes := []TableNode{
 		testNode{
-			id: "1",
+			id: 1,
 			values: map[ColumnID]StyledString{
 				column1: NewStyledString("1"),
 			},
 			children: []*testNode{
 				{
-					id: "2",
+					id: 2,
 					values: map[ColumnID]StyledString{
 						column1: NewStyledString("2"),
 					},
@@ -407,13 +407,13 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 			},
 		},
 		testNode{
-			id: "3",
+			id: 3,
 			values: map[ColumnID]StyledString{
 				column1: NewStyledString("3"),
 			},
 			children: []*testNode{
 				{
-					id: "4",
+					id: 4,
 					values: map[ColumnID]StyledString{
 						column1: NewStyledString("4"),
 					},
@@ -436,7 +436,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if table.ScrollToMatch("1", true) != false {
+		if table.ScrollToNextMatch("1", true) != false {
 			t.Fatal("expected match NOT to be found")
 		}
 	})
@@ -447,7 +447,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 			t.Fatal(err)
 		}
 		table.SetTraversable(true, true)
-		if table.ScrollToMatch("2", true) != true {
+		if table.ScrollToNextMatch("2", true) != true {
 			t.Fatal("expected match to be found")
 		}
 		expectedCursorIndex := nullInt{
@@ -464,7 +464,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if table.ScrollToMatch("3", false) != true {
+		if table.ScrollToNextMatch("3", false) != true {
 			t.Fatal("expected match to be found")
 		}
 		expectedCursorIndex := nullInt{
@@ -483,7 +483,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 		}
 		table.SetTraversable(true, true)
 		table.Scroll(1)
-		if table.ScrollToMatch("1", true) != true {
+		if table.ScrollToNextMatch("1", true) != true {
 			t.Fatal("expected match to be found")
 		}
 		expectedCursorIndex := nullInt{
@@ -495,12 +495,12 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 		}
 	})
 
-	t.Run("searching must ignore hidden nodes", func(t *testing.T) {
+	t.Run("searching must ignore hidden innerNodes", func(t *testing.T) {
 		table, err := NewHierarchicalTable(conf, nodes, 0, 10, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if table.ScrollToMatch("2", true) != false {
+		if table.ScrollToNextMatch("2", true) != false {
 			t.Fatal("expected match NOT to be found")
 		}
 	})
@@ -509,13 +509,13 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 func TestHierarchicalTable_Resize(t *testing.T) {
 	nodes := []TableNode{
 		testNode{
-			id: "1",
+			id: 1,
 			values: map[ColumnID]StyledString{
 				column1: NewStyledString("1"),
 			},
 			children: []*testNode{
 				{
-					id: "2",
+					id: 2,
 					values: map[ColumnID]StyledString{
 						column1: NewStyledString("2"),
 					},
@@ -523,13 +523,13 @@ func TestHierarchicalTable_Resize(t *testing.T) {
 			},
 		},
 		testNode{
-			id: "3",
+			id: 3,
 			values: map[ColumnID]StyledString{
 				column1: NewStyledString("3"),
 			},
 			children: []*testNode{
 				{
-					id: "4",
+					id: 4,
 					values: map[ColumnID]StyledString{
 						column1: NewStyledString("4"),
 					},
@@ -547,7 +547,7 @@ func TestHierarchicalTable_Resize(t *testing.T) {
 		},
 	}
 
-	t.Run("resizing the table to a height of 0 should move the cursor to the first row", func(t *testing.T){
+	t.Run("resizing the table to a height of 0 should move the cursor to the first row", func(t *testing.T) {
 		table, err := NewHierarchicalTable(conf, nodes, 10, 4, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -572,7 +572,7 @@ func TestHierarchicalTable_Resize(t *testing.T) {
 	})
 }
 
-func TestHierarchicalTable_header(t *testing.T) {
+func TestHierarchicalTable_headers(t *testing.T) {
 	t.Run("", func(t *testing.T) {
 		conf := ColumnConfiguration{
 			column1: {
@@ -608,7 +608,8 @@ func TestHierarchicalTable_header(t *testing.T) {
 		expectedHeader := strings.Join([]string{"column1", "column2", "column", "olumn4"}, table.sep)
 		table.Resize(runewidth.StringWidth(expectedHeader), table.height)
 
-		if diff := cmp.Diff(expectedHeader, table.header().String()); diff != "" {
+		header := table.styledString(table.headers(), "").String()
+		if diff := cmp.Diff(expectedHeader, header); diff != "" {
 			t.Fatal(diff)
 		}
 	})
@@ -657,4 +658,111 @@ func TestInnerTableNode_setPrefix(t *testing.T) {
 		t.Fatal(diff)
 	}
 
+}
+
+func TestHierarchicalTable_SortBy(t *testing.T) {
+	conf := ColumnConfiguration{
+		column1: {
+			Header:    "column1",
+			Order:     0,
+			MaxWidth:  999,
+			Alignment: Left,
+			Less: func(nodes []TableNode, asc bool) func(i, j int) bool {
+				return func(i, j int) bool {
+					ni := nodes[i].(testNode)
+					nj := nodes[j].(testNode)
+
+					if asc {
+						return ni.id < nj.id
+					} else {
+						return ni.id > nj.id
+					}
+				}
+			},
+		},
+		column2: {
+			Header:    "column2",
+			Order:     1,
+			MaxWidth:  999,
+			Alignment: Left,
+		},
+	}
+
+	nodes := []TableNode{
+		testNode{id: 1},
+		testNode{id: 4},
+		testNode{id: 3},
+		testNode{id: 2},
+	}
+
+	t.Run("sort order must be preserved on table creation", func(t *testing.T) {
+		table, err := NewHierarchicalTable(conf, nodes, 10, 10, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expectedPaths := []nodePath{
+			nodePathFromIDs(1),
+			nodePathFromIDs(4),
+			nodePathFromIDs(3),
+			nodePathFromIDs(2),
+		}
+		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
+	t.Run("sorting on a column without a comparison function must not have any effect", func(t *testing.T) {
+		table, err := NewHierarchicalTable(conf, nodes, 10, 10, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		table.SortBy(column2, true)
+
+		expectedPaths := []nodePath{
+			nodePathFromIDs(1),
+			nodePathFromIDs(4),
+			nodePathFromIDs(3),
+			nodePathFromIDs(2),
+		}
+		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
+	t.Run("after sorting, nodes must be ordered as specified", func(t *testing.T) {
+		table, err := NewHierarchicalTable(conf, nodes, 10, 10, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		table.SortBy(column1, true)
+
+		expectedPaths := []nodePath{
+			nodePathFromIDs(1),
+			nodePathFromIDs(2),
+			nodePathFromIDs(3),
+			nodePathFromIDs(4),
+		}
+		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
+	t.Run("table headers must reflect sorting order", func(t *testing.T) {
+		table, err := NewHierarchicalTable(conf, nodes, 10, 10, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		table.SortBy(column1, false)
+
+		header := table.headers()[column1].String()
+		expectedHeader := "column1-"
+
+		if header != expectedHeader {
+			t.Fatalf("expected header %q but got %q", expectedHeader, header)
+		}
+	})
 }

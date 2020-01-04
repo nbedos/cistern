@@ -200,7 +200,7 @@ func (c Controller) text() []tui.LocalizedStyledString {
 
 func (c *Controller) nextMatch() {
 	if c.tableSearch != "" {
-		found := c.table.ScrollToMatch(c.tableSearch, true)
+		found := c.table.ScrollToNextMatch(c.tableSearch, true)
 		if !found {
 			c.writeStatus(fmt.Sprintf("No match found for %#v", c.tableSearch))
 		}
@@ -403,7 +403,7 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 				c.table.SetTraversable(true, true)
 			case 'n', 'N':
 				if c.status.InputBuffer != "" {
-					_ = c.table.ScrollToMatch(c.status.InputBuffer, ev.Rune() == 'n')
+					_ = c.table.ScrollToNextMatch(c.status.InputBuffer, ev.Rune() == 'n')
 				}
 			case 'q':
 				return ErrExit
