@@ -547,13 +547,13 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 			Alignment: tui.Right,
 			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
 				return func(i, j int) bool {
-					ni := nodes[i].(cache.Pipeline)
-					nj := nodes[j].(cache.Pipeline)
+					IDi := nodes[i].(cache.Pipeline).Values(loc)[cache.ColumnPipeline]
+					IDj := nodes[j].(cache.Pipeline).Values(loc)[cache.ColumnPipeline]
 
 					if asc {
-						return ni.ID < nj.ID
+						return IDi.String() < IDj.String()
 					} else {
-						return ni.ID > nj.ID
+						return IDi.String() > IDj.String()
 					}
 				}
 			},
