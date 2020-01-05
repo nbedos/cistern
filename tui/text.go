@@ -164,23 +164,11 @@ func NewStyledString(content string, classes ...Class) StyledString {
 	}
 }
 
-type LocalizedStyledString struct {
-	X int
-	Y int
-	S StyledString
-}
-
-func Draw(texts []LocalizedStyledString, screen tcell.Screen, style tcell.Style, styleSheet StyleSheet) {
-	for _, t := range texts {
-		t.Draw(screen, style, styleSheet)
-	}
-}
-
 type StyleSheet = map[Class]func(s tcell.Style) tcell.Style
 
-func (t LocalizedStyledString) Draw(screen tcell.Screen, style tcell.Style, styleSheet StyleSheet) {
-	x, y := t.X, t.Y
-	for _, component := range t.S.components {
+func (s StyledString) Draw(screen tcell.Screen, y int, style tcell.Style, styleSheet StyleSheet) {
+	x := 0
+	for _, component := range s.components {
 		s := style
 		for _, c := range component.Classes {
 			f, exists := styleSheet[c]

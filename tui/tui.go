@@ -73,9 +73,11 @@ func (t TUI) poll() {
 	}
 }
 
-func (t TUI) Draw(texts ...LocalizedStyledString) {
+func (t TUI) Draw(ss ...StyledString) {
 	t.screen.Clear()
-	Draw(texts, t.screen, t.defaultStyle, t.styleSheet)
+	for y, s := range ss {
+		s.Draw(t.screen, y, t.defaultStyle, t.styleSheet)
+	}
 	t.screen.Show()
 }
 

@@ -183,20 +183,15 @@ func (c *Controller) refresh() {
 	c.resize(c.width, c.height)
 }
 
-func (c Controller) text() []tui.LocalizedStyledString {
-	texts := make([]tui.LocalizedStyledString, 0)
-	yOffset := 0
-
+func (c Controller) text() []tui.StyledString {
+	ss := make([]tui.StyledString, 0)
 	for _, child := range []tui.Widget{c.header, c.table, c.status} {
-		for _, line := range child.Text() {
-			line.Y += yOffset
-			texts = append(texts, line)
+		for _, s := range child.StyledStrings() {
+			ss = append(ss, s)
 		}
-		_, height := child.Size()
-		yOffset += height
 	}
 
-	return texts
+	return ss
 }
 
 func (c *Controller) nextMatch() {

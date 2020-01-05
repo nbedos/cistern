@@ -475,10 +475,6 @@ func (t HierarchicalTable) styledString(values map[ColumnID]StyledString, prefix
 	return line
 }
 
-func (t HierarchicalTable) Size() (int, int) {
-	return t.width, t.height
-}
-
 func (t *HierarchicalTable) Resize(width int, height int) {
 	t.width = utils.MaxInt(0, width)
 	t.height = utils.MaxInt(0, height)
@@ -500,40 +496,30 @@ func (t *HierarchicalTable) Resize(width int, height int) {
 	}
 }
 
-func (t *HierarchicalTable) Text() []LocalizedStyledString {
-	texts := make([]LocalizedStyledString, 0)
+func (t *HierarchicalTable) StyledStrings() []StyledString {
+	ss := make([]StyledString, 0)
 
-	y := 0
 	if t.height > 0 {
 		s := t.styledString(t.headers(), "")
 		s.Add(TableHeader)
-
-		texts = append(texts, LocalizedStyledString{
-			X: 0,
-			Y: y,
-			S: s,
-		})
-		y++
+		ss = append(ss, s)
 	}
 
 	if t.pageIndex.Valid && t.cursorIndex.Valid {
 		for i, row := range t.rows[t.pageIndex.Int:utils.MinInt(t.pageIndex.Int+t.PageSize(), len(t.rows))] {
-			s := LocalizedStyledString{
-				X: 0,
-				Y: y,
-				S: t.styledString(row.values, row.prefix),
-			}
-			y++
-
+			s := t.styledString(row.values, row.prefix)
 			if t.cursorIndex.Int == i+t.pageIndex.Int {
-				s.S.Add(ActiveRow)
+				s.Add(ActiveRow)
 			}
-
-			texts = append(texts, s)
+			ss = append(ss, s)
 		}
 	}
 
-	return texts
+	for len(ss) < t.height {
+		ss = append(ss, StyledString{})
+	}
+
+	return ss
 }
 
 func (t *HierarchicalTable) ActiveNodePath() []interface{} {

@@ -34,17 +34,15 @@ func TestTUI_Draw(t *testing.T) {
 
 	width, height := 80, 20
 	tui.screen.(tcell.SimulationScreen).SetSize(width, height)
-	s := LocalizedStyledString{
-		X: 5,
-		Y: 5,
-		S: NewStyledString("a"),
-	}
+	s := NewStyledString("a")
 
-	tui.Draw(s)
+	tui.Draw(s, s, s)
 
-	r, _, _, _ := tui.screen.(tcell.SimulationScreen).GetContent(5, 5)
-	if expectedRune := []rune(s.S.String())[0]; r != expectedRune {
-		t.Fatalf("invalid cell Content: expected %v but got '%v'", expectedRune, r)
+	for i := 0; i < 3; i++ {
+		r, _, _, _ := tui.screen.(tcell.SimulationScreen).GetContent(0, i)
+		if expectedRune := []rune(s.String())[0]; r != expectedRune {
+			t.Fatalf("invalid cell Content: expected %v but got '%v'", expectedRune, r)
+		}
 	}
 }
 
@@ -118,5 +116,3 @@ func TestTUI_Exec(t *testing.T) {
 		}
 	})
 }
-
-

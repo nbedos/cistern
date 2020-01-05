@@ -37,32 +37,27 @@ func (s *StatusBar) Write(status string) {
 	}
 }
 
-func (s StatusBar) Size() (int, int) {
-	return s.width, s.height
-}
-
 func (s *StatusBar) Resize(width int, height int) {
 	s.width = utils.MaxInt(0, width)
 	s.height = utils.MaxInt(0, height)
 }
 
-func (s StatusBar) Text() []LocalizedStyledString {
-	if s.ShowInput {
-		return []LocalizedStyledString{{
-			X: 0,
-			Y: utils.MaxInt(s.height-1, 0),
-			S: NewStyledString(fmt.Sprintf("%s%s", s.InputPrefix, s.InputBuffer)),
-		}}
+func (s StatusBar) StyledStrings() []StyledString {
+	lines := make([]StyledString, 0)
+
+	for i := 0; i < s.height; i++ {
+		var line StyledString
+		if s.ShowInput {
+			if i == s.height-1 {
+				line = NewStyledString(fmt.Sprintf("%s%s", s.InputPrefix, s.InputBuffer))
+			}
+		} else {
+			if bufferIndex := i - (s.height - len(s.outputBuffer)); bufferIndex >= 0 {
+				line = NewStyledString(s.outputBuffer[bufferIndex])
+			}
+		}
+		lines = append(lines, line)
 	}
 
-	texts := make([]LocalizedStyledString, 0)
-	startRow := utils.MaxInt(0, len(s.outputBuffer)-s.height)
-	for i := startRow; i < len(s.outputBuffer); i++ {
-		texts = append(texts, LocalizedStyledString{
-			X: 0,
-			Y: i - startRow,
-			S: NewStyledString(s.outputBuffer[i]),
-		})
-	}
-	return texts
+	return lines
 }

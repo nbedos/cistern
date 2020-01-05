@@ -27,27 +27,23 @@ func (s *TextArea) Write(lines ...StyledString) {
 	s.Content = lines
 }
 
-func (s TextArea) Size() (int, int) {
-	return s.width, s.height
-}
-
 func (s *TextArea) Resize(width int, height int) {
 	s.width = utils.MaxInt(0, width)
 	s.height = utils.MaxInt(0, height)
 }
 
-func (s TextArea) Text() []LocalizedStyledString {
-	texts := make([]LocalizedStyledString, 0)
-	for i, line := range s.Content {
-		texts = append(texts, LocalizedStyledString{
-			X: 0,
-			Y: i,
-			S: line,
-		})
-		if len(texts) >= s.height {
+func (s TextArea) StyledStrings() []StyledString {
+	ss := make([]StyledString, 0)
+	for _, line := range s.Content {
+		ss = append(ss, line)
+		if len(ss) >= s.height {
 			break
 		}
 	}
 
-	return texts
+	for len(ss) < s.height {
+		ss = append(ss, StyledString{})
+	}
+
+	return ss
 }
