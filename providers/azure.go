@@ -34,7 +34,16 @@ var azureURL = url.URL{
 	Host:   "dev.azure.com",
 }
 
-func NewAzurePipelinesClient(id string, name string, token string, rateLimit time.Duration) AzurePipelinesClient {
+func NewAzurePipelinesClient(id string, name string, token string, requestsPerSecond float64) AzurePipelinesClient {
+	rateLimit := time.Second / 10
+	if requestsPerSecond > 0 {
+		rateLimit = time.Second / time.Duration(requestsPerSecond)
+	}
+
+	if name == "" {
+		name = "azure"
+	}
+
 	return AzurePipelinesClient{
 		baseURL:     azureURL,
 		httpClient:  &http.Client{Timeout: 10 * time.Second},

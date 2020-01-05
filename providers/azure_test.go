@@ -261,7 +261,7 @@ func setWebURLs(p cache.Pipeline, webURL utils.NullString) cache.Pipeline {
 
 func TestAzurePipelinesClient_parseAzureWebURL(t *testing.T) {
 	webURL := "https://dev.azure.com/owner/repo/_build/results?buildId=16"
-	client := NewAzurePipelinesClient("azure", "azure", "", time.Second)
+	client := NewAzurePipelinesClient("azure", "azure", "", 1)
 	owner, repo, id, err := client.parseAzureWebURL(webURL)
 	if err != nil || owner != "owner" || repo != "repo" || id != "16" {
 		t.Fatalf("invalid result")

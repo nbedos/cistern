@@ -31,9 +31,18 @@ var CircleCIURL = url.URL{
 	RawPath: "api/v1.1",
 }
 
-func NewCircleCIClient(id string, name string, token string, URL url.URL, rateLimit time.Duration) CircleCIClient {
+func NewCircleCIClient(id string, name string, token string, requestsPerSecond float64) CircleCIClient {
+	rateLimit := time.Second / 10
+	if requestsPerSecond > 0 {
+		rateLimit = time.Second / time.Duration(requestsPerSecond)
+	}
+
+	if name == "" {
+		name = "circleci"
+	}
+
 	return CircleCIClient{
-		baseURL:     URL,
+		baseURL:     CircleCIURL,
 		httpClient:  &http.Client{Timeout: 10 * time.Second},
 		rateLimiter: time.Tick(rateLimit),
 		token:       token,

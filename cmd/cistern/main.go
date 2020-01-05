@@ -7,10 +7,8 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -45,6 +43,12 @@ token = ""
 
 `
 
+type PipelinesConfiguration struct {
+	Columns []string `toml:"name"`
+	Sort    string   `toml:"string"`
+	Depth   int      `toml:"depth"`
+}
+
 type ProvidersConfiguration struct {
 	GitLab []struct {
 		Name              string  `toml:"name"`
@@ -78,7 +82,57 @@ type ProvidersConfiguration struct {
 	}
 }
 
+func (c ProvidersConfiguration) Providers(ctx context.Context) ([]cache.SourceProvider, []cache.CIProvider, error) {
+	source := make([]cache.SourceProvider, 0)
+	ci := make([]cache.CIProvider, 0)
+
+	for i, conf := range c.GitLab {
+		id := fmt.Sprintf("gitlab-%d", i)
+		client, err := providers.NewGitLabClient(id, conf.Name, conf.URL, conf.Token, conf.RequestsPerSecond)
+		if err != nil {
+			return nil, nil, err
+		}
+		source = append(source, client)
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.GitHub {
+		id := fmt.Sprintf("github-%d", i)
+		client := providers.NewGitHubClient(ctx, id, &conf.Token)
+		source = append(source, client)
+	}
+
+	for i, conf := range c.CircleCI {
+		id := fmt.Sprintf("circleci-%d", i)
+		client := providers.NewCircleCIClient(id, conf.Name, conf.Token, conf.RequestsPerSecond)
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.AppVeyor {
+		id := fmt.Sprintf("appveyor-%d", i)
+		client := providers.NewAppVeyorClient(id, conf.Name, conf.Token, conf.RequestsPerSecond)
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.Travis {
+		id := fmt.Sprintf("travis-%d", i)
+		client, err := providers.NewTravisClient(id, conf.Name, conf.Token, conf.URL, conf.RequestsPerSecond)
+		if err != nil {
+			return nil, nil, err
+		}
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.Azure {
+		id := fmt.Sprintf("azure-%d", i)
+		client := providers.NewAzurePipelinesClient(id, conf.Name, conf.Token, conf.RequestsPerSecond)
+		ci = append(ci, client)
+	}
+	return source, ci, nil
+}
+
 type Configuration struct {
+	Pipelines PipelinesConfiguration
 	Providers ProvidersConfiguration
 }
 
@@ -114,108 +168,6 @@ func ConfigFromPaths(paths ...string) (Configuration, error) {
 	}
 
 	return c, ErrMissingConf
-}
-
-func (c ProvidersConfiguration) Providers(ctx context.Context) ([]cache.SourceProvider, []cache.CIProvider, error) {
-	source := make([]cache.SourceProvider, 0)
-	ci := make([]cache.CIProvider, 0)
-
-	for i, conf := range c.GitLab {
-		rateLimit := time.Second / 10
-		if conf.RequestsPerSecond > 0 {
-			rateLimit = time.Second / time.Duration(conf.RequestsPerSecond)
-		}
-
-		id := fmt.Sprintf("gitlab-%d", i)
-		name := "gitlab"
-		if conf.Name != "" {
-			name = conf.Name
-		}
-
-		client, err := providers.NewGitLabClient(id, name, conf.URL, conf.Token, rateLimit)
-		if err != nil {
-			return nil, nil, err
-		}
-		source = append(source, client)
-		ci = append(ci, client)
-	}
-
-	for i, conf := range c.GitHub {
-		id := fmt.Sprintf("github-%d", i)
-		client := providers.NewGitHubClient(ctx, id, &conf.Token)
-		source = append(source, client)
-	}
-
-	for i, conf := range c.CircleCI {
-		rateLimit := time.Second / 10
-		if conf.RequestsPerSecond > 0 {
-			rateLimit = time.Second / time.Duration(conf.RequestsPerSecond)
-		}
-		id := fmt.Sprintf("circleci-%d", i)
-		name := "circleci"
-		if conf.Name != "" {
-			name = conf.Name
-		}
-		client := providers.NewCircleCIClient(id, name, conf.Token, providers.CircleCIURL, rateLimit)
-		ci = append(ci, client)
-	}
-
-	for i, conf := range c.AppVeyor {
-		rateLimit := time.Second / 10
-		if conf.RequestsPerSecond > 0 {
-			rateLimit = time.Second / time.Duration(conf.RequestsPerSecond)
-		}
-		id := fmt.Sprintf("appveyor-%d", i)
-		name := "appveyor"
-		if conf.Name != "" {
-			name = conf.Name
-		}
-		client := providers.NewAppVeyorClient(id, name, conf.Token, rateLimit)
-		ci = append(ci, client)
-	}
-
-	for i, conf := range c.Travis {
-		rateLimit := time.Second / 20
-		if conf.RequestsPerSecond > 0 {
-			rateLimit = time.Second / time.Duration(conf.RequestsPerSecond)
-		}
-		id := fmt.Sprintf("travis-%d", i)
-		var err error
-		var u *url.URL
-		switch strings.ToLower(conf.URL) {
-		case "org":
-			u = &providers.TravisOrgURL
-		case "com":
-			u = &providers.TravisComURL
-		default:
-			u, err = url.Parse(conf.URL)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-
-		name := "travis"
-		if conf.Name != "" {
-			name = conf.Name
-		}
-		client := providers.NewTravisClient(id, name, conf.Token, *u, rateLimit)
-		ci = append(ci, client)
-	}
-
-	for i, conf := range c.Azure {
-		rateLimit := time.Second / 10
-		if conf.RequestsPerSecond > 0 {
-			rateLimit = time.Second / time.Duration(conf.RequestsPerSecond)
-		}
-		id := fmt.Sprintf("azure-%d", i)
-		name := "azure"
-		if conf.Name != "" {
-			name = conf.Name
-		}
-		client := providers.NewAzurePipelinesClient(id, name, conf.Token, rateLimit)
-		ci = append(ci, client)
-	}
-	return source, ci, nil
 }
 
 const usage = `usage: cistern [-r REPOSITORY | --repository REPOSITORY] [COMMIT]

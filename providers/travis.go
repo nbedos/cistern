@@ -287,9 +287,31 @@ type TravisClient struct {
 var TravisOrgURL = url.URL{Scheme: "https", Host: "api.travis-ci.org"}
 var TravisComURL = url.URL{Scheme: "https", Host: "api.travis-ci.com"}
 
-func NewTravisClient(id string, name string, token string, URL url.URL, rateLimit time.Duration) TravisClient {
+func NewTravisClient(id string, name string, token string, URL string, requestsPerSecond float64) (TravisClient, error) {
+	rateLimit := time.Second / 20
+	if requestsPerSecond > 0 {
+		rateLimit = time.Second / time.Duration(requestsPerSecond)
+	}
+
+	var err error
+	var u *url.URL
+	switch strings.ToLower(URL) {
+	case "org":
+		u = &TravisOrgURL
+	case "com":
+		u = &TravisComURL
+	default:
+		if u, err = url.Parse(URL); err != nil {
+			return TravisClient{}, err
+		}
+	}
+
+	if name == "" {
+		name = "travis"
+	}
+
 	return TravisClient{
-		baseURL:            URL,
+		baseURL:            *u,
 		httpClient:         &http.Client{Timeout: 10 * time.Second},
 		rateLimiter:        time.Tick(rateLimit),
 		logBackoffInterval: 10 * time.Second,
@@ -299,7 +321,7 @@ func NewTravisClient(id string, name string, token string, URL url.URL, rateLimi
 			Name: name,
 		},
 		buildsPageSize: 10,
-	}
+	}, nil
 }
 
 func (c TravisClient) ID() string {

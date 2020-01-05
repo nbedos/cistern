@@ -23,14 +23,25 @@ type GitLabClient struct {
 
 const gitLabCom = "https://gitlab.com"
 
-func NewGitLabClient(id string, name string, baseURL string, token string, rateLimit time.Duration) (GitLabClient, error) {
+func NewGitLabClient(id string, name string, baseURL string, token string, requestsPerSecond float64) (GitLabClient, error) {
 	remote := gitlab.NewClient(nil, token)
 	if baseURL == "" {
 		baseURL = gitLabCom
 	}
+
 	if err := remote.SetBaseURL(baseURL); err != nil {
 		return GitLabClient{}, err
 	}
+
+	rateLimit := time.Second / 10
+	if requestsPerSecond > 0 {
+		rateLimit = time.Second / time.Duration(requestsPerSecond)
+	}
+
+	if name == "" {
+		name = "gitlab"
+	}
+
 	return GitLabClient{
 		provider: cache.Provider{
 			ID:   id,

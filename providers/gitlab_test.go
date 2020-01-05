@@ -18,7 +18,7 @@ import (
 )
 
 func TestParsePipelineURL(t *testing.T) {
-	c, err := NewGitLabClient("gitlab", "gitlab", "", "", time.Millisecond)
+	c, err := NewGitLabClient("gitlab", "gitlab", "", "", 1000)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -32,7 +32,16 @@ var appVeyorURL = url.URL{
 	RawPath: "/api",
 }
 
-func NewAppVeyorClient(id string, name string, token string, rateLimit time.Duration) AppVeyorClient {
+func NewAppVeyorClient(id string, name string, token string, requestsPerSecond float64) AppVeyorClient {
+	rateLimit := time.Second / 10
+	if requestsPerSecond > 0 {
+		rateLimit = time.Second / time.Duration(requestsPerSecond)
+	}
+
+	if name == "" {
+		name = "appveyor"
+	}
+
 	return AppVeyorClient{
 		url:         appVeyorURL,
 		client:      &http.Client{Timeout: 10 * time.Second},
