@@ -57,7 +57,7 @@ func (ps nodePaths) Diff(others nodePaths) string {
 	return cmp.Diff(ps, others, cmp.AllowUnexported(nodePath{}))
 }
 
-func TestHierarchicalTable_Scroll(t *testing.T) {
+func TestHierarchicalTable_VerticalScroll(t *testing.T) {
 	t.Run("scrolling an empty table must have no effect at all", func(t *testing.T) {
 		table, err := NewHierarchicalTable(nil, nil, 0, 3, nil)
 		if err != nil {
@@ -66,7 +66,7 @@ func TestHierarchicalTable_Scroll(t *testing.T) {
 
 		for _, amount := range []int{0, -9, 100, -999, +9999} {
 			// Must not crash
-			table.Scroll(amount)
+			table.VerticalScroll(amount)
 
 			if table.pageIndex.Valid || table.cursorIndex.Valid {
 				t.Fatal("table.pageIndex and table.cursorIndex must both have .Valid=false")
@@ -173,7 +173,7 @@ func TestHierarchicalTable_Scroll(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, amount := range testCase.scrollAmounts {
-				table.Scroll(amount)
+				table.VerticalScroll(amount)
 			}
 
 			if diff := testCase.pageIndex.Diff(table.pageIndex); diff != "" {
@@ -298,7 +298,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 			testNode{id: 2},
 		})
 
-		table.Scroll(1)
+		table.VerticalScroll(1)
 
 		table.Replace([]TableNode{
 			testNode{id: 0},
@@ -327,7 +327,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 			testNode{id: 5},
 		})
 
-		table.Scroll(1)
+		table.VerticalScroll(1)
 
 		table.Replace([]TableNode{
 			testNode{id: 1},
@@ -366,7 +366,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 			testNode{id: 5},
 		})
 
-		table.Scroll(1)
+		table.VerticalScroll(1)
 
 		table.Replace([]TableNode{
 			testNode{id: 2},
@@ -409,7 +409,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 			testNode{id: 5},
 		})
 
-		table.Scroll(1)
+		table.VerticalScroll(1)
 
 		table.Replace([]TableNode{
 			testNode{id: 1},
@@ -532,7 +532,7 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 		}
 
 		table.SetTraversable(true, true)
-		table.Scroll(1)
+		table.VerticalScroll(1)
 		table.SetTraversable(false, true)
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
@@ -552,7 +552,7 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 		}
 
 		table.SetTraversable(true, true)
-		table.Scroll(2)
+		table.VerticalScroll(2)
 		table.SetTraversable(false, true)
 
 		expectedCursorIndex := nullInt{
@@ -657,7 +657,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 			t.Fatal(err)
 		}
 		table.SetTraversable(true, true)
-		table.Scroll(1)
+		table.VerticalScroll(1)
 		if table.ScrollToNextMatch("1", true) != true {
 			t.Fatal("expected match to be found")
 		}
@@ -729,7 +729,7 @@ func TestHierarchicalTable_Resize(t *testing.T) {
 		}
 
 		table.SetTraversable(true, true)
-		table.Scroll(2)
+		table.VerticalScroll(2)
 		table.Resize(table.width, 0)
 		table.Resize(table.width, 4)
 
@@ -785,6 +785,77 @@ func TestHierarchicalTable_headers(t *testing.T) {
 
 		header := table.styledString(table.headers(), "").String()
 		if diff := cmp.Diff(expectedHeader, header); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+}
+
+
+func TestHierarchicalTable_styledString(t *testing.T) {
+	conf := ColumnConfiguration{
+		column1: {
+			Header:    "column1",
+			Order:     0,
+			MaxWidth:  999,
+			Alignment: Left,
+		},
+		column2: {
+			Header:    "column2",
+			Order:     1,
+			MaxWidth:  999,
+			Alignment: Left,
+		},
+		column3: {
+			Header:    "column3",
+			Order:     2,
+			MaxWidth:  999,
+			Alignment: Left,
+		},
+		column4: {
+			Header:    "column4",
+			Order:     3,
+			MaxWidth:  999,
+			Alignment: Left,
+		},
+	}
+
+	values := map[ColumnID]StyledString{
+		column1: NewStyledString("column1"),
+		column2: NewStyledString("column2"),
+		column3: NewStyledString("column3"),
+		column4: NewStyledString("column4"),
+	}
+
+	t.Run("No horizontal scrolling, all columns must be visible", func(t *testing.T) {
+		table, err := NewHierarchicalTable(conf, nil, 37, 10, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := table.styledString(values, "").String()
+		if diff := cmp.Diff("column1   column2   column3   column4", s); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
+	t.Run("horizontal scrolling, all columns except the first must be visible", func(t *testing.T) {
+		table, err := NewHierarchicalTable(conf, nil, 37, 10, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		table.HorizontalScroll(1)
+		s := table.styledString(values, "").String()
+		if diff := cmp.Diff("column2   column3   column4          ", s); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
+	t.Run("no configuration: do not display anything but do not crash either", func(t *testing.T) {
+		table, err := NewHierarchicalTable(nil, nil, 37, 10, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := table.styledString(values, "").String()
+		if diff := cmp.Diff("", s); diff != "" {
 			t.Fatal(diff)
 		}
 	})

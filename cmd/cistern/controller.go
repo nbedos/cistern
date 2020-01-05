@@ -350,13 +350,17 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 	case *tcell.EventKey:
 		switch ev.Key() {
 		case tcell.KeyDown:
-			c.table.Scroll(+1)
+			c.table.VerticalScroll(+1)
 		case tcell.KeyUp:
-			c.table.Scroll(-1)
+			c.table.VerticalScroll(-1)
+		case tcell.KeyLeft:
+			c.table.HorizontalScroll(-1)
+		case tcell.KeyRight:
+			c.table.HorizontalScroll(+1)
 		case tcell.KeyPgDn:
-			c.table.Scroll(c.table.PageSize())
+			c.table.VerticalScroll(c.table.PageSize())
 		case tcell.KeyPgUp:
-			c.table.Scroll(-c.table.PageSize())
+			c.table.VerticalScroll(-c.table.PageSize())
 		case tcell.KeyHome:
 			c.table.Top()
 		case tcell.KeyEnd:
@@ -409,9 +413,13 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 					return err
 				}
 			case 'j':
-				c.table.Scroll(+1)
+				c.table.VerticalScroll(+1)
 			case 'k':
-				c.table.Scroll(-1)
+				c.table.VerticalScroll(-1)
+			case 'h':
+				c.table.HorizontalScroll(-1)
+			case 'l':
+				c.table.HorizontalScroll(+1)
 			case 'c':
 				c.table.SetTraversable(false, false)
 			case 'C', '-':

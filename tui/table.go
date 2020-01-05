@@ -208,15 +208,16 @@ type HierarchicalTable struct {
 	// Index in `rows` of the first node of the current page
 	pageIndex nullInt
 	// Index in `rows` of the node where the cursor is located
-	cursorIndex nullInt
-	height      int
-	width       int
-	sep         string
-	location    *time.Location
-	conf        ColumnConfiguration
-	columnWidth map[ColumnID]int
-	order       Order
-	scrolled    bool
+	cursorIndex  nullInt
+	height       int
+	width        int
+	sep          string
+	location     *time.Location
+	conf         ColumnConfiguration
+	columnWidth  map[ColumnID]int
+	order        Order
+	scrolled     bool
+	columnOffset int
 }
 
 func NewHierarchicalTable(conf ColumnConfiguration, nodes []TableNode, width int, height int, loc *time.Location) (HierarchicalTable, error) {
@@ -383,7 +384,11 @@ func (t *HierarchicalTable) SetTraversable(traversable bool, recursive bool) {
 	}
 }
 
-func (t *HierarchicalTable) Scroll(amount int) {
+func (t *HierarchicalTable) HorizontalScroll(amount int) {
+	t.columnOffset = utils.Bounded(t.columnOffset+amount, 0, len(t.conf.ColumnIDs())-1)
+}
+
+func (t *HierarchicalTable) VerticalScroll(amount int) {
 	if !t.cursorIndex.Valid || !t.pageIndex.Valid {
 		return
 	}
@@ -395,10 +400,10 @@ func (t *HierarchicalTable) Scroll(amount int) {
 
 	switch {
 	case t.cursorIndex.Int < t.pageIndex.Int:
-		// Scroll up
+		// VerticalScroll up
 		t.pageIndex.Int = t.cursorIndex.Int
 	case t.cursorIndex.Int > t.pageIndex.Int+t.PageSize()-1:
-		// Scroll down
+		// VerticalScroll down
 		scrollAmount := t.cursorIndex.Int - (t.pageIndex.Int + t.PageSize() - 1)
 		t.pageIndex.Int = utils.Bounded(t.pageIndex.Int+scrollAmount, 0, len(t.rows)-1)
 		t.cursorIndex.Int = t.pageIndex.Int + t.PageSize() - 1
@@ -406,11 +411,11 @@ func (t *HierarchicalTable) Scroll(amount int) {
 }
 
 func (t *HierarchicalTable) Top() {
-	t.Scroll(-len(t.rows))
+	t.VerticalScroll(-len(t.rows))
 }
 
 func (t *HierarchicalTable) Bottom() {
-	t.Scroll(len(t.rows))
+	t.VerticalScroll(len(t.rows))
 }
 
 func (t *HierarchicalTable) ScrollToNextMatch(s string, ascending bool) bool {
@@ -430,7 +435,7 @@ func (t *HierarchicalTable) ScrollToNextMatch(s string, ascending bool) bool {
 	for i := start; i != t.cursorIndex.Int; i = next(i) {
 		for id := range t.conf {
 			if t.rows[i].values[id].Contains(s) {
-				t.Scroll(i - t.cursorIndex.Int)
+				t.VerticalScroll(i - t.cursorIndex.Int)
 				return true
 			}
 		}
@@ -468,6 +473,13 @@ func (t HierarchicalTable) styledString(values map[ColumnID]StyledString, prefix
 		w := utils.MinInt(t.columnWidth[id], t.conf[id].MaxWidth)
 		v.Fit(alignment, w)
 		paddedColumns = append(paddedColumns, v)
+	}
+	if len(paddedColumns) > 0 {
+		if t.columnOffset >= 0 && t.columnOffset < len(paddedColumns) {
+			paddedColumns = paddedColumns[t.columnOffset:]
+		} else {
+			paddedColumns = nil
+		}
 	}
 	line := Join(paddedColumns, NewStyledString(t.sep))
 	line.Fit(Left, t.width)
