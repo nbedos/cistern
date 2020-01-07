@@ -10,13 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/utils"
 	"github.com/xanzy/go-gitlab"
 )
 
 type GitLabClient struct {
-	provider    cache.Provider
+	provider    Provider
 	remote      *gitlab.Client
 	rateLimiter <-chan time.Time
 }
@@ -38,12 +37,8 @@ func NewGitLabClient(id string, name string, baseURL string, token string, reque
 		rateLimit = time.Second / time.Duration(requestsPerSecond)
 	}
 
-	if name == "" {
-		name = "gitlab"
-	}
-
 	return GitLabClient{
-		provider: cache.Provider{
+		provider: Provider{
 			ID:   id,
 			Name: name,
 		},
@@ -52,10 +47,10 @@ func NewGitLabClient(id string, name string, baseURL string, token string, reque
 	}, nil
 }
 
-func (c GitLabClient) Commit(ctx context.Context, repo string, ref string) (cache.Commit, error) {
+func (c GitLabClient) Commit(ctx context.Context, repo string, ref string) (Commit, error) {
 	slug, err := c.parseRepositoryURL(repo)
 	if err != nil {
-		return cache.Commit{}, cache.ErrUnknownRepositoryURL
+		return Commit{}, ErrUnknownRepositoryURL
 	}
 
 	ref = url.PathEscape(ref)
@@ -63,20 +58,20 @@ func (c GitLabClient) Commit(ctx context.Context, repo string, ref string) (cach
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
-		return cache.Commit{}, ctx.Err()
+		return Commit{}, ctx.Err()
 	}
 	gitlabCommit, _, err := c.remote.Commits.GetCommit(slug, url.PathEscape(ref), gitlab.WithContext(ctx))
 	if err != nil {
 		if err, ok := err.(*gitlab.ErrorResponse); ok {
 			switch err.Response.StatusCode {
 			case 401, 404:
-				return cache.Commit{}, cache.ErrUnknownGitReference
+				return Commit{}, ErrUnknownGitReference
 			}
 		}
-		return cache.Commit{}, err
+		return Commit{}, err
 	}
 
-	commit := cache.Commit{
+	commit := Commit{
 		Sha:     gitlabCommit.ID,
 		Author:  fmt.Sprintf("%s <%s>", gitlabCommit.AuthorName, gitlabCommit.AuthorEmail),
 		Date:    *gitlabCommit.AuthoredDate,
@@ -88,11 +83,11 @@ func (c GitLabClient) Commit(ctx context.Context, repo string, ref string) (cach
 		select {
 		case <-c.rateLimiter:
 		case <-ctx.Done():
-			return cache.Commit{}, ctx.Err()
+			return Commit{}, ctx.Err()
 		}
 		refs, resp, err := c.remote.Commits.GetCommitRefs(slug, commit.Sha, &opt, gitlab.WithContext(ctx))
 		if err != nil {
-			return cache.Commit{}, err
+			return Commit{}, err
 		}
 
 		for _, ref := range refs {
@@ -127,7 +122,7 @@ func (c GitLabClient) buildURLsPipelines(ctx context.Context, slug string, sha s
 		pipelines, resp, err := c.remote.Pipelines.ListProjectPipelines(slug, &options)
 		if err != nil {
 			if err, ok := err.(*gitlab.ErrorResponse); ok && err.Response.StatusCode == 404 {
-				return nil, cache.ErrUnknownRepositoryURL
+				return nil, ErrUnknownRepositoryURL
 			}
 			return nil, err
 		}
@@ -219,10 +214,10 @@ func (c GitLabClient) Name() string {
 	return c.provider.Name
 }
 
-func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (cache.Pipeline, error) {
+func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (Pipeline, error) {
 	slug, id, err := c.parsePipelineURL(u)
 	if err != nil {
-		return cache.Pipeline{}, err
+		return Pipeline{}, err
 	}
 
 	return c.fetchPipeline(ctx, slug, id)
@@ -231,7 +226,7 @@ func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (cache.Pipelin
 func (c GitLabClient) parseRepositoryURL(u string) (string, error) {
 	host, owner, repo, err := utils.RepoHostOwnerAndName(u)
 	if err != nil || host != c.remote.BaseURL().Hostname() {
-		return "", cache.ErrUnknownRepositoryURL
+		return "", ErrUnknownRepositoryURL
 	}
 
 	slug := fmt.Sprintf("%s/%s", url.PathEscape(owner), url.PathEscape(repo))
@@ -245,13 +240,13 @@ func (c GitLabClient) parsePipelineURL(u string) (string, int, error) {
 	}
 
 	if v.Hostname() != c.remote.BaseURL().Hostname() {
-		return "", 0, cache.ErrUnknownPipelineURL
+		return "", 0, ErrUnknownPipelineURL
 	}
 
 	// url format: https://gitlab.com/nbedos/cistern/pipelines/97604657
 	pathComponents := strings.FieldsFunc(v.EscapedPath(), func(c rune) bool { return c == '/' })
 	if len(pathComponents) < 4 || pathComponents[2] != "pipelines" {
-		return "", 0, cache.ErrUnknownPipelineURL
+		return "", 0, ErrUnknownPipelineURL
 	}
 
 	slug := fmt.Sprintf("%s/%s", pathComponents[0], pathComponents[1])
@@ -278,30 +273,30 @@ func (c *GitLabClient) getTraceFile(ctx context.Context, repositorySlug string, 
 	return buf, err
 }
 
-func fromGitLabState(s string) cache.State {
+func fromGitLabState(s string) State {
 	switch strings.ToLower(s) {
 	case "created", "pending":
-		return cache.Pending
+		return Pending
 	case "running":
-		return cache.Running
+		return Running
 	case "canceled":
-		return cache.Canceled
+		return Canceled
 	case "success", "passed":
-		return cache.Passed
+		return Passed
 	case "failed":
-		return cache.Failed
+		return Failed
 	case "skipped":
-		return cache.Skipped
+		return Skipped
 	case "manual":
-		return cache.Manual
+		return Manual
 	default:
-		return cache.Unknown
+		return Unknown
 	}
 }
 
-func (c GitLabClient) Log(ctx context.Context, step cache.Step) (string, error) {
+func (c GitLabClient) Log(ctx context.Context, step Step) (string, error) {
 	if step.Log.Key == "" {
-		return "", cache.ErrNoLogHere
+		return "", ErrNoLogHere
 	}
 	id, err := strconv.Atoi(step.ID)
 	if err != nil {
@@ -378,7 +373,7 @@ func (c GitLabClient) fetchJobs(ctx context.Context, slug string, pipelineID int
 	return allJobs, err
 }
 
-func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID int) (pipeline cache.Pipeline, err error) {
+func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID int) (pipeline Pipeline, err error) {
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
@@ -393,15 +388,15 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 		return pipeline, fmt.Errorf("missing UpdatedAt date for pipeline #%d", gitlabPipeline.ID)
 	}
 
-	pipeline = cache.Pipeline{
-		GitReference: cache.GitReference{
+	pipeline = Pipeline{
+		GitReference: GitReference{
 			SHA:   gitlabPipeline.SHA,
 			Ref:   gitlabPipeline.Ref,
 			IsTag: gitlabPipeline.Tag,
 		},
-		Step: cache.Step{
+		Step: Step{
 			ID:         strconv.Itoa(gitlabPipeline.ID),
-			Type:       cache.StepPipeline,
+			Type:       StepPipeline,
 			State:      fromGitLabState(gitlabPipeline.Status),
 			StartedAt:  utils.NullTimeFromTime(gitlabPipeline.StartedAt),
 			FinishedAt: utils.NullTimeFromTime(gitlabPipeline.FinishedAt),
@@ -425,15 +420,15 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 
 	jobs, err := c.fetchJobs(ctx, slug, gitlabPipeline.ID)
 	if err != nil {
-		return cache.Pipeline{}, err
+		return Pipeline{}, err
 	}
 
 	stagesIndexByName := make(map[string]int)
 	for _, job := range jobs {
 		if _, exists := stagesIndexByName[job.Stage]; !exists {
-			stage := cache.Step{
+			stage := Step{
 				ID:   strconv.Itoa(len(stagesIndexByName) + 1),
-				Type: cache.StepStage,
+				Type: StepStage,
 				Name: job.Stage,
 			}
 			stagesIndexByName[job.Stage] = len(pipeline.Children)
@@ -442,12 +437,12 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 	}
 
 	for _, gitlabJob := range jobs {
-		job := cache.Step{
+		job := Step{
 			ID:    strconv.Itoa(gitlabJob.ID),
-			Type:  cache.StepJob,
+			Type:  StepJob,
 			State: fromGitLabState(gitlabJob.Status),
 			Name:  gitlabJob.Name,
-			Log: cache.Log{
+			Log: Log{
 				Key: slug,
 			},
 			StartedAt:  utils.NullTimeFromTime(gitlabJob.StartedAt),
@@ -475,7 +470,7 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 	for i, stage := range pipeline.Children {
 		// Each stage contains all job runs. Select only the last run of each job
 		// Earliest runs should not influence the current state of the stage
-		jobsByName := make(map[string]cache.Step)
+		jobsByName := make(map[string]Step)
 		for _, job := range stage.Children {
 			previousJob, exists := jobsByName[job.Name]
 			// Dates may be NULL so we have to rely on IDs to find out which job is older. meh.
@@ -483,12 +478,12 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 				jobsByName[job.Name] = job
 			}
 		}
-		jobs := make([]cache.Step, 0, len(jobsByName))
+		jobs := make([]Step, 0, len(jobsByName))
 		for _, job := range jobsByName {
 			jobs = append(jobs, job)
 		}
 
-		aggregate := cache.Aggregate(jobs)
+		aggregate := Aggregate(jobs)
 		pipeline.Children[i].State = aggregate.State
 		pipeline.Children[i].StartedAt = aggregate.StartedAt
 		pipeline.Children[i].CreatedAt = aggregate.CreatedAt

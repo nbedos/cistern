@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/utils"
 )
 
@@ -38,24 +37,24 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 		httpClient:  ts.Client(),
 		rateLimiter: time.Tick(time.Millisecond),
 		token:       "token",
-		provider: cache.Provider{
+		provider: Provider{
 			ID:   "id",
 			Name: "name",
 		},
 		buildsPageSize: 10,
 	}
 
-	expectedPipeline := cache.Pipeline{
+	expectedPipeline := Pipeline{
 		Number: "72",
-		GitReference: cache.GitReference{
+		GitReference: GitReference{
 			SHA:   "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
 			Ref:   "feature/travis_improvements",
 			IsTag: false,
 		},
-		Step: cache.Step{
-			ID:    "609256446",
-			Type:  cache.StepPipeline,
-			State: cache.Failed,
+		Step: Step{
+			ID:        "609256446",
+			Type:      StepPipeline,
+			State:     Failed,
 			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
@@ -77,12 +76,12 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 		},
 	}
 
-	expectedPipeline.Children = []cache.Step{
+	expectedPipeline.Children = []Step{
 		{
-			ID:    "11290169",
-			Type:  cache.StepStage,
-			Name:  "Tests",
-			State: cache.Failed,
+			ID:        "11290169",
+			Type:      StepStage,
+			Name:      "Tests",
+			State:     Failed,
 			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
@@ -102,12 +101,12 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			},
 		},
 	}
-	expectedPipeline.Children[0].Children = []cache.Step{
+	expectedPipeline.Children[0].Children = []Step{
 		{
-			ID:    "609256447",
-			Type:  cache.StepJob,
-			State: cache.Failed,
-			Name:  "GoLang 1.13 on Ubuntu Bionic",
+			ID:        "609256447",
+			Type:      StepJob,
+			State:     Failed,
+			Name:      "GoLang 1.13 on Ubuntu Bionic",
 			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
@@ -121,7 +120,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 				Valid:    true,
 				Duration: 26 * time.Second,
 			},
-			Log: cache.Log{},
+			Log: Log{},
 			WebURL: utils.NullString{
 				String: fmt.Sprintf("%s/nbedos/cistern/jobs/609256447", ts.URL),
 				Valid:  true,
@@ -129,10 +128,10 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			AllowFailure: false,
 		},
 		{
-			ID:    "609256448",
-			Type:  cache.StepJob,
-			State: cache.Failed,
-			Name:  "GoLang 1.12 on Ubuntu Trusty",
+			ID:        "609256448",
+			Type:      StepJob,
+			State:     Failed,
+			Name:      "GoLang 1.12 on Ubuntu Trusty",
 			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 509000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
@@ -146,7 +145,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 				Valid:    true,
 				Duration: 30 * time.Second,
 			},
-			Log: cache.Log{},
+			Log: Log{},
 			WebURL: utils.NullString{
 				String: fmt.Sprintf("%s/nbedos/cistern/jobs/609256448", ts.URL),
 				Valid:  true,
@@ -154,10 +153,10 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			AllowFailure: false,
 		},
 		{
-			ID:    "609256449",
-			Type:  cache.StepJob,
-			State: cache.Failed,
-			Name:  "GoLang 1.13 on macOS 10.14",
+			ID:        "609256449",
+			Type:      StepJob,
+			State:     Failed,
+			Name:      "GoLang 1.13 on macOS 10.14",
 			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 512000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
@@ -171,7 +170,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 				Valid:    true,
 				Duration: 31 * time.Second,
 			},
-			Log: cache.Log{},
+			Log: Log{},
 			WebURL: utils.NullString{
 				String: fmt.Sprintf("%s/nbedos/cistern/jobs/609256449", ts.URL),
 				Valid:  true,
@@ -179,10 +178,10 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			AllowFailure: false,
 		},
 		{
-			ID:    "609256450",
-			Type:  cache.StepJob,
-			State: cache.Failed,
-			Name:  "GoLang 1.12 on macOS 10.13",
+			ID:        "609256450",
+			Type:      StepJob,
+			State:     Failed,
+			Name:      "GoLang 1.12 on macOS 10.13",
 			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 514000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
@@ -196,7 +195,7 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 				Valid:    true,
 				Duration: 27 * time.Second,
 			},
-			Log: cache.Log{},
+			Log: Log{},
 			WebURL: utils.NullString{
 				String: fmt.Sprintf("%s/nbedos/cistern/jobs/609256450", ts.URL),
 				Valid:  true,

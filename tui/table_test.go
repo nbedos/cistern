@@ -3,7 +3,6 @@ package tui
 import (
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mattn/go-runewidth"
@@ -28,7 +27,7 @@ func (n testNode) NodeChildren() []TableNode {
 	return nodes
 }
 
-func (n testNode) Values(location *time.Location) map[ColumnID]StyledString {
+func (n testNode) Values(v interface{}) map[ColumnID]StyledString {
 	return n.values
 }
 
@@ -57,9 +56,13 @@ func (ps nodePaths) Diff(others nodePaths) string {
 	return cmp.Diff(ps, others, cmp.AllowUnexported(nodePath{}))
 }
 
+var defaultConf = TableConfiguration{
+	Sep: "  ",
+}
+
 func TestHierarchicalTable_VerticalScroll(t *testing.T) {
 	t.Run("scrolling an empty table must have no effect at all", func(t *testing.T) {
-		table, err := NewHierarchicalTable(nil, nil, 0, 3, nil)
+		table, err := NewHierarchicalTable(defaultConf, nil, 0, 3)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -168,7 +171,7 @@ func TestHierarchicalTable_VerticalScroll(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			table, err := NewHierarchicalTable(nil, nodes, 0, pageSize+1, nil)
+			table, err := NewHierarchicalTable(defaultConf, nodes, 0, pageSize+1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -315,7 +318,6 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		}
 	})
 
-
 	t.Run("the cursor must move to the new location of the row", func(t *testing.T) {
 		table := HierarchicalTable{
 			height:      3,
@@ -354,7 +356,6 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		}
 	})
 
-
 	t.Run("the cursor must move to the new location of the row", func(t *testing.T) {
 		table := HierarchicalTable{
 			height:      4,
@@ -392,8 +393,6 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 			t.Fatal(diff)
 		}
 	})
-
-
 
 	t.Run("the cursor must move to the new location of the row", func(t *testing.T) {
 		table := HierarchicalTable{
@@ -471,7 +470,7 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 	}
 
 	t.Run("opening the first row must make its first-degree children visible", func(t *testing.T) {
-		table, err := NewHierarchicalTable(nil, nodes, 0, 10, nil)
+		table, err := NewHierarchicalTable(defaultConf, nodes, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -489,7 +488,7 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 	})
 
 	t.Run("opening recursively the first row must make all its children visible", func(t *testing.T) {
-		table, err := NewHierarchicalTable(nil, nodes, 0, 10, nil)
+		table, err := NewHierarchicalTable(defaultConf, nodes, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -508,7 +507,7 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 	})
 
 	t.Run("opening and then closing the first row must have no visible effect", func(t *testing.T) {
-		table, err := NewHierarchicalTable(nil, nodes, 0, 10, nil)
+		table, err := NewHierarchicalTable(defaultConf, nodes, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -526,7 +525,7 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 	})
 
 	t.Run("opening recursively row '1' and then closing row '2' must hide row '3'", func(t *testing.T) {
-		table, err := NewHierarchicalTable(nil, nodes, 0, 10, nil)
+		table, err := NewHierarchicalTable(defaultConf, nodes, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -546,7 +545,7 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 	})
 
 	t.Run("closing a terminal node must not have any effect", func(t *testing.T) {
-		table, err := NewHierarchicalTable(nil, nodes, 0, 10, nil)
+		table, err := NewHierarchicalTable(defaultConf, nodes, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -597,17 +596,18 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 		},
 	}
 
-	conf := ColumnConfiguration{
+	conf := defaultConf
+	conf.Columns = ColumnConfiguration{
 		column1: {
 			Header:    "column1",
-			Order:     0,
+			Position:  0,
 			MaxWidth:  42,
 			Alignment: Left,
 		},
 	}
 
 	t.Run("searching an empty table must return false", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nil, 0, 10, nil)
+		table, err := NewHierarchicalTable(conf, nil, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -617,7 +617,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 	})
 
 	t.Run("searching must return true if a match exists and move the cursor to that row", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nodes, 0, 10, nil)
+		table, err := NewHierarchicalTable(conf, nodes, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -635,7 +635,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 	})
 
 	t.Run("searching backwards must return true if a match exists and move the cursor to that row", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nodes, 0, 10, nil)
+		table, err := NewHierarchicalTable(conf, nodes, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -652,7 +652,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 	})
 
 	t.Run("searching must cycle back at the top of the table if needed", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nodes, 0, 10, nil)
+		table, err := NewHierarchicalTable(conf, nodes, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -671,7 +671,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 	})
 
 	t.Run("searching must ignore hidden innerNodes", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nodes, 0, 10, nil)
+		table, err := NewHierarchicalTable(conf, nodes, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -713,17 +713,18 @@ func TestHierarchicalTable_Resize(t *testing.T) {
 		},
 	}
 
-	conf := ColumnConfiguration{
+	conf := defaultConf
+	conf.Columns = ColumnConfiguration{
 		column1: {
 			Header:    "column1",
-			Order:     0,
+			Position:  0,
 			MaxWidth:  42,
 			Alignment: Left,
 		},
 	}
 
 	t.Run("resizing the table to a height of 0 should move the cursor to the first row", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nodes, 10, 4, nil)
+		table, err := NewHierarchicalTable(conf, nodes, 10, 4)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -749,38 +750,39 @@ func TestHierarchicalTable_Resize(t *testing.T) {
 
 func TestHierarchicalTable_headers(t *testing.T) {
 	t.Run("", func(t *testing.T) {
-		conf := ColumnConfiguration{
+		conf := defaultConf
+		conf.Columns = ColumnConfiguration{
 			column1: {
 				Header:    "column1",
-				Order:     0,
+				Position:  0,
 				MaxWidth:  999,
 				Alignment: Left,
 			},
 			column2: {
 				Header:    "column2",
-				Order:     1,
+				Position:  1,
 				MaxWidth:  999,
 				Alignment: Left,
 			},
 			column3: {
 				Header:    "column3",
-				Order:     2,
+				Position:  2,
 				MaxWidth:  6,
 				Alignment: Left,
 			},
 			column4: {
 				Header:    "column4",
-				Order:     3,
+				Position:  3,
 				MaxWidth:  6,
 				Alignment: Right,
 			},
 		}
 
-		table, err := NewHierarchicalTable(conf, nil, 0, 10, nil)
+		table, err := NewHierarchicalTable(conf, nil, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedHeader := strings.Join([]string{"column1 ", "column2 ", "column", "lumn4 "}, table.sep)
+		expectedHeader := strings.Join([]string{"column1", "column2", "column", "olumn4"}, table.conf.Sep)
 		table.Resize(runewidth.StringWidth(expectedHeader), table.height)
 
 		header := table.styledString(table.headers(), "").String()
@@ -790,30 +792,30 @@ func TestHierarchicalTable_headers(t *testing.T) {
 	})
 }
 
-
 func TestHierarchicalTable_styledString(t *testing.T) {
-	conf := ColumnConfiguration{
+	conf := defaultConf
+	conf.Columns = ColumnConfiguration{
 		column1: {
 			Header:    "column1",
-			Order:     0,
+			Position:  0,
 			MaxWidth:  999,
 			Alignment: Left,
 		},
 		column2: {
 			Header:    "column2",
-			Order:     1,
+			Position:  1,
 			MaxWidth:  999,
 			Alignment: Left,
 		},
 		column3: {
 			Header:    "column3",
-			Order:     2,
+			Position:  2,
 			MaxWidth:  999,
 			Alignment: Left,
 		},
 		column4: {
 			Header:    "column4",
-			Order:     3,
+			Position:  3,
 			MaxWidth:  999,
 			Alignment: Left,
 		},
@@ -827,30 +829,30 @@ func TestHierarchicalTable_styledString(t *testing.T) {
 	}
 
 	t.Run("No horizontal scrolling, all columns must be visible", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nil, 37, 10, nil)
+		table, err := NewHierarchicalTable(conf, nil, 34, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
 		s := table.styledString(values, "").String()
-		if diff := cmp.Diff("column1   column2   column3   column4", s); diff != "" {
+		if diff := cmp.Diff("column1  column2  column3  column4", s); diff != "" {
 			t.Fatal(diff)
 		}
 	})
 
 	t.Run("horizontal scrolling, all columns except the first must be visible", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nil, 37, 10, nil)
+		table, err := NewHierarchicalTable(conf, nil, 25, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
 		table.HorizontalScroll(1)
 		s := table.styledString(values, "").String()
-		if diff := cmp.Diff("column2   column3   column4          ", s); diff != "" {
+		if diff := cmp.Diff("column2  column3  column4", s); diff != "" {
 			t.Fatal(diff)
 		}
 	})
 
 	t.Run("no configuration: do not display anything but do not crash either", func(t *testing.T) {
-		table, err := NewHierarchicalTable(nil, nil, 37, 10, nil)
+		table, err := NewHierarchicalTable(defaultConf, nil, 28, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -907,13 +909,14 @@ func TestInnerTableNode_setPrefix(t *testing.T) {
 }
 
 func TestHierarchicalTable_SortBy(t *testing.T) {
-	conf := ColumnConfiguration{
+	conf := defaultConf
+	conf.Columns = ColumnConfiguration{
 		column1: {
 			Header:    "column1",
-			Order:     0,
+			Position:  0,
 			MaxWidth:  999,
 			Alignment: Left,
-			Less: func(nodes []TableNode, asc bool) func(i, j int) bool {
+			Less: func(nodes []TableNode, asc bool, v interface{}) func(i, j int) bool {
 				return func(i, j int) bool {
 					ni := nodes[i].(testNode)
 					nj := nodes[j].(testNode)
@@ -928,7 +931,7 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 		},
 		column2: {
 			Header:    "column2",
-			Order:     1,
+			Position:  1,
 			MaxWidth:  999,
 			Alignment: Left,
 		},
@@ -942,7 +945,7 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 	}
 
 	t.Run("sort order must be preserved on table creation", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nodes, 10, 10, nil)
+		table, err := NewHierarchicalTable(conf, nodes, 10, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -959,7 +962,7 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 	})
 
 	t.Run("sorting on a column without a comparison function must not have any effect", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nodes, 10, 10, nil)
+		table, err := NewHierarchicalTable(conf, nodes, 10, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -978,7 +981,7 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 	})
 
 	t.Run("after sorting, nodes must be ordered as specified", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nodes, 10, 10, nil)
+		table, err := NewHierarchicalTable(conf, nodes, 10, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -997,7 +1000,9 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 	})
 
 	t.Run("table headers must reflect sorting order", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nodes, 10, 10, nil)
+		conf := conf
+		conf.HeaderSuffixDescending = "-"
+		table, err := NewHierarchicalTable(conf, nodes, 10, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1005,7 +1010,7 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 		table.SortBy(column1, false)
 
 		header := table.headers()[column1].String()
-		expectedHeader := "column1▼"
+		expectedHeader := "column1-"
 
 		if header != expectedHeader {
 			t.Fatalf("expected header %q but got %q", expectedHeader, header)
@@ -1013,7 +1018,7 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 	})
 
 	t.Run("sort order must be preserved across Replace calls", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nodes, 10, 10, nil)
+		table, err := NewHierarchicalTable(conf, nodes, 10, 10)
 		if err != nil {
 			t.Fatal(err)
 		}

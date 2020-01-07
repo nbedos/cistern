@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/utils"
 	"github.com/xanzy/go-gitlab"
 )
@@ -91,18 +90,18 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedPipeline := cache.Pipeline{
-		GitReference: cache.GitReference{
+	expectedPipeline := Pipeline{
+		GitReference: GitReference{
 			SHA: "6645b9ba15963e480be7763d68d9c275760d555e",
 			Ref: "master",
 		},
-		Step: cache.Step{
+		Step: Step{
 			ID:           "103230300",
 			Name:         "",
-			Type:         cache.StepPipeline,
-			State:        cache.Passed,
+			Type:         StepPipeline,
+			State:        Passed,
 			AllowFailure: false,
-			CreatedAt: time.Date(2019, 12, 15, 21, 46, 40, 694000000, time.UTC),
+			CreatedAt:    time.Date(2019, 12, 15, 21, 46, 40, 694000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 12, 15, 21, 46, 41, 214000000, time.UTC),
@@ -120,7 +119,7 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 				Valid:  true,
 				String: "https://gitlab.com/nbedos/cistern/pipelines/103230300",
 			},
-			Children: []cache.Step{
+			Children: []Step{
 				{
 					ID:    "1",
 					Name:  "test",
@@ -143,7 +142,7 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 						Valid:  true,
 						String: "https://gitlab.com/nbedos/cistern/pipelines/103230300",
 					},
-					Children: []cache.Step{
+					Children: []Step{
 						{
 							ID:    "379869167",
 							Name:  "golang 1.13",
@@ -163,7 +162,7 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 								Duration: time.Minute + 31*time.Second,
 							},
 							WebURL: utils.NullString{Valid: true, String: "https://gitlab.com/nbedos/cistern/-/jobs/379869167"},
-							Log:    cache.Log{Key: "nbedos/cistern"},
+							Log:    Log{Key: "nbedos/cistern"},
 						},
 					},
 				},
@@ -179,9 +178,9 @@ func TestGitLabClient_Log(t *testing.T) {
 	client, _, teardown := setupGitLabTestServer(t)
 	defer teardown()
 
-	step := cache.Step{
+	step := Step{
 		ID: "42",
-		Log: cache.Log{
+		Log: Log{
 			Key: "nbedos/cistern",
 		},
 	}
@@ -205,7 +204,7 @@ func TestGitLabClient_Commit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		expectedCommit := cache.Commit{
+		expectedCommit := Commit{
 			Sha:      "a24840cf94b395af69da4a1001d32e3694637e20",
 			Author:   "nbedos <nicolas.bedos@gmail.com>",
 			Date:     time.Date(2019, 12, 16, 18, 6, 43, 0, time.UTC),
@@ -226,7 +225,7 @@ func TestGitLabClient_Commit(t *testing.T) {
 		defer teardown()
 
 		_, err := client.Commit(context.Background(), testURL+"/owner/repo", "0000000")
-		if err != cache.ErrUnknownGitReference {
+		if err != ErrUnknownGitReference {
 			t.Fatal(err)
 		}
 	})

@@ -14,7 +14,7 @@ var newScreen = func() (tcell.Screen, error) {
 }
 
 func TestNewTUI(t *testing.T) {
-	tui, err := NewTUI(newScreen, tcell.StyleDefault, StyleSheet{})
+	tui, err := NewTUI(newScreen, tcell.StyleDefault)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestNewTUI(t *testing.T) {
 }
 
 func TestTUI_Draw(t *testing.T) {
-	tui, err := NewTUI(newScreen, tcell.StyleDefault, StyleSheet{})
+	tui, err := NewTUI(newScreen, tcell.StyleDefault)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestTUI_Draw(t *testing.T) {
 
 func TestTUI_Exec(t *testing.T) {
 	t.Run("invalid command should return an error", func(t *testing.T) {
-		tui, err := NewTUI(newScreen, tcell.StyleDefault, StyleSheet{})
+		tui, err := NewTUI(newScreen, tcell.StyleDefault)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -70,7 +70,7 @@ func TestTUI_Exec(t *testing.T) {
 	})
 
 	t.Run("Execute command without stream", func(t *testing.T) {
-		tui, err := NewTUI(newScreen, tcell.StyleDefault, StyleSheet{})
+		tui, err := NewTUI(newScreen, tcell.StyleDefault)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -91,7 +91,7 @@ func TestTUI_Exec(t *testing.T) {
 	})
 
 	t.Run("Exec must return when the context is cancelled", func(t *testing.T) {
-		tui, err := NewTUI(newScreen, tcell.StyleDefault, StyleSheet{})
+		tui, err := NewTUI(newScreen, tcell.StyleDefault)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -14,12 +14,10 @@ import (
 
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/encoding"
-	"github.com/nbedos/cistern/cache"
+	"github.com/nbedos/cistern/providers"
 	"github.com/nbedos/cistern/tui"
 	"github.com/nbedos/cistern/utils"
 )
-
-var ErrNoProvider = errors.New("list of providers must not be empty")
 
 type inputDestination int
 
@@ -29,9 +27,14 @@ const (
 	inputRef
 )
 
+type ControllerConfiguration struct {
+	tui.TableConfiguration
+	providers.GitStyle
+}
+
 type Controller struct {
 	tui              *tui.TUI
-	cache            cache.Cache
+	cache            providers.Cache
 	ref              string
 	width            int
 	height           int
@@ -42,11 +45,12 @@ type Controller struct {
 	inputDestination inputDestination
 	defaultStatus    string
 	help             string
+	style            providers.GitStyle
 }
 
 var ErrExit = errors.New("exit")
 
-func NewController(ui *tui.TUI, conf tui.ColumnConfiguration, ref string, c cache.Cache, loc *time.Location, defaultStatus string, help string) (Controller, error) {
+func NewController(ui *tui.TUI, conf ControllerConfiguration, ref string, c providers.Cache, defaultStatus string, help string) (Controller, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := ui.Size()
 	header, err := tui.NewTextArea(width, height)
@@ -54,11 +58,11 @@ func NewController(ui *tui.TUI, conf tui.ColumnConfiguration, ref string, c cach
 		return Controller{}, err
 	}
 
-	table, err := tui.NewHierarchicalTable(conf, nil, width, height, loc)
+	table, err := tui.NewHierarchicalTable(conf.TableConfiguration, nil, width, height)
 	if err != nil {
 		return Controller{}, err
 	}
-	table.SortBy(cache.ColumnStarted, false)
+
 
 	status, err := tui.NewStatusBar(width, height)
 	if err != nil {
@@ -77,6 +81,7 @@ func NewController(ui *tui.TUI, conf tui.ColumnConfiguration, ref string, c cach
 		status:        &status,
 		defaultStatus: defaultStatus,
 		help:          help,
+		style:         conf.GitStyle,
 	}, nil
 }
 
@@ -139,7 +144,7 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 			switch e {
 			case context.Canceled:
 				// Do nothing
-			case cache.ErrUnknownGitReference:
+			case providers.ErrUnknownGitReference:
 				c.status.Write(fmt.Sprintf("error: git reference was not found on remote server(s)"))
 				c.draw()
 			default:
@@ -174,7 +179,7 @@ func (c *Controller) writeDefaultStatus() {
 
 func (c *Controller) refresh() {
 	commit, _ := c.cache.Commit(c.ref)
-	c.header.Write(commit.Strings()...)
+	c.header.Write(commit.StyledStrings(c.style)...)
 	pipelines := make([]tui.TableNode, 0)
 	for _, pipeline := range c.cache.Pipelines(c.ref) {
 		pipelines = append(pipelines, pipeline)
@@ -211,7 +216,7 @@ func (c *Controller) ReverseSortOrder() {
 
 func (c *Controller) SortByNextColumn(reverse bool) {
 	if order := c.table.Order(); order.Valid {
-		ids := c.table.Configuration().ColumnIDs()
+		ids := c.table.Configuration().Columns.IDs()
 		for i, id := range ids {
 			if id == order.ID {
 				j := i + 1
@@ -255,12 +260,12 @@ func (c *Controller) viewLog(ctx context.Context) error {
 	}()
 	key, ids, exists := c.activeStepPath()
 	if !exists {
-		return cache.ErrNoLogHere
+		return providers.ErrNoLogHere
 	}
 
 	log, err := c.cache.Log(ctx, key, ids)
 	if err != nil {
-		if err == cache.ErrNoLogHere {
+		if err == providers.ErrNoLogHere {
 			return nil
 		}
 		return err
@@ -298,18 +303,18 @@ func (c *Controller) viewHelp(ctx context.Context) error {
 	return c.tui.Exec(ctx, "man", []string{"-l", file.Name()}, nil)
 }
 
-func (c Controller) activeStepPath() (cache.PipelineKey, []string, bool) {
+func (c Controller) activeStepPath() (providers.PipelineKey, []string, bool) {
 	if stepPath := c.table.ActiveNodePath(); len(stepPath) > 0 {
-		key, ok := stepPath[0].(cache.PipelineKey)
+		key, ok := stepPath[0].(providers.PipelineKey)
 		if !ok {
-			return cache.PipelineKey{}, nil, false
+			return providers.PipelineKey{}, nil, false
 		}
 
 		stepIDs := make([]string, 0)
 		for _, id := range stepPath[1:] {
 			s, ok := id.(string)
 			if !ok {
-				return cache.PipelineKey{}, nil, false
+				return providers.PipelineKey{}, nil, false
 			}
 			stepIDs = append(stepIDs, s)
 		}
@@ -317,7 +322,7 @@ func (c Controller) activeStepPath() (cache.PipelineKey, []string, bool) {
 		return key, stepIDs, true
 	}
 
-	return cache.PipelineKey{}, nil, false
+	return providers.PipelineKey{}, nil, false
 }
 
 func (c Controller) openActiveRowInBrowser() error {
@@ -475,285 +480,29 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 	return nil
 }
 
-func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, ref string, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location, help string) (err error) {
-	if len(CIProviders) == 0 || len(SourceProviders) == 0 {
-		return ErrNoProvider
-	}
+func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, ref string, conf Configuration) error {
 	// FIXME Discard log until the status bar is implemented in order to hide the "Unsolicited response received on
 	//  idle HTTP channel" from GitLab's HTTP client
 	log.SetOutput(ioutil.Discard)
 	encoding.Register()
 
 	defaultStyle := tcell.StyleDefault
-	styleSheet := tui.StyleSheet{
-		tui.TableHeader: func(s tcell.Style) tcell.Style {
-			return s.Bold(true).Reverse(true)
-		},
-		tui.ActiveRow: func(s tcell.Style) tcell.Style {
-			return s.Background(tcell.ColorSilver).Foreground(tcell.ColorBlack).Bold(false).Underline(false).Blink(false)
-		},
-		tui.Provider: func(s tcell.Style) tcell.Style {
-			return s.Bold(true)
-		},
-		tui.StatusFailed: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorMaroon).Bold(false)
-		},
-		tui.StatusPassed: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorGreen).Bold(false)
-		},
-		tui.StatusRunning: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorOlive).Bold(false)
-		},
-		tui.StatusSkipped: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorGray).Bold(false)
-		},
-		tui.GitSha: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorOlive)
-		},
-		tui.GitBranch: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorTeal).Bold(false)
-		},
-		tui.GitTag: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorYellow).Bold(false)
-		},
-		tui.GitHead: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorAqua)
-		},
+	if conf.Style.Default != nil {
+		transform, err := conf.Style.Default.Parse()
+		if err != nil {
+			return err
+		}
+		defaultStyle = transform(defaultStyle)
 	}
+
 	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  v:Logs  b:Browser  ?:Help  q:Quit"
 
-	const maxWidth = 999
-
-	tableConfig := map[tui.ColumnID]tui.Column{
-		cache.ColumnRef: {
-			Header:    "REF",
-			Order:     1,
-			MaxWidth:  maxWidth,
-			Alignment: tui.Left,
-			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
-				return func(i, j int) bool {
-					refi := nodes[i].(cache.Pipeline).Values(loc)[cache.ColumnRef]
-					refj := nodes[j].(cache.Pipeline).Values(loc)[cache.ColumnRef]
-
-					if asc {
-						return refi.String() < refj.String()
-					} else {
-						return refj.String() > refi.String()
-					}
-				}
-			},
-		},
-		cache.ColumnPipeline: {
-			Order:     2,
-			Header:    "PIPELINE",
-			MaxWidth:  maxWidth,
-			Alignment: tui.Right,
-			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
-				return func(i, j int) bool {
-					IDi := nodes[i].(cache.Pipeline).Values(loc)[cache.ColumnPipeline]
-					IDj := nodes[j].(cache.Pipeline).Values(loc)[cache.ColumnPipeline]
-
-					if asc {
-						return IDi.String() < IDj.String()
-					} else {
-						return IDi.String() > IDj.String()
-					}
-				}
-			},
-		},
-		cache.ColumnType: {
-			Order:     3,
-			Header:    "TYPE",
-			MaxWidth:  maxWidth,
-			Alignment: tui.Left,
-			// The following sorting function has no effect on the table since all Pipelines
-			// have the same type. We just include it for consistency.
-			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
-				return func(i, j int) bool {
-					ni := nodes[i].(cache.Pipeline)
-					nj := nodes[j].(cache.Pipeline)
-
-					if asc {
-						return ni.Type < nj.Type
-					} else {
-						return ni.Type > nj.Type
-					}
-				}
-			},
-		},
-		cache.ColumnState: {
-			Order:     4,
-			Header:    "STATE",
-			MaxWidth:  maxWidth,
-			Alignment: tui.Left,
-			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
-				return func(i, j int) bool {
-					ni := nodes[i].(cache.Pipeline)
-					nj := nodes[j].(cache.Pipeline)
-
-					if asc {
-						return ni.State < nj.State
-					} else {
-						return ni.State > nj.State
-					}
-				}
-			},
-		},
-		cache.ColumnAllowedFailure: {
-			Order:     5,
-			Header:    "XFAIL",
-			MaxWidth:  maxWidth,
-			Alignment: tui.Left,
-			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
-				return func(i, j int) bool {
-					faili := nodes[i].(cache.Pipeline).Values(loc)[cache.ColumnAllowedFailure]
-					failj := nodes[j].(cache.Pipeline).Values(loc)[cache.ColumnAllowedFailure]
-
-					if asc {
-						return faili.String() < failj.String()
-					} else {
-						return faili.String() > failj.String()
-					}
-				}
-			},
-		},
-		cache.ColumnCreated: {
-			Order:     6,
-			Header:    "CREATED",
-			MaxWidth:  maxWidth,
-			Alignment: tui.Left,
-			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
-				return func(i, j int) bool {
-					ni := nodes[i].(cache.Pipeline)
-					nj := nodes[j].(cache.Pipeline)
-
-					if asc {
-						return ni.CreatedAt.Before(nj.CreatedAt)
-					} else {
-						return ni.CreatedAt.After(nj.CreatedAt)
-					}
-				}
-			},
-		},
-		cache.ColumnStarted: {
-			Order:     7,
-			Header:    "STARTED",
-			MaxWidth:  maxWidth,
-			Alignment: tui.Left,
-			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
-				return func(i, j int) bool {
-					ti := nodes[i].(cache.Pipeline).StartedAt.Time
-					tj := nodes[j].(cache.Pipeline).StartedAt.Time
-
-					// Assume that Null values are attributed to events that will occur in the
-					// future, so give them a maximal value
-					if !nodes[i].(cache.Pipeline).StartedAt.Valid {
-						ti = time.Unix(1<<62, 0)
-					}
-
-					if !nodes[j].(cache.Pipeline).StartedAt.Valid {
-						tj = time.Unix(1<<62, 0)
-					}
-
-					if asc {
-						return ti.Before(tj)
-					} else {
-						return ti.After(tj)
-					}
-				}
-			},
-		},
-		cache.ColumnFinished: {
-			Order:     8,
-			Header:    "FINISHED",
-			MaxWidth:  maxWidth,
-			Alignment: tui.Left,
-			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
-				return func(i, j int) bool {
-					ti := nodes[i].(cache.Pipeline).FinishedAt.Time
-					tj := nodes[j].(cache.Pipeline).FinishedAt.Time
-
-					if !nodes[i].(cache.Pipeline).FinishedAt.Valid {
-						ti = time.Unix(1<<62, 0)
-					}
-
-					if !nodes[j].(cache.Pipeline).FinishedAt.Valid {
-						tj = time.Unix(1<<62, 0)
-					}
-
-					if asc {
-						return ti.Before(tj)
-					} else {
-						return ti.After(tj)
-					}
-				}
-			},
-		},
-		cache.ColumnDuration: {
-			Order:     10,
-			Header:    "DURATION",
-			MaxWidth:  maxWidth,
-			Alignment: tui.Right,
-			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
-				return func(i, j int) bool {
-					ni := nodes[i].(cache.Pipeline)
-					nj := nodes[j].(cache.Pipeline)
-
-					if !ni.Duration.Valid {
-						if !nj.Duration.Valid {
-							return false
-						}
-						return asc
-					}
-
-					if asc {
-						return ni.Duration.Duration < nj.Duration.Duration
-					} else {
-						return ni.Duration.Duration > nj.Duration.Duration
-					}
-				}
-			},
-		},
-		cache.ColumnName: {
-			Order:      11,
-			Header:     "NAME",
-			MaxWidth:   maxWidth,
-			Alignment:  tui.Left,
-			TreePrefix: true,
-			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
-				return func(i, j int) bool {
-					namei := nodes[i].(cache.Pipeline).Values(loc)[cache.ColumnName]
-					namej := nodes[j].(cache.Pipeline).Values(loc)[cache.ColumnName]
-
-					if asc {
-						return namei.String() < namej.String()
-					} else {
-						return namei.String() > namej.String()
-					}
-				}
-			},
-		},
-		cache.ColumnWebURL: {
-			Order:     12,
-			Header:    "URL",
-			MaxWidth:  maxWidth,
-			Alignment: tui.Left,
-			Less: func(nodes []tui.TableNode, asc bool) func(i, j int) bool {
-				return func(i, j int) bool {
-					urli := nodes[i].(cache.Pipeline).Values(loc)[cache.ColumnWebURL]
-					urlj := nodes[j].(cache.Pipeline).Values(loc)[cache.ColumnWebURL]
-
-					if asc {
-						return urli.String() < urlj.String()
-					} else {
-						return urli.String() > urlj.String()
-					}
-				}
-			},
-		},
+	tableConfig, err := conf.TableConfig(defaultTableColumns)
+	if err != nil {
+		return err
 	}
 
-	ui, err := tui.NewTUI(newScreen, defaultStyle, styleSheet)
+	ui, err := tui.NewTUI(newScreen, defaultStyle)
 	if err != nil {
 		return err
 	}
@@ -764,12 +513,23 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		ui.Finish()
 	}()
 
-	cacheDB := cache.NewCache(CIProviders, SourceProviders)
+	cacheDB, err := conf.Providers.ToCache(ctx)
+	if err != nil {
+		return err
+	}
 
-	controller, err := NewController(&ui, tableConfig, ref, cacheDB, loc, defaultStatus, help)
+	controllerConf := ControllerConfiguration{
+		TableConfiguration: tableConfig,
+		GitStyle:           tableConfig.NodeStyle.(providers.StepStyle).GitStyle,
+	}
+
+	controller, err := NewController(&ui, controllerConf, ref, cacheDB, defaultStatus, manualPage)
 	if err != nil {
 		return err
 	}
 
 	return controller.Run(ctx, repo)
 }
+
+const maxWidth = 999
+

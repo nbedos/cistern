@@ -1,4 +1,4 @@
-package cache
+package providers
 
 import (
 	"context"
@@ -176,30 +176,37 @@ type Commit struct {
 	Statuses []string
 }
 
-func (c Commit) Strings() []tui.StyledString {
+type GitStyle struct {
+	Location *time.Location
+	SHA      tui.StyleTransform
+	Head     tui.StyleTransform
+	Branch   tui.StyleTransform
+	Tag      tui.StyleTransform
+}
+
+func (c Commit) StyledStrings(conf GitStyle) []tui.StyledString {
 	var title tui.StyledString
-	commit := tui.NewStyledString(fmt.Sprintf("commit %s", c.Sha), tui.GitSha)
+	commit := tui.NewStyledString(fmt.Sprintf("commit %s", c.Sha), conf.SHA)
 	if len(c.Branches) > 0 || len(c.Tags) > 0 {
 		refs := make([]tui.StyledString, 0, len(c.Branches)+len(c.Tags))
 		for _, tag := range c.Tags {
-			refs = append(refs, tui.NewStyledString(fmt.Sprintf("tag: %s", tag), tui.GitTag))
+			refs = append(refs, tui.NewStyledString(fmt.Sprintf("tag: %s", tag), conf.Tag))
 		}
 		for _, branch := range c.Branches {
 			if branch == c.Head {
 				var s tui.StyledString
-				s.Append("HEAD -> ", tui.GitHead)
-				s.Append(branch, tui.GitBranch)
+				s.Append("HEAD -> ", conf.Head)
 				refs = append([]tui.StyledString{s}, refs...)
 			} else {
-				refs = append(refs, tui.NewStyledString(branch, tui.GitBranch))
+				refs = append(refs, tui.NewStyledString(branch, conf.Branch))
 			}
 		}
 
 		title = tui.Join([]tui.StyledString{
 			commit,
-			tui.NewStyledString(" (", tui.GitSha),
-			tui.Join(refs, tui.NewStyledString(", ", tui.GitSha)),
-			tui.NewStyledString(")", tui.GitSha),
+			tui.NewStyledString(" (", conf.SHA),
+			tui.Join(refs, tui.NewStyledString(", ", conf.SHA)),
+			tui.NewStyledString(")", conf.SHA),
 		}, tui.NewStyledString(""))
 	} else {
 		title = commit
@@ -208,7 +215,7 @@ func (c Commit) Strings() []tui.StyledString {
 	texts := []tui.StyledString{
 		title,
 		tui.NewStyledString(fmt.Sprintf("Author: %s", c.Author)),
-		tui.NewStyledString(fmt.Sprintf("Date: %s", c.Date.Truncate(time.Second).Local().String())),
+		tui.NewStyledString(fmt.Sprintf("Date: %s", c.Date.Truncate(time.Second).In(conf.Location).String())),
 		tui.NewStyledString(""),
 	}
 	for _, line := range strings.Split(c.Message, "\n") {
@@ -416,9 +423,26 @@ func (s Step) InheritedValues() []tui.ColumnID {
 	return []tui.ColumnID{ColumnRef, ColumnPipeline}
 }
 
-func (s Step) Values(loc *time.Location) map[tui.ColumnID]tui.StyledString {
+
+type StepStyle struct {
+	GitStyle
+	Provider tui.StyleTransform
+	Status   struct {
+		Failed   tui.StyleTransform
+		Canceled tui.StyleTransform
+		Passed   tui.StyleTransform
+		Running  tui.StyleTransform
+		Pending  tui.StyleTransform
+		Skipped  tui.StyleTransform
+		Manual   tui.StyleTransform
+	}
+}
+
+func (s Step) Values(v interface{}) map[tui.ColumnID]tui.StyledString {
+	conf := v.(StepStyle)
+
 	timeToString := func(t time.Time) string {
-		return t.In(loc).Truncate(time.Second).Format("Jan 2 15:04")
+		return t.In(conf.Location).Truncate(time.Second).Format("Jan 2 15:04")
 	}
 
 	nullTimeToString := func(t utils.NullTime) tui.StyledString {
@@ -443,14 +467,20 @@ func (s Step) Values(loc *time.Location) map[tui.ColumnID]tui.StyledString {
 
 	state := tui.NewStyledString(string(s.State))
 	switch s.State {
-	case Failed, Canceled:
-		state.Add(tui.StatusFailed)
+	case Failed:
+		state.Apply(conf.Status.Failed)
+	case Canceled:
+		state.Apply(conf.Status.Canceled)
 	case Passed:
-		state.Add(tui.StatusPassed)
+		state.Apply(conf.Status.Passed)
 	case Running:
-		state.Add(tui.StatusRunning)
-	case Pending, Skipped, Manual:
-		state.Add(tui.StatusSkipped)
+		state.Apply(conf.Status.Running)
+	case Pending:
+		state.Apply(conf.Status.Pending)
+	case Skipped:
+		state.Apply(conf.Status.Skipped)
+	case Manual:
+		state.Apply(conf.Status.Manual)
 	}
 
 	webURL := "-"
@@ -487,7 +517,7 @@ type Pipeline struct {
 	providerID   string
 	ProviderHost string
 	ProviderName string
-	GitReference // FIXME Remove?
+	GitReference
 	Step
 }
 
@@ -541,8 +571,10 @@ func (p Pipeline) InheritedValues() []tui.ColumnID {
 	return nil
 }
 
-func (p Pipeline) Values(loc *time.Location) map[tui.ColumnID]tui.StyledString {
-	values := p.Step.Values(loc)
+func (p Pipeline) Values(v interface{}) map[tui.ColumnID]tui.StyledString {
+	conf := v.(StepStyle)
+
+	values := p.Step.Values(conf)
 
 	number := p.Number
 	if number == "" {
@@ -553,16 +585,16 @@ func (p Pipeline) Values(loc *time.Location) map[tui.ColumnID]tui.StyledString {
 	}
 	values[ColumnPipeline] = tui.NewStyledString(number)
 
-	name := tui.NewStyledString(p.ProviderName, tui.Provider)
+	name := tui.NewStyledString(p.ProviderName, conf.Provider)
 	if p.Name != "" {
 		name.Append(fmt.Sprintf(": %s", p.Name))
 	}
 	values[ColumnName] = name
 
 	if p.IsTag {
-		values[ColumnRef] = tui.NewStyledString(p.Ref, tui.GitTag)
+		values[ColumnRef] = tui.NewStyledString(p.Ref, conf.Tag)
 	} else {
-		values[ColumnRef] = tui.NewStyledString(p.Ref, tui.GitBranch)
+		values[ColumnRef] = tui.NewStyledString(p.Ref, conf.Branch)
 	}
 
 	return values
@@ -577,6 +609,95 @@ type Cache struct {
 	pipelineByKey map[PipelineKey]*Pipeline
 	pipelineByRef map[string]map[PipelineKey]*Pipeline
 }
+
+type Configuration struct {
+	GitLab []struct {
+		Name              string  `toml:"name" default:"gitlab"`
+		URL               string  `toml:"url"`
+		Token             string  `toml:"token"`
+		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+	}
+	GitHub []struct {
+		Token string `toml:"token"`
+	}
+	CircleCI []struct {
+		Name              string  `toml:"name" default:"circleci"`
+		Token             string  `toml:"token"`
+		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+	}
+	Travis []struct {
+		Name              string  `toml:"name" default:"travis"`
+		URL               string  `toml:"url"`
+		Token             string  `toml:"token"`
+		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+	}
+	AppVeyor []struct {
+		Name              string  `toml:"name" default:"appveyor"`
+		Token             string  `toml:"token"`
+		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+	}
+	Azure []struct {
+		Name              string  `toml:"name" default:"azure"`
+		Token             string  `toml:"token"`
+		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+	}
+}
+
+func (c Configuration) ToCache(ctx context.Context) (Cache, error) {
+	source := make([]SourceProvider, 0)
+	ci := make([]CIProvider, 0)
+
+	for i, conf := range c.GitLab {
+		id := fmt.Sprintf("gitlab-%d", i)
+		client, err := NewGitLabClient(id, conf.Name, conf.URL, conf.Token, conf.RequestsPerSecond)
+		if err != nil {
+			return Cache{}, err
+		}
+		source = append(source, client)
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.GitHub {
+		id := fmt.Sprintf("github-%d", i)
+		client := NewGitHubClient(ctx, id, &conf.Token)
+		source = append(source, client)
+	}
+
+	for i, conf := range c.CircleCI {
+		id := fmt.Sprintf("circleci-%d", i)
+		client := NewCircleCIClient(id, conf.Name, conf.Token, conf.RequestsPerSecond)
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.AppVeyor {
+		id := fmt.Sprintf("appveyor-%d", i)
+		client := NewAppVeyorClient(id, conf.Name, conf.Token, conf.RequestsPerSecond)
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.Travis {
+		id := fmt.Sprintf("travis-%d", i)
+		client, err := NewTravisClient(id, conf.Name, conf.Token, conf.URL, conf.RequestsPerSecond)
+		if err != nil {
+			return Cache{}, err
+		}
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.Azure {
+		id := fmt.Sprintf("azure-%d", i)
+		client := NewAzurePipelinesClient(id, conf.Name, conf.Token, conf.RequestsPerSecond)
+		ci = append(ci, client)
+	}
+
+	if len(ci) == 0 || len(source) == 0 {
+		return Cache{}, ErrNoProvider
+	}
+
+	return NewCache(ci, source), nil
+}
+
+var ErrNoProvider = errors.New("list of providers must not be empty")
 
 func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache {
 	providersByAccountID := make(map[string]CIProvider, len(CIProviders))

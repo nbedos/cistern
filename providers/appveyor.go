@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/utils"
 )
 
@@ -22,7 +21,7 @@ type AppVeyorClient struct {
 	client      *http.Client
 	rateLimiter <-chan time.Time
 	token       string
-	provider    cache.Provider
+	provider    Provider
 }
 
 var appVeyorURL = url.URL{
@@ -38,16 +37,12 @@ func NewAppVeyorClient(id string, name string, token string, requestsPerSecond f
 		rateLimit = time.Second / time.Duration(requestsPerSecond)
 	}
 
-	if name == "" {
-		name = "appveyor"
-	}
-
 	return AppVeyorClient{
 		url:         appVeyorURL,
 		client:      &http.Client{Timeout: 10 * time.Second},
 		rateLimiter: time.Tick(rateLimit),
 		token:       token,
-		provider: cache.Provider{
+		provider: Provider{
 			ID:   id,
 			Name: name,
 		},
@@ -66,9 +61,9 @@ func (c AppVeyorClient) Name() string {
 	return c.provider.Name
 }
 
-func (c AppVeyorClient) Log(ctx context.Context, step cache.Step) (string, error) {
-	if step.Type != cache.StepJob {
-		return "", cache.ErrNoLogHere
+func (c AppVeyorClient) Log(ctx context.Context, step Step) (string, error) {
+	if step.Type != StepJob {
+		return "", ErrNoLogHere
 	}
 
 	endpoint := c.url
@@ -92,10 +87,10 @@ func (c AppVeyorClient) Log(ctx context.Context, step cache.Step) (string, error
 	return string(log), err
 }
 
-func (c AppVeyorClient) BuildFromURL(ctx context.Context, u string) (cache.Pipeline, error) {
+func (c AppVeyorClient) BuildFromURL(ctx context.Context, u string) (Pipeline, error) {
 	owner, repo, id, err := parseAppVeyorURL(u)
 	if err != nil {
-		return cache.Pipeline{}, err
+		return Pipeline{}, err
 	}
 
 	return c.fetchPipeline(ctx, owner, repo, id)
@@ -153,7 +148,7 @@ func (c AppVeyorClient) get(ctx context.Context, u url.URL) (io.ReadCloser, erro
 	return resp.Body, err
 }
 
-func (c AppVeyorClient) fetchPipeline(ctx context.Context, owner string, repoName string, id int) (cache.Pipeline, error) {
+func (c AppVeyorClient) fetchPipeline(ctx context.Context, owner string, repoName string, id int) (Pipeline, error) {
 	// We only have the build ID and need a build object. We have to query two endpoints:
 	// 		1. /projects/owner/repoName/history with startBuildId = id gives us a build object with
 	//      an empty job list but with a version number
@@ -177,14 +172,14 @@ func (c AppVeyorClient) fetchPipeline(ctx context.Context, owner string, repoNam
 		Builds []appVeyorBuild `json:"builds"`
 	}
 	if err := c.getJSON(ctx, history, &b); err != nil {
-		return cache.Pipeline{}, err
+		return Pipeline{}, err
 	}
 
 	if len(b.Builds) != 1 {
-		return cache.Pipeline{}, fmt.Errorf("found no build with id %d", id)
+		return Pipeline{}, fmt.Errorf("found no build with id %d", id)
 	}
 	if b.Builds[0].ID != id {
-		return cache.Pipeline{}, fmt.Errorf("expected build #%d but got %d", id, b.Builds[0].ID)
+		return Pipeline{}, fmt.Errorf("expected build #%d but got %d", id, b.Builds[0].ID)
 	}
 	version := b.Builds[0].Version
 
@@ -197,7 +192,7 @@ func (c AppVeyorClient) fetchPipeline(ctx context.Context, owner string, repoNam
 		Build appVeyorBuild `json:"build"`
 	}
 	if err := c.getJSON(ctx, endpoint, &bVersion); err != nil {
-		return cache.Pipeline{}, err
+		return Pipeline{}, err
 	}
 
 	return bVersion.Build.toCachePipeline(b.Project.Owner, b.Project.Name)
@@ -211,13 +206,13 @@ func parseAppVeyorURL(u string) (string, string, int, error) {
 	}
 
 	if !strings.HasSuffix(v.Hostname(), "appveyor.com") {
-		return "", "", 0, cache.ErrUnknownPipelineURL
+		return "", "", 0, ErrUnknownPipelineURL
 	}
 
 	// url format: https://ci.appveyor.com/project/nbedos/cistern/builds/29070120
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 6 || cs[1] != "project" || cs[4] != "builds" {
-		return "", "", 0, cache.ErrUnknownPipelineURL
+		return "", "", 0, ErrUnknownPipelineURL
 	}
 
 	owner, repo := cs[2], cs[3]
@@ -228,20 +223,20 @@ func parseAppVeyorURL(u string) (string, string, int, error) {
 	return owner, repo, id, nil
 }
 
-func fromAppVeyorState(s string) cache.State {
+func fromAppVeyorState(s string) State {
 	switch strings.ToLower(s) {
 	case "queued", "received", "starting":
-		return cache.Pending
+		return Pending
 	case "running":
-		return cache.Running
+		return Running
 	case "success":
-		return cache.Passed
+		return Passed
 	case "failed":
-		return cache.Failed
+		return Failed
 	case "cancelled":
-		return cache.Canceled
+		return Canceled
 	default:
-		return cache.Unknown
+		return Unknown
 	}
 }
 
@@ -264,22 +259,22 @@ type appVeyorBuild struct {
 	UpdatedAt   string        `json:"updated"`
 }
 
-func (b appVeyorBuild) toCachePipeline(owner string, repository string) (cache.Pipeline, error) {
+func (b appVeyorBuild) toCachePipeline(owner string, repository string) (Pipeline, error) {
 	ref := b.Branch
 	if b.IsTag {
 		ref = b.Tag
 	}
 
-	pipeline := cache.Pipeline{
+	pipeline := Pipeline{
 		Number: strconv.Itoa(b.Number),
-		GitReference: cache.GitReference{
+		GitReference: GitReference{
 			SHA:   b.Sha,
 			Ref:   ref,
 			IsTag: b.IsTag,
 		},
-		Step: cache.Step{
+		Step: Step{
 			ID:    strconv.Itoa(b.ID),
-			Type:  cache.StepPipeline,
+			Type:  StepPipeline,
 			State: fromAppVeyorState(b.Status),
 		},
 	}
@@ -337,13 +332,13 @@ type appVeyorJob struct {
 	FinishedAt   string `json:"finished"`
 }
 
-func (j appVeyorJob) toCacheStep(id string, buildURL string) (cache.Step, error) {
+func (j appVeyorJob) toCacheStep(id string, buildURL string) (Step, error) {
 	if id == "" {
-		return cache.Step{}, errors.New("job id must not be the empty string")
+		return Step{}, errors.New("job id must not be the empty string")
 	}
-	step := cache.Step{
+	step := Step{
 		ID:    id,
-		Type:  cache.StepJob,
+		Type:  StepJob,
 		State: fromAppVeyorState(j.Status),
 		Name:  j.Name,
 		WebURL: utils.NullString{

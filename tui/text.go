@@ -26,8 +26,8 @@ const (
 )
 
 type elementaryString struct {
-	Content string
-	Classes []Class
+	Content   string
+	Transform StyleTransform
 }
 
 type StyledString struct {
@@ -42,17 +42,14 @@ func (s StyledString) String() string {
 	return buf.String()
 }
 
-func (s *StyledString) Add(c Class) {
+func (s *StyledString) Apply(t StyleTransform) {
 	for i := range s.components {
-		s.components[i].Classes = append(s.components[i].Classes, c)
+		s.components[i].Transform = t.On(s.components[i].Transform)
 	}
 }
 
-func (s *StyledString) Append(content string, classes ...Class) {
-	s.components = append(s.components, elementaryString{
-		Content: content,
-		Classes: classes,
-	})
+func (s *StyledString) Append(content string, t ...StyleTransform) {
+	s.AppendString(NewStyledString(content, t...))
 }
 
 func (s *StyledString) AppendString(other StyledString) {
@@ -153,28 +150,26 @@ func (s StyledString) Contains(value string) bool {
 	return strings.Contains(b.String(), value)
 }
 
-func NewStyledString(content string, classes ...Class) StyledString {
-	return StyledString{
+func NewStyledString(content string, ts ...StyleTransform) StyledString {
+	s := StyledString{
 		components: []elementaryString{
 			{
 				Content: content,
-				Classes: classes,
 			},
 		},
 	}
+	for _, t := range ts {
+		s.Apply(t)
+	}
+	return s
 }
 
-type StyleSheet = map[Class]func(s tcell.Style) tcell.Style
-
-func (s StyledString) Draw(screen tcell.Screen, y int, style tcell.Style, styleSheet StyleSheet) {
+func (s StyledString) Draw(screen tcell.Screen, y int, style tcell.Style) {
 	x := 0
 	for _, component := range s.components {
 		s := style
-		for _, c := range component.Classes {
-			f, exists := styleSheet[c]
-			if exists && f != nil {
-				s = f(s)
-			}
+		if component.Transform != nil {
+			s = component.Transform(s)
 		}
 
 		for _, r := range component.Content {
