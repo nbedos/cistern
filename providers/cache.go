@@ -196,6 +196,7 @@ func (c Commit) StyledStrings(conf GitStyle) []tui.StyledString {
 			if branch == c.Head {
 				var s tui.StyledString
 				s.Append("HEAD -> ", conf.Head)
+				s.Append(branch, conf.Branch)
 				refs = append([]tui.StyledString{s}, refs...)
 			} else {
 				refs = append(refs, tui.NewStyledString(branch, conf.Branch))
