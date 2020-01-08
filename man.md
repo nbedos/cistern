@@ -128,15 +128,15 @@ Right, l   Scroll right
 
 Left, h    Scroll left
 
+Page Up    Move cursor up by one screen
+
+Page Down  Move cursor down by one screen
+
 <          Move sort column left
 
 \>         Move sort column right
 
 !          Reverse sort order
-
-Page Up    Move cursor up by one screen
-
-Page Down  Move cursor down by one screen
 
 o, +       Open the fold at the cursor
 

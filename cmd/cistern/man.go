@@ -230,6 +230,21 @@ T}@T{
 Move cursor down by one screen
 T}
 T{
+<
+T}@T{
+Move sort column left
+T}
+T{
+>
+T}@T{
+Move sort column right
+T}
+T{
+!
+T}@T{
+Reverse sort order
+T}
+T{
 o, +
 T}@T{
 Open the fold at the cursor
@@ -315,13 +330,9 @@ If \f[C]XDG_CONFIG_HOME\f[R] (resp.
 cistern uses a configuration file in TOML version
 v0.5.0 (https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md)
 format.
-The configuration file is made of keys grouped together in tables.
-The specification of each table is given in the example below.
-.SS Reference
 .PP
-The complete format of the configuration file is described in a
-self-documenting example included in the release archives and also
-available on
+The complete format of the configuration file is described in the
+example included in the release archives which is also available on
 GitHub (https://github.com/nbedos/cistern/blob/master/cmd/cistern/cistern.toml)
 .SS Minimal example
 .PP
@@ -359,8 +370,8 @@ sort = \[dq]-started\[dq]
 # cistern will still run but with some limitations:
 #     - GitHub: cistern will hit the rate-limit for
 #     unauthenticated requests in a few minutes
-#     - GitLab: cistern will NOT be able to access job of
-#     pipelines
+#     - GitLab: cistern will NOT be able to access pipeline
+#     jobs
 #
 
 ### GITHUB ###
@@ -472,7 +483,7 @@ Monitor pipelines of other repositories
 cistern -r https://gitlab.com/nbedos/cistern        # Web URL
 cistern -r git\[at]github.com:nbedos/cistern.git        # Git URL
 cistern -r github.com/nbedos/cistern                # URL without scheme
-cistern -r /home/user/repos/repo                  # Path to a repository
+cistern -r /home/user/repos/repo                    # Path to a repository
 
 # Specify both repository and git reference
 cistern -r github.com/nbedos/cistern master

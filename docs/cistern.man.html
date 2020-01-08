@@ -5,7 +5,7 @@
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <meta name="author" content="Nicolas Bedos" />
-  <title>CISTERN(1) | version 0.2.0dev0-6-gb627dab-dirty-linux-amd64</title>
+  <title>CISTERN(1) | version 0.2.0dev0-23-g9a477eb-linux-amd64</title>
   <style>
       code{white-space: pre-wrap;}
       span.smallcaps{font-variant: small-caps;}
@@ -19,7 +19,7 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">CISTERN(1) | version 0.2.0dev0-6-gb627dab-dirty-linux-amd64</h1>
+<h1 class="title">CISTERN(1) | version 0.2.0dev0-23-g9a477eb-linux-amd64</h1>
 <p class="author">Nicolas Bedos</p>
 </header>
 <h1 id="name">NAME</h1>
@@ -118,6 +118,25 @@ cistern -r /home/user/repos/myrepo</code></pre>
 <p>Show usage of cistern</p>
 <h2 id="version"><code>--version</code></h2>
 <p>Print the version of cistern being run</p>
+<h1 id="columns">COLUMNS</h1>
+<h2 id="ref">REF</h2>
+<p>Tag or branch associated to the pipeline</p>
+<h2 id="pipeline">PIPELINE</h2>
+<p>Identifier of the pipeline</p>
+<h2 id="type">TYPE</h2>
+<p>Either “P” (Pipeline), “S” (Stage), “J” (Job) or “T” (Task)</p>
+<h2 id="state">STATE</h2>
+<p>State of the pipeline</p>
+<h2 id="xfail">XFAIL</h2>
+<p>Expected failure. Boolean indicating whether this step is allowed to fail without impacting the overall state of the pipeline</p>
+<h2 id="created-started-finished">CREATED, STARTED, FINISHED</h2>
+<p>Date when the pipeline was created, started or finished</p>
+<h2 id="duration">DURATION</h2>
+<p>Time it took for the pipeline to finish</p>
+<h2 id="name-1">NAME</h2>
+<p>Name of the provider followed by the name of the pipeline, if any</p>
+<h2 id="url">URL</h2>
+<p>URL of the step on the website of the provider</p>
 <h1 id="interactive-commands">INTERACTIVE COMMANDS</h1>
 <p>Below are the default commands for interacting with cistern.</p>
 <table style="width:82%;">
@@ -141,6 +160,14 @@ cistern -r /home/user/repos/myrepo</code></pre>
 <td style="text-align: left;">Move cursor down by one line</td>
 </tr>
 <tr class="odd">
+<td style="text-align: left;">Right, l</td>
+<td style="text-align: left;">Scroll right</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Left, h</td>
+<td style="text-align: left;">Scroll left</td>
+</tr>
+<tr class="odd">
 <td style="text-align: left;">Page Up</td>
 <td style="text-align: left;">Move cursor up by one screen</td>
 </tr>
@@ -149,50 +176,62 @@ cistern -r /home/user/repos/myrepo</code></pre>
 <td style="text-align: left;">Move cursor down by one screen</td>
 </tr>
 <tr class="odd">
+<td style="text-align: left;">&lt;</td>
+<td style="text-align: left;">Move sort column left</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">&gt;</td>
+<td style="text-align: left;">Move sort column right</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">!</td>
+<td style="text-align: left;">Reverse sort order</td>
+</tr>
+<tr class="even">
 <td style="text-align: left;">o, +</td>
 <td style="text-align: left;">Open the fold at the cursor</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;">O</td>
 <td style="text-align: left;">Open the fold at the cursor and all sub-folds</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;">c, -</td>
 <td style="text-align: left;">Close the fold at the cursor</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;">C</td>
 <td style="text-align: left;">Close the fold at the cursor and all sub-folds</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;">/</td>
 <td style="text-align: left;">Open search prompt</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;">Escape</td>
 <td style="text-align: left;">Close search prompt</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;">Enter, n</td>
 <td style="text-align: left;">Move to the next match</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;">N</td>
 <td style="text-align: left;">Move to the previous match</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;">v</td>
 <td style="text-align: left;">View the log of the job at the cursor<sup>[a]</sup></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;">b</td>
 <td style="text-align: left;">Open with default web browser</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;">q</td>
 <td style="text-align: left;">Quit</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;">?</td>
 <td style="text-align: left;">View manual page</td>
 </tr>
@@ -210,69 +249,57 @@ cistern -r /home/user/repos/myrepo</code></pre>
 </ol>
 <p>If <code>XDG_CONFIG_HOME</code> (resp. <code>XDG_CONFIG_DIRS</code>) is not set, cistern uses the default value <code>"$HOME/.config"</code> (resp. <code>"/etc/xdg"</code>) instead.</p>
 <h2 id="format">Format</h2>
-<p>cistern uses a configuration file in <a href="https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md">TOML version v0.5.0</a> format. The configuration file is made of keys grouped together in tables. The specification of each table is given in the example below.</p>
-<h2 id="example">Example</h2>
-<p>This example describes and uses all existing configuration options.</p>
+<p>cistern uses a configuration file in <a href="https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md">TOML version v0.5.0</a> format.</p>
+<p>The complete format of the configuration file is described in the example included in the release archives which is also available <a href="https://github.com/nbedos/cistern/blob/master/cmd/cistern/cistern.toml">on GitHub</a></p>
+<h2 id="minimal-example">Minimal example</h2>
+<p>This is a minimal example of a configuration file focused mostly on setting up credentials. It should be enough to get you started running cistern.</p>
 <pre class="toml"><code>#### CISTERN CONFIGURATION FILE ####
-# This file is a complete, valid configuration file for cistern
-# and should be located at $XDG_CONFIG_HOME/cistern/cistern.toml
-# 
+# This is a configuration file for cistern that should be located at
+# $XDG_CONFIG_HOME/cistern/cistern.toml
+
+## GENERIC OPTIONS ##
+# List of columns displayed on screen. Available columns are 
+# &quot;ref&quot;, &quot;pipeline&quot;, &quot;type&quot;, &quot;state&quot;, &quot;created&quot;, &quot;started&quot;,
+# &quot;finished&quot;, &quot;duration&quot;, &quot;xfail&quot;, &quot;name&quot;, &quot;url&quot;
+columns = [&quot;ref&quot;, &quot;pipeline&quot;, &quot;type&quot;, &quot;state&quot;, &quot;started&quot;, &quot;duration&quot;, &quot;name&quot;, &quot;url&quot;]
+
+# Name of the column used for sorting the table prefixed by an
+# optional &quot;+&quot; (ascending order) or &quot;-&quot; (descending order).
+sort = &quot;-started&quot;
+
 
 ## PROVIDERS ##
 [providers]
-# The &#39;providers&#39; table is used to define credentials for 
-# accessing online services. cistern relies on two types of
-# providers:
+# The sections below define credentials for accessing source 
+# providers (GitHub, GitLab) and CI providers (GitLab, Travis,
+# AppVeyor, Azure Devops, CircleCI).
 #
-#    - &#39;source providers&#39; are used for listing the CI pipelines
-#    associated to a given commit (GitHub and GitLab are source
-#    providers)
-#    - &#39;CI providers&#39; are used to get detailed information about
-#    CI pipelines (GitLab, AppVeyor, CircleCI, Travis and Azure
-#    Devops are CI providers)
-#
-# cistern requires credentials for at least one source provider and
-# one CI provider to run. Feel free to remove sections below 
-# as long as this rule is met.
-#
-# Note that for all providers, not setting an API token or 
-# setting `token = &quot;&quot;` will cause the provider to make
-# unauthenticated API requests. 
+# Feel free to remove any section as long as you leave one
+# section for a source provider and one for a CI provider.
+# 
+# When an API token is not set or set to the empty string,
+# cistern will still run but with some limitations:
+#     - GitHub: cistern will hit the rate-limit for
+#     unauthenticated requests in a few minutes
+#     - GitLab: cistern will NOT be able to access pipeline
+#     jobs
 #
 
 ### GITHUB ###
 [[providers.github]]
 # GitHub API token (optional, string)
-#
-# Note: Unauthenticated API requests are heavily rate-limited by 
-# GitHub (60 requests per hour and per IP address) whereas 
-# authenticated clients benefit from a rate of 5000 requests per
-# hour. Providing an  API token is strongly encouraged: without
-# one, cistern will likely reach the rate limit in a matter of
-# minutes.
-#
 # GitHub token management: https://github.com/settings/tokens
 token = &quot;&quot;
 
 
 ### GITLAB ###
 [[providers.gitlab]]
-# Name shown by cistern for this provider
-# (optional, string, default: &quot;gitlab&quot;)
-name = &quot;gitlab&quot;
-
-# GitLab instance URL (optional, string, default: &quot;https://gitlab.com&quot;)
+# GitLab instance URL (optional, string, default:
+# &quot;https://gitlab.com&quot;)
 # (the GitLab instance must support GitLab REST API V4)
 url = &quot;https://gitlab.com&quot;
 
 # GitLab API token (optional, string)
-#
-# Note: GitLab prevents access to pipeline jobs for 
-# unauthenticated users meaning if you wish to use cistern
-# to view GitLab pipelines you will have to provide
-# appropriate credentials. This is true even for pipelines
-# of public repositories.
-#
 # gitlab.com token management:
 #     https://gitlab.com/profile/personal_access_tokens
 token = &quot;&quot;
@@ -280,16 +307,12 @@ token = &quot;&quot;
 
 ### TRAVIS CI ###
 [[providers.travis]]
-# Name shown by cistern for this provider
-# (optional, string, default: &quot;travis&quot;)
-name = &quot;travis&quot;
-
 # URL of the Travis instance. &quot;org&quot; and &quot;com&quot; can be used as
 # shorthands for the full URL of travis.org and travis.com
 # (string, mandatory)
 url = &quot;org&quot;
 
-# API access token for the travis API (string, optional)
+# API access token for the travis API (string, optional).
 # Travis tokens are managed at:
 #    - https://travis-ci.org/account/preferences
 #    - https://travis-ci.com/account/preferences
@@ -298,17 +321,12 @@ token = &quot;&quot;
 
 # Define another account for accessing travis.com
 [[providers.travis]]
-name = &quot;travis&quot;
 url = &quot;com&quot;
 token = &quot;&quot;
 
 
 ### APPVEYOR ###
 [[providers.appveyor]]
-# Name shown by cistern for this provider
-# (optional, string, default: &quot;appveyor&quot;)
-name = &quot;appveyor&quot;
-
 # AppVeyor API token (optional, string)
 # AppVeyor token managemement: https://ci.appveyor.com/api-keys
 token = &quot;&quot;
@@ -316,10 +334,6 @@ token = &quot;&quot;
 
 ### CIRCLECI ###
 [[providers.circleci]]
-# Name shown by cistern for this provider
-# (optional, string, default: &quot;circleci&quot;)
-name = &quot;circleci&quot;
-
 # Circle CI API token (optional, string)
 # See https://circleci.com/account/api
 token = &quot;&quot;
@@ -327,10 +341,6 @@ token = &quot;&quot;
 
 ### AZURE DEVOPS ###
 [[providers.azure]]
-# Name shown by cistern for this provider
-# (optional, string, default: &quot;azure&quot;)
-name = &quot;azure&quot;
-
 # Azure API token (optional, string)
 # Azure token management is done at https://dev.azure.com/ via
 # the user settings menu
@@ -366,7 +376,7 @@ cistern master</code></pre>
 cistern -r https://gitlab.com/nbedos/cistern        # Web URL
 cistern -r git@github.com:nbedos/cistern.git        # Git URL
 cistern -r github.com/nbedos/cistern                # URL without scheme
-cistern -r /home/user/repos/repo                  # Path to a repository
+cistern -r /home/user/repos/repo                    # Path to a repository
 
 # Specify both repository and git reference
 cistern -r github.com/nbedos/cistern master</code></pre>
