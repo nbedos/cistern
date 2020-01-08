@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/utils"
 )
 
@@ -59,7 +58,7 @@ func Setup() (AzurePipelinesClient, func(), error) {
 		httpClient:  testServer.Client(),
 		rateLimiter: time.Tick(time.Millisecond),
 		token:       "",
-		provider: cache.Provider{
+		provider: Provider{
 			ID:   "azure",
 			Name: "azure",
 		},
@@ -73,22 +72,19 @@ func Setup() (AzurePipelinesClient, func(), error) {
 	return client, teardown, nil
 }
 
-var expectedPipeline = cache.Pipeline{
+var expectedPipeline = Pipeline{
 	Number: "20191204.3",
-	GitReference: cache.GitReference{
+	GitReference: GitReference{
 		SHA:   "5e4d496d63086609cb3c03aa0ee4e032e4b6b08b",
 		Ref:   "azure-pipelines",
 		IsTag: false,
 	},
-	Step: cache.Step{
-		ID:    "16",
-		Name:  "owner.repo (1)",
-		Type:  cache.StepPipeline,
-		State: cache.Failed,
-		CreatedAt: utils.NullTime{
-			Valid: true,
-			Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-		},
+	Step: Step{
+		ID:        "16",
+		Name:      "owner.repo (1)",
+		Type:      StepPipeline,
+		State:     Failed,
+		CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 		StartedAt: utils.NullTime{
 			Valid: true,
 			Time:  time.Date(2019, 12, 4, 13, 9, 52, 764105000, time.UTC),
@@ -106,12 +102,13 @@ var expectedPipeline = cache.Pipeline{
 			String: "http://HOST/owner/repo/_build/results?buildId=16",
 			Valid:  true,
 		},
-		Children: []cache.Step{
+		Children: []Step{
 			{
-				ID:    "8bfbeaae-4c8e-5f12-f154-edd305817000",
-				Type:  cache.StepStage,
-				Name:  "tests",
-				State: "failed",
+				ID:        "8bfbeaae-4c8e-5f12-f154-edd305817000",
+				Type:      StepStage,
+				Name:      "tests",
+				State:     "failed",
+				CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 				StartedAt: utils.NullTime{
 					Valid: true,
 					Time:  time.Date(2019, 12, 4, 13, 9, 56, 653333300, time.UTC),
@@ -128,16 +125,13 @@ var expectedPipeline = cache.Pipeline{
 					String: "http://HOST/owner/repo/_build/results?buildId=16",
 					Valid:  true,
 				},
-				Children: []cache.Step{
+				Children: []Step{
 					{
-						ID:    "a1fe9f00-6aac-5c3d-c3c6-290a6d3ec2ef",
-						Type:  cache.StepJob,
-						State: "failed",
-						Name:  "Ubuntu_16_04",
-						CreatedAt: utils.NullTime{
-							Valid: true,
-							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-						},
+						ID:        "a1fe9f00-6aac-5c3d-c3c6-290a6d3ec2ef",
+						Type:      StepJob,
+						State:     "failed",
+						Name:      "Ubuntu_16_04",
+						CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 						StartedAt: utils.NullTime{
 							Valid: true,
 							Time:  time.Date(2019, 12, 4, 13, 10, 0, 713333300, time.UTC),
@@ -156,14 +150,11 @@ var expectedPipeline = cache.Pipeline{
 						},
 					},
 					{
-						ID:    "e305bc7f-849a-5981-f9f4-d079b0b7f451",
-						Type:  cache.StepJob,
-						State: "failed",
-						Name:  "Ubuntu_18_04",
-						CreatedAt: utils.NullTime{
-							Valid: true,
-							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-						},
+						ID:        "e305bc7f-849a-5981-f9f4-d079b0b7f451",
+						Type:      StepJob,
+						State:     "failed",
+						Name:      "Ubuntu_18_04",
+						CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 						StartedAt: utils.NullTime{
 							Valid: true,
 							Time:  time.Date(2019, 12, 4, 13, 9, 56, 653333300, time.UTC),
@@ -182,14 +173,11 @@ var expectedPipeline = cache.Pipeline{
 						},
 					},
 					{
-						ID:    "aa83c9de-d200-5148-7d44-5e08a0dd6659",
-						Type:  cache.StepJob,
-						State: "failed",
-						Name:  "macoOS_10_14",
-						CreatedAt: utils.NullTime{
-							Valid: true,
-							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
-						},
+						ID:        "aa83c9de-d200-5148-7d44-5e08a0dd6659",
+						Type:      StepJob,
+						State:     "failed",
+						Name:      "macoOS_10_14",
+						CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 						StartedAt: utils.NullTime{
 							Valid: true,
 							Time:  time.Date(2019, 12, 4, 13, 9, 59, 943333300, time.UTC),
@@ -206,12 +194,13 @@ var expectedPipeline = cache.Pipeline{
 							String: "http://HOST/owner/repo/_build/results?buildId=16",
 							Valid:  true,
 						},
-						Children: []cache.Step{
+						Children: []Step{
 							{
-								ID:    "fd63e659-60cf-51c7-a63d-0111af4550dd",
-								Name:  "Set up the Go workspace",
-								Type:  cache.StepTask,
-								State: "passed",
+								ID:        "fd63e659-60cf-51c7-a63d-0111af4550dd",
+								Name:      "Set up the Go workspace",
+								Type:      StepTask,
+								State:     "passed",
+								CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 								StartedAt: utils.NullTime{
 									Valid: true,
 									Time:  time.Date(2019, 12, 4, 13, 10, 3, 153333300, time.UTC),
@@ -230,10 +219,11 @@ var expectedPipeline = cache.Pipeline{
 								},
 							},
 							{
-								ID:    "bebceb1b-138c-57de-594c-688f96e7a793",
-								Name:  "Build",
-								Type:  cache.StepTask,
-								State: "failed",
+								ID:        "bebceb1b-138c-57de-594c-688f96e7a793",
+								Name:      "Build",
+								Type:      StepTask,
+								State:     "failed",
+								CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
 								StartedAt: utils.NullTime{
 									Valid: true,
 									Time:  time.Date(2019, 12, 4, 13, 10, 3, 870000000, time.UTC),
@@ -259,8 +249,8 @@ var expectedPipeline = cache.Pipeline{
 	},
 }
 
-func setWebURLs(p cache.Pipeline, webURL utils.NullString) cache.Pipeline {
-	p.Step = p.Step.Map(func(s cache.Step) cache.Step {
+func setWebURLs(p Pipeline, webURL utils.NullString) Pipeline {
+	p.Step = p.Step.Map(func(s Step) Step {
 		s.WebURL = webURL
 		return s
 	})
@@ -270,7 +260,7 @@ func setWebURLs(p cache.Pipeline, webURL utils.NullString) cache.Pipeline {
 
 func TestAzurePipelinesClient_parseAzureWebURL(t *testing.T) {
 	webURL := "https://dev.azure.com/owner/repo/_build/results?buildId=16"
-	client := NewAzurePipelinesClient("azure", "azure", "", time.Second)
+	client := NewAzurePipelinesClient("azure", "azure", "", 1)
 	owner, repo, id, err := client.parseAzureWebURL(webURL)
 	if err != nil || owner != "owner" || repo != "repo" || id != "16" {
 		t.Fatalf("invalid result")
@@ -335,10 +325,10 @@ func TestAzurePipelinesClient_Log(t *testing.T) {
 		Path:   "/owner/repo/_apis/build/builds/16/logs/1234",
 	}
 	ctx := context.Background()
-	job := cache.Step{
+	job := Step{
 		ID:   "1234",
-		Type: cache.StepJob,
-		Log: cache.Log{
+		Type: StepJob,
+		Log: Log{
 			Key: logURL.String(),
 		},
 	}

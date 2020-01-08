@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/utils"
 )
 
@@ -83,22 +82,19 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedPipeline := cache.Pipeline{
+	expectedPipeline := Pipeline{
 		Number: "",
-		GitReference: cache.GitReference{
+		GitReference: GitReference{
 			SHA:   "210b32c023c9c9668d7e0098bec24e64cfd37bd3",
 			Ref:   "master",
 			IsTag: false,
 		},
-		Step: cache.Step{
-			ID:    "36",
-			Name:  "build",
-			Type:  cache.StepPipeline,
-			State: cache.Passed,
-			CreatedAt: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
-			},
+		Step: Step{
+			ID:        "36",
+			Name:      "build",
+			Type:      StepPipeline,
+			State:     Passed,
+			CreatedAt: time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 21, 14, 40, 32, 555000000, time.UTC),
@@ -116,13 +112,14 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 				Valid:  true,
 				String: "https://circleci.com/gh/nbedos/cistern/36",
 			},
-			Log: cache.Log{},
-			Children: []cache.Step{
+			Log: Log{},
+			Children: []Step{
 				{
 					ID:    "0.0",
 					Name:  "Spin up Environment",
 					Type:  3,
 					State: "passed",
+					CreatedAt: time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
 					StartedAt: utils.NullTime{
 						Valid: true,
 						Time:  time.Date(2019, 11, 21, 14, 40, 32, 620000000, time.UTC),
@@ -139,7 +136,7 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 						Valid:  true,
 						String: "https://circleci.com/gh/nbedos/cistern/36",
 					},
-					Log: cache.Log{
+					Log: Log{
 						Key: "example.com/logurl",
 					},
 				},
@@ -161,8 +158,8 @@ func TestCircleCIClient_Log(t *testing.T) {
 		rateLimiter: time.Tick(time.Millisecond),
 	}
 
-	step := cache.Step{
-		Log: cache.Log{
+	step := Step{
+		Log: Log{
 			Key:     testURL.String() + "/cistern/log/36",
 			Content: utils.NullString{},
 		},

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/utils"
 )
 
@@ -37,15 +36,12 @@ func TestAppVeyorJob_ToCacheJob(t *testing.T) {
 		FinishedAt:   "2019-11-23T12:24:34.5646724+00:00",
 	}
 
-	expectedJob := cache.Step{
-		ID:    "id",
-		Type:  cache.StepJob,
-		State: "passed",
-		Name:  "name",
-		CreatedAt: utils.NullTime{
-			Valid: true,
-			Time:  time.Date(2019, 11, 23, 12, 24, 26, 918187100, time.UTC),
-		},
+	expectedJob := Step{
+		ID:        "id",
+		Type:      StepJob,
+		State:     "passed",
+		Name:      "name",
+		CreatedAt: time.Date(2019, 11, 23, 12, 24, 26, 918187100, time.UTC),
 		StartedAt: utils.NullTime{
 			Valid: true,
 			Time:  time.Date(2019, 11, 23, 12, 24, 31, 814573500, time.UTC),
@@ -94,20 +90,17 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 		UpdatedAt:   "2019-11-23T12:24:34.5646724+00:00",
 	}
 
-	expectedBuild := cache.Pipeline{
+	expectedBuild := Pipeline{
 		Number: "42",
-		GitReference: cache.GitReference{
+		GitReference: GitReference{
 			SHA:   "fd4c4ae5a4005e38c66566e2480087072620e9de",
 			Ref:   "feature/appveyor",
 			IsTag: false,
 		},
-		Step: cache.Step{
+		Step: Step{
 			ID:    "42",
 			State: "failed",
-			CreatedAt: utils.NullTime{
-				Valid: true,
-				Time:  time.Date(2019, 11, 23, 12, 24, 25, 590025800, time.UTC),
-			},
+			CreatedAt: time.Date(2019, 11, 23, 12, 24, 25, 590025800, time.UTC),
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 23, 12, 24, 31, 814573500, time.UTC),
@@ -193,7 +186,7 @@ func TestAppVeyorClient_BuildFromURL(t *testing.T) {
 		client:      &http.Client{Timeout: 10 * time.Second},
 		rateLimiter: time.Tick(time.Millisecond),
 		token:       "token",
-		provider: cache.Provider{
+		provider: Provider{
 			ID:   "id",
 			Name: "name",
 		},
@@ -236,15 +229,15 @@ func TestAppVeyorClient_Log(t *testing.T) {
 		client:      &http.Client{Timeout: 10 * time.Second},
 		rateLimiter: time.Tick(time.Millisecond),
 		token:       "token",
-		provider: cache.Provider{
+		provider: Provider{
 			ID:   "id",
 			Name: "name",
 		},
 	}
 
-	job := cache.Step{
+	job := Step{
 		ID:   "jobId",
-		Type: cache.StepJob,
+		Type: StepJob,
 	}
 	log, err := client.Log(context.Background(), job)
 	if err != nil {

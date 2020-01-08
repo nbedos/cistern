@@ -12,26 +12,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/utils"
 )
 
-func fromTravisState(s string) cache.State {
+func fromTravisState(s string) State {
 	switch strings.ToLower(s) {
 	case "created", "queued", "received":
-		return cache.Pending
+		return Pending
 	case "started":
-		return cache.Running
+		return Running
 	case "canceled":
-		return cache.Canceled
+		return Canceled
 	case "passed":
-		return cache.Passed
+		return Passed
 	case "failed", "errored":
-		return cache.Failed
+		return Failed
 	case "skipped":
-		return cache.Skipped
+		return Skipped
 	default:
-		return cache.Unknown
+		return Unknown
 	}
 }
 
@@ -60,18 +59,17 @@ type travisBuild struct {
 	Jobs []travisJob
 }
 
-func (b travisBuild) toPipeline(webURL string) (pipeline cache.Pipeline, err error) {
-	pipeline = cache.Pipeline{
+func (b travisBuild) toPipeline(webURL string) (pipeline Pipeline, err error) {
+	pipeline = Pipeline{
 		Number: b.Number,
-		GitReference: cache.GitReference{
+		GitReference: GitReference{
 			SHA:   b.Commit.Sha,
 			Ref:   "",
 			IsTag: b.Tag.Name != "",
 		},
-		Step: cache.Step{
-			ID:        strconv.Itoa(b.ID),
-			State:     fromTravisState(b.State),
-			CreatedAt: utils.NullTime{}, // FIXME We need this
+		Step: Step{
+			ID:    strconv.Itoa(b.ID),
+			State: fromTravisState(b.State),
 			Duration: utils.NullDuration{
 				Duration: time.Duration(b.Duration) * time.Second,
 				Valid:    b.Duration > 0,
@@ -103,12 +101,19 @@ func (b travisBuild) toPipeline(webURL string) (pipeline cache.Pipeline, err err
 	sort.Slice(b.Jobs, func(i, j int) bool {
 		return b.Jobs[i].Stage.ID < b.Jobs[j].Stage.ID || (b.Jobs[i].Stage.ID == b.Jobs[j].Stage.ID && b.Jobs[i].ID < b.Jobs[j].ID)
 	})
-	for _, travisJob := range b.Jobs {
+	for i, travisJob := range b.Jobs {
 		job, err := travisJob.toStep(webURL)
 		if err != nil {
 			return pipeline, err
 		}
-		pipeline.CreatedAt = utils.MinNullTime(pipeline.CreatedAt, job.CreatedAt)
+
+		if i == 0 {
+			pipeline.CreatedAt = job.CreatedAt
+		} else {
+			if job.CreatedAt.Before(pipeline.CreatedAt) {
+				pipeline.CreatedAt = job.CreatedAt
+			}
+		}
 
 		if travisJob.Stage.ID != 0 {
 			s, err := travisJob.Stage.toStep(pipeline.WebURL.String)
@@ -116,13 +121,21 @@ func (b travisBuild) toPipeline(webURL string) (pipeline cache.Pipeline, err err
 				return pipeline, err
 			}
 
+			isNewStage := false
 			if len(pipeline.Children) == 0 || pipeline.Children[len(pipeline.Children)-1].ID != s.ID {
 				pipeline.Children = append(pipeline.Children, s)
+				isNewStage = true
 			}
 
 			stage := &pipeline.Children[len(pipeline.Children)-1]
 			stage.Children = append(stage.Children, job)
-			stage.CreatedAt = utils.MinNullTime(stage.CreatedAt, job.CreatedAt)
+			if isNewStage {
+				stage.CreatedAt = job.CreatedAt
+			} else {
+				if job.CreatedAt.Before(stage.CreatedAt) {
+					stage.CreatedAt = job.CreatedAt
+				}
+			}
 		} else {
 			pipeline.Children = append(pipeline.Children, job)
 		}
@@ -180,7 +193,7 @@ func (c travisJobConfig) String() string {
 	return strings.Join(nonEmptyValues, ", ")
 }
 
-func (j travisJob) toStep(webURL string) (cache.Step, error) {
+func (j travisJob) toStep(webURL string) (Step, error) {
 	var err error
 
 	name, _ := j.Config["name"].(string)
@@ -188,12 +201,12 @@ func (j travisJob) toStep(webURL string) (cache.Step, error) {
 		name = j.Config.String()
 	}
 
-	job := cache.Step{
+	job := Step{
 		ID:    strconv.Itoa(j.ID),
-		Type:  cache.StepJob,
+		Type:  StepJob,
 		State: fromTravisState(j.State),
 		Name:  name,
-		Log: cache.Log{
+		Log: Log{
 			Content: utils.NullString{String: j.Log, Valid: j.Log != ""},
 		},
 		WebURL: utils.NullString{
@@ -203,15 +216,19 @@ func (j travisJob) toStep(webURL string) (cache.Step, error) {
 		AllowFailure: j.AllowFailure,
 	}
 
+	job.CreatedAt, err = time.Parse(time.RFC3339, j.CreatedAt)
+	if err != nil {
+		return job, err
+	}
+
 	ats := map[string]*utils.NullTime{
-		j.CreatedAt:  &job.CreatedAt,
 		j.StartedAt:  &job.StartedAt,
 		j.FinishedAt: &job.FinishedAt,
 	}
 	for s, t := range ats {
 		*t, err = utils.NullTimeFromString(s)
 		if err != nil {
-			return cache.Step{}, err
+			return Step{}, err
 		}
 	}
 
@@ -230,10 +247,10 @@ type travisStage struct {
 	FinishedAt string `json:"finished_at"`
 }
 
-func (s travisStage) toStep(webURL string) (cache.Step, error) {
-	stage := cache.Step{
+func (s travisStage) toStep(webURL string) (Step, error) {
+	stage := Step{
 		ID:    strconv.Itoa(s.ID),
-		Type:  cache.StepStage,
+		Type:  StepStage,
 		Name:  s.Name,
 		State: fromTravisState(s.State),
 		WebURL: utils.NullString{
@@ -263,25 +280,43 @@ type TravisClient struct {
 	logBackoffInterval time.Duration
 	buildsPageSize     int
 	token              string
-	provider           cache.Provider
+	provider           Provider
 }
 
 var TravisOrgURL = url.URL{Scheme: "https", Host: "api.travis-ci.org"}
 var TravisComURL = url.URL{Scheme: "https", Host: "api.travis-ci.com"}
 
-func NewTravisClient(id string, name string, token string, URL url.URL, rateLimit time.Duration) TravisClient {
+func NewTravisClient(id string, name string, token string, URL string, requestsPerSecond float64) (TravisClient, error) {
+	rateLimit := time.Second / 20
+	if requestsPerSecond > 0 {
+		rateLimit = time.Second / time.Duration(requestsPerSecond)
+	}
+
+	var err error
+	var u *url.URL
+	switch strings.ToLower(URL) {
+	case "org":
+		u = &TravisOrgURL
+	case "com":
+		u = &TravisComURL
+	default:
+		if u, err = url.Parse(URL); err != nil {
+			return TravisClient{}, err
+		}
+	}
+
 	return TravisClient{
-		baseURL:            URL,
+		baseURL:            *u,
 		httpClient:         &http.Client{Timeout: 10 * time.Second},
 		rateLimiter:        time.Tick(rateLimit),
 		logBackoffInterval: 10 * time.Second,
 		token:              token,
-		provider: cache.Provider{
+		provider: Provider{
 			ID:   id,
 			Name: name,
 		},
 		buildsPageSize: 10,
-	}
+	}, nil
 }
 
 func (c TravisClient) ID() string {
@@ -296,17 +331,17 @@ func (c TravisClient) Name() string {
 	return c.provider.Name
 }
 
-func (c TravisClient) BuildFromURL(ctx context.Context, u string) (cache.Pipeline, error) {
+func (c TravisClient) BuildFromURL(ctx context.Context, u string) (Pipeline, error) {
 	owner, repo, id, err := parseTravisWebURL(&c.baseURL, u)
 	if err != nil {
-		return cache.Pipeline{}, err
+		return Pipeline{}, err
 	}
 
 	slug := fmt.Sprintf("%s/%s", owner, repo)
 	return c.fetchPipeline(ctx, slug, id)
 }
 
-// Extract owner, repository and build ID from web URL of build
+// Extract owner, repository and build ID from web url of build
 func parseTravisWebURL(baseURL *url.URL, u string) (string, string, string, error) {
 	v, err := url.Parse(u)
 	if err != nil {
@@ -314,13 +349,13 @@ func parseTravisWebURL(baseURL *url.URL, u string) (string, string, string, erro
 	}
 
 	if v.Hostname() != strings.TrimPrefix(baseURL.Hostname(), "api.") {
-		return "", "", "", cache.ErrUnknownPipelineURL
+		return "", "", "", ErrUnknownPipelineURL
 	}
 
-	// URL format: https://travis-ci.org/nbedos/termtosvg/builds/612815758
+	// url format: https://travis-ci.org/nbedos/termtosvg/builds/612815758
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 5 || cs[3] != "builds" {
-		return "", "", "", cache.ErrUnknownPipelineURL
+		return "", "", "", ErrUnknownPipelineURL
 	}
 
 	owner, repo, id := cs[1], cs[2], cs[4]
@@ -388,7 +423,7 @@ func (err HTTPError) Error() string {
 		err.Method, err.URL, err.Status, err.Message)
 }
 
-func (c TravisClient) fetchPipeline(ctx context.Context, slug string, buildID string) (cache.Pipeline, error) {
+func (c TravisClient) fetchPipeline(ctx context.Context, slug string, buildID string) (Pipeline, error) {
 	buildURL := c.baseURL
 	buildURL.Path += fmt.Sprintf("/build/%s", buildID)
 	parameters := buildURL.Query()
@@ -397,7 +432,7 @@ func (c TravisClient) fetchPipeline(ctx context.Context, slug string, buildID st
 
 	body, err := c.get(ctx, "GET", buildURL)
 	if err != nil {
-		return cache.Pipeline{}, err
+		return Pipeline{}, err
 	}
 
 	var build travisBuild
@@ -405,19 +440,19 @@ func (c TravisClient) fetchPipeline(ctx context.Context, slug string, buildID st
 
 	webURL, err := c.webURL(slug)
 	if err != nil {
-		return cache.Pipeline{}, err
+		return Pipeline{}, err
 	}
 	pipeline, err := build.toPipeline(webURL.String())
 	if err != nil {
-		return cache.Pipeline{}, err
+		return Pipeline{}, err
 	}
 
 	return pipeline, nil
 }
 
-func (c TravisClient) Log(ctx context.Context, step cache.Step) (string, error) {
-	if step.Type != cache.StepJob {
-		return "", cache.ErrNoLogHere
+func (c TravisClient) Log(ctx context.Context, step Step) (string, error) {
+	if step.Type != StepJob {
+		return "", ErrNoLogHere
 	}
 
 	var reqURL = c.baseURL

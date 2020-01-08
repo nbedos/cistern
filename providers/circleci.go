@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/utils"
 )
 
@@ -21,7 +20,7 @@ type CircleCIClient struct {
 	httpClient  *http.Client
 	rateLimiter <-chan time.Time
 	token       string
-	provider    cache.Provider
+	provider    Provider
 }
 
 var CircleCIURL = url.URL{
@@ -31,13 +30,18 @@ var CircleCIURL = url.URL{
 	RawPath: "api/v1.1",
 }
 
-func NewCircleCIClient(id string, name string, token string, URL url.URL, rateLimit time.Duration) CircleCIClient {
+func NewCircleCIClient(id string, name string, token string, requestsPerSecond float64) CircleCIClient {
+	rateLimit := time.Second / 10
+	if requestsPerSecond > 0 {
+		rateLimit = time.Second / time.Duration(requestsPerSecond)
+	}
+
 	return CircleCIClient{
-		baseURL:     URL,
+		baseURL:     CircleCIURL,
 		httpClient:  &http.Client{Timeout: 10 * time.Second},
 		rateLimiter: time.Tick(rateLimit),
 		token:       token,
-		provider: cache.Provider{
+		provider: Provider{
 			ID:   id,
 			Name: name,
 		},
@@ -84,7 +88,7 @@ func (c CircleCIClient) get(ctx context.Context, resourceURL url.URL) (*bytes.Bu
 			message = errorBody.Message
 		}
 
-		// Remove the authentication token from the URL so that it's not leaked in logs
+		// Remove the authentication token from the url so that it's not leaked in logs
 		noTokenURL := req.URL
 		parameters := noTokenURL.Query()
 		parameters.Del("circle-token")
@@ -122,17 +126,17 @@ func (c CircleCIClient) Name() string {
 	return c.provider.Name
 }
 
-func (c CircleCIClient) BuildFromURL(ctx context.Context, u string) (cache.Pipeline, error) {
+func (c CircleCIClient) BuildFromURL(ctx context.Context, u string) (Pipeline, error) {
 	owner, repo, id, err := parseCircleCIWebURL(&c.baseURL, u)
 	if err != nil {
-		return cache.Pipeline{}, err
+		return Pipeline{}, err
 	}
 
 	endPoint := c.projectEndpoint(owner, repo)
 	return c.fetchPipeline(ctx, endPoint, id)
 }
 
-// Extract owner, repository and build ID from web URL of build
+// Extract owner, repository and build ID from web url of build
 func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, int, error) {
 	v, err := url.Parse(u)
 	if err != nil {
@@ -140,13 +144,13 @@ func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, int, error
 	}
 
 	if v.Hostname() != strings.TrimPrefix(baseURL.Hostname(), "api.") {
-		return "", "", 0, cache.ErrUnknownPipelineURL
+		return "", "", 0, ErrUnknownPipelineURL
 	}
 
-	// URL format: https://circleci.com/gh/nbedos/cistern/36
+	// url format: https://circleci.com/gh/nbedos/cistern/36
 	cs := strings.Split(v.EscapedPath(), "/")
 	if len(cs) < 5 {
-		return "", "", 0, cache.ErrUnknownPipelineURL
+		return "", "", 0, ErrUnknownPipelineURL
 	}
 
 	owner, repo := cs[2], cs[3]
@@ -158,9 +162,9 @@ func parseCircleCIWebURL(baseURL *url.URL, u string) (string, string, int, error
 	return owner, repo, id, nil
 }
 
-func (c CircleCIClient) Log(ctx context.Context, step cache.Step) (string, error) {
+func (c CircleCIClient) Log(ctx context.Context, step Step) (string, error) {
 	if step.Log.Key == "" {
-		return "", cache.ErrNoLogHere
+		return "", ErrNoLogHere
 	}
 
 	req, err := http.NewRequest("GET", step.Log.Key, nil)
@@ -204,9 +208,9 @@ func (c CircleCIClient) Log(ctx context.Context, step cache.Step) (string, error
 	return builder.String(), err
 }
 
-func (c CircleCIClient) fetchPipeline(ctx context.Context, projectEndpoint url.URL, buildID int) (cache.Pipeline, error) {
+func (c CircleCIClient) fetchPipeline(ctx context.Context, projectEndpoint url.URL, buildID int) (Pipeline, error) {
 	var err error
-	var pipeline cache.Pipeline
+	var pipeline Pipeline
 
 	projectEndpoint.Path += fmt.Sprintf("/%d", buildID)
 	body, err := c.get(ctx, projectEndpoint)
@@ -238,13 +242,13 @@ type circleCIAction struct {
 	DurationMilliseconds int    `json:"run_time_millis"`
 }
 
-func (a circleCIAction) toStep(webURL utils.NullString) (cache.Step, error) {
-	step := cache.Step{
+func (a circleCIAction) toStep(webURL utils.NullString) (Step, error) {
+	step := Step{
 		ID:    strconv.Itoa(a.Index),
-		Type:  cache.StepTask,
+		Type:  StepTask,
 		State: fromCircleCIStatus(a.Status),
 		Name:  a.Name,
-		Log: cache.Log{
+		Log: Log{
 			Key: a.LogURL,
 		},
 		WebURL: webURL,
@@ -292,17 +296,17 @@ type circleCIBuild struct {
 	} `json:"steps"`
 }
 
-func (b circleCIBuild) toPipeline() (cache.Pipeline, error) {
-	pipeline := cache.Pipeline{
-		GitReference: cache.GitReference{
+func (b circleCIBuild) toPipeline() (Pipeline, error) {
+	pipeline := Pipeline{
+		GitReference: GitReference{
 			SHA:   b.Sha,
 			Ref:   "",
 			IsTag: false,
 		},
-		Step: cache.Step{
+		Step: Step{
 			ID:    strconv.Itoa(b.ID),
 			Name:  b.Workflows.JobName,
-			Type:  cache.StepPipeline,
+			Type:  StepPipeline,
 			State: fromCircleCIStatus(b.Status),
 			WebURL: utils.NullString{
 				String: b.WebURL,
@@ -319,7 +323,7 @@ func (b circleCIBuild) toPipeline() (cache.Pipeline, error) {
 	}
 
 	var err error
-	if pipeline.CreatedAt, err = utils.NullTimeFromString(b.CreatedAt); err != nil {
+	if pipeline.CreatedAt, err = time.Parse(time.RFC3339, b.CreatedAt); err != nil {
 		return pipeline, err
 	}
 	if pipeline.StartedAt, err = utils.NullTimeFromString(b.StartedAt); err != nil {
@@ -329,7 +333,10 @@ func (b circleCIBuild) toPipeline() (cache.Pipeline, error) {
 		return pipeline, err
 	}
 
-	updatedAt := utils.MaxNullTime(pipeline.FinishedAt, pipeline.StartedAt, pipeline.CreatedAt)
+	updatedAt := utils.MaxNullTime(
+		utils.NullTime{Time: pipeline.CreatedAt, Valid: true},
+		pipeline.FinishedAt,
+		pipeline.StartedAt)
 	if !updatedAt.Valid {
 		return pipeline, errors.New("updatedAt attribute cannot be null")
 	}
@@ -349,6 +356,7 @@ func (b circleCIBuild) toPipeline() (cache.Pipeline, error) {
 				return pipeline, err
 			}
 			task.ID = fmt.Sprintf("%d.%d", i, j)
+			task.CreatedAt = pipeline.CreatedAt
 			pipeline.Children = append(pipeline.Children, task)
 		}
 	}
@@ -356,24 +364,24 @@ func (b circleCIBuild) toPipeline() (cache.Pipeline, error) {
 	return pipeline, nil
 }
 
-func fromCircleCIStatus(status string) cache.State {
+func fromCircleCIStatus(status string) State {
 	switch status {
 	case "canceled", "cancelled":
-		return cache.Canceled
+		return Canceled
 	case "infrastructure_fail", "timedout", "failed":
-		return cache.Failed
+		return Failed
 	case "running":
-		return cache.Running
+		return Running
 	case "queued", "scheduled":
-		return cache.Pending
+		return Pending
 	case "not_running", "not_run":
-		return cache.Skipped
+		return Skipped
 	case "success":
-		return cache.Passed
+		return Passed
 	case "retried", "no_tests", "fixed":
 		// What do those mean?
-		return cache.Unknown
+		return Unknown
 	default:
-		return cache.Unknown
+		return Unknown
 	}
 }

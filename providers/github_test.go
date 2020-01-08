@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v28/github"
-	"github.com/nbedos/cistern/cache"
 )
 
 func setupGitHubTestServer() (*http.Client, string, func()) {
@@ -102,7 +101,7 @@ func TestCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedCommit := cache.Commit{
+	expectedCommit := Commit{
 		Sha:      "d58600a58bf1738c6529ce3489a546bfa2178e07",
 		Author:   "nbedos <nicolas.bedos@gmail.com>",
 		Date:     time.Date(2019, 11, 16, 14, 59, 32, 0, time.UTC),

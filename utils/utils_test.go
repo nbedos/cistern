@@ -5,108 +5,13 @@ import (
 	"testing"
 )
 
-type TestNode struct {
-	value       string
-	prefix      string
-	traversable bool
-	children    []TestNode
-}
-
-func (n TestNode) String() string {
-	return n.value
-}
-
-func (n TestNode) Children() []TreeNode {
-	children := make([]TreeNode, len(n.children))
-	for i := range n.children {
-		children[i] = &n.children[i]
-	}
-	return children
-}
-
-func (n TestNode) Traversable() bool {
-	return n.traversable
-}
-
-func (n *TestNode) SetTraversable(open bool, recursive bool) {
-	n.traversable = open
-	if recursive {
-		for _, node := range n.children {
-			node.SetTraversable(open, recursive)
-		}
-	}
-}
-
-func TestDepthFirstTraversal(t *testing.T) {
-	node := TestNode{
-		value:       "root",
-		traversable: true,
-		children: []TestNode{
-			{
-				value:       "a",
-				traversable: true,
-				children: []TestNode{
-					{
-						value:       "aa",
-						traversable: false,
-						children:    nil,
-					},
-					{
-						value:       "ab",
-						traversable: false,
-						children:    nil,
-					},
-				},
-			},
-			{
-				value:       "b",
-				traversable: false,
-				children: []TestNode{
-					{
-						value:       "ba",
-						traversable: false,
-						children:    nil,
-					},
-				},
-			},
-			{
-				value:       "c",
-				traversable: true,
-				children: []TestNode{
-					{
-						value:       "ca",
-						traversable: false,
-						children:    nil,
-					},
-					{
-						value:       "cb",
-						traversable: false,
-						children:    nil,
-					},
-					{
-						value:       "cc",
-						traversable: false,
-						children:    nil,
-					},
-				},
-			},
-		},
-	}
-
-	expectedvalues := []string{"root", "a", "aa", "ab", "b", "c", "ca", "cb", "cc"}
-	for i, n := range DepthFirstTraversal(&node, false) {
-		if fmt.Sprintf("%s", n) != expectedvalues[i] {
-			t.Fatalf("unexpected node: %q", n)
-		}
-	}
-}
 
 func TestRepositorySlugFromURL(t *testing.T) {
 	urls := []string{
-		// SSH git URL
+		// SSH git url
 		"git@github.com:nbedos/cistern.git",
 		"git@github.com:nbedos/cistern",
-		// HTTPS git URL
+		// HTTPS git url
 		"https://github.com/nbedos/cistern.git",
 		// Host shouldn't matter
 		"git@gitlab.com:nbedos/cistern.git",
@@ -114,14 +19,14 @@ func TestRepositorySlugFromURL(t *testing.T) {
 		"https://gitlab.com/nbedos/cistern",
 		// Extraneous path components should be ignored
 		"https://gitlab.com/nbedos/cistern/tree/master/cache",
-		// URL scheme shouldn't matter
+		// url scheme shouldn't matter
 		"http://gitlab.com/nbedos/cistern",
 		"gitlab.com/nbedos/cistern",
 	}
 	expectedOwner, expectedRepo := "nbedos", "cistern"
 
 	for _, u := range urls {
-		t.Run(fmt.Sprintf("URL: %v", u), func(t *testing.T) {
+		t.Run(fmt.Sprintf("url: %v", u), func(t *testing.T) {
 			_, owner, repo, err := RepoHostOwnerAndName(u)
 			if err != nil {
 				t.Fatal(err)
@@ -135,14 +40,14 @@ func TestRepositorySlugFromURL(t *testing.T) {
 	urls = []string{
 		// Missing 1 path component
 		"git@github.com:nbedos.git",
-		// Invalid URL (colon)
+		// Invalid url (colon)
 		"https://github.com:nbedos/cistern.git",
 	}
 
 	for _, u := range urls {
-		t.Run(fmt.Sprintf("URL: %v", u), func(t *testing.T) {
+		t.Run(fmt.Sprintf("url: %v", u), func(t *testing.T) {
 			if _, _, _, err := RepoHostOwnerAndName(u); err == nil {
-				t.Fatalf("expected error but got nil for URL %q", u)
+				t.Fatalf("expected error but got nil for url %q", u)
 			}
 		})
 	}
