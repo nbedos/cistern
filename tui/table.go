@@ -18,6 +18,7 @@ type TableNode interface {
 	NodeChildren() []TableNode
 	Values(v interface{}) map[ColumnID]StyledString
 	InheritedValues() []ColumnID
+	Compare(other TableNode, id ColumnID, v interface{}) int
 }
 
 func (n *innerTableNode) setPrefix(parent string, isLastChild bool) {
@@ -63,7 +64,6 @@ type Column struct {
 	MaxWidth   int
 	Alignment  Alignment
 	TreePrefix bool
-	Less       func(nodes []TableNode, asc bool, v interface{}) func(i, j int) bool
 }
 
 type ColumnID int
@@ -141,11 +141,11 @@ func (n innerTableNode) depthFirstTraversal(traverseAll bool) []*innerTableNode 
 	return explored
 }
 
-func toInnerTableNode(n TableNode, parent innerTableNode, traversable map[nodePath]bool, v interface{}, depth int) innerTableNode {
+func (t HierarchicalTable) toInnerTableNode(n TableNode, parent innerTableNode, traversable map[nodePath]bool, depth int) innerTableNode {
 	path := parent.path.append(n.NodeID())
 	s := innerTableNode{
 		path:        path,
-		values:      n.Values(v),
+		values:      n.Values(t.conf.NodeStyle),
 		traversable: traversable[path],
 	}
 
@@ -159,8 +159,10 @@ func toInnerTableNode(n TableNode, parent innerTableNode, traversable map[nodePa
 		s.values[c] = parent.values[c]
 	}
 
-	for _, child := range n.NodeChildren() {
-		innerNode := toInnerTableNode(child, s, traversable, v, depth-1)
+	children := n.NodeChildren()
+	t.sortSlice(children)
+	for _, child := range children {
+		innerNode := t.toInnerTableNode(child, s, traversable, depth-1)
 		s.children = append(s.children, &innerNode)
 	}
 
@@ -361,24 +363,44 @@ func (t *HierarchicalTable) computeTraversal() {
 	}
 }
 
+func (t *HierarchicalTable) sortSlice(nodes []TableNode) {
+	if t.order.Valid {
+		indexById := make(map[interface{}]int)
+		for i, child := range nodes {
+			indexById[child.NodeID()] = i
+		}
+		sort.Slice(nodes, func(i, j int) bool {
+			c := nodes[i].Compare(nodes[j], t.order.ID, t.conf.NodeStyle)
+			if c == 0 {
+				if t.order.Ascending {
+					return indexById[nodes[i].NodeID()] < indexById[nodes[j].NodeID()]
+				} else {
+					return indexById[nodes[i].NodeID()] > indexById[nodes[j].NodeID()]
+				}
+			} else {
+				return (c < 0 && t.order.Ascending) || (c > 0 && !t.order.Ascending)
+			}
+		})
+	}
+}
+
 func (t *HierarchicalTable) Replace(nodes []TableNode) {
+	// Defensive copy to preserve the initial sort order
+	t.outterNodes = make([]TableNode, len(nodes))
+	copy(t.outterNodes, nodes)
+
 	// Save traversable state
 	traversable := make(map[nodePath]bool, 0)
 	for _, node := range t.depthFirstTraversal(true) {
 		traversable[node.path] = node.traversable
 	}
 
-	if t.order.Valid && t.conf.Columns != nil && nodes != nil {
-		if column, exists := t.conf.Columns[t.order.ID]; exists && column.Less != nil {
-			sort.Slice(nodes, column.Less(nodes, t.order.Ascending, t.conf.NodeStyle))
-		}
-	}
-	t.outterNodes = nodes
+	t.sortSlice(nodes)
 
 	// Copy node hierarchy and compute the path of each node along the way
-	t.innerNodes = make([]innerTableNode, 0, len(t.outterNodes))
+	t.innerNodes = make([]innerTableNode, 0, len(nodes))
 	for _, n := range nodes {
-		innerNode := toInnerTableNode(n, innerTableNode{}, traversable, t.conf.NodeStyle, t.conf.DefaultDepth)
+		innerNode := t.toInnerTableNode(n, innerTableNode{}, traversable, t.conf.DefaultDepth)
 		t.innerNodes = append(t.innerNodes, innerNode)
 	}
 

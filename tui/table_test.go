@@ -15,6 +15,16 @@ type testNode struct {
 	children  []*testNode
 }
 
+func (n testNode) Compare(other TableNode, id ColumnID, v interface{}) int {
+	if n.id < other.(testNode).id {
+		return -1
+	} else if n.id == other.(testNode).id {
+		return 0
+	} else {
+		return 1
+	}
+}
+
 func (n testNode) NodeID() interface{} {
 	return n.id
 }
@@ -22,7 +32,7 @@ func (n testNode) NodeID() interface{} {
 func (n testNode) NodeChildren() []TableNode {
 	nodes := make([]TableNode, 0, len(n.children))
 	for _, child := range n.children {
-		nodes = append(nodes, child)
+		nodes = append(nodes, *child)
 	}
 	return nodes
 }
@@ -916,18 +926,6 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 			Position:  0,
 			MaxWidth:  999,
 			Alignment: Left,
-			Less: func(nodes []TableNode, asc bool, v interface{}) func(i, j int) bool {
-				return func(i, j int) bool {
-					ni := nodes[i].(testNode)
-					nj := nodes[j].(testNode)
-
-					if asc {
-						return ni.id < nj.id
-					} else {
-						return ni.id > nj.id
-					}
-				}
-			},
 		},
 		column2: {
 			Header:    "column2",
@@ -949,25 +947,6 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		expectedPaths := []nodePath{
-			nodePathFromIDs(1),
-			nodePathFromIDs(4),
-			nodePathFromIDs(3),
-			nodePathFromIDs(2),
-		}
-		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
-			t.Fatal(diff)
-		}
-	})
-
-	t.Run("sorting on a column without a comparison function must not have any effect", func(t *testing.T) {
-		table, err := NewHierarchicalTable(conf, nodes, 10, 10)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		table.SortBy(column2, true)
 
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
@@ -1017,19 +996,42 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 		}
 	})
 
-	t.Run("sort order must be preserved across Replace calls", func(t *testing.T) {
+	t.Run("sort must be applied recursively", func(t *testing.T) {
+		nodes := []TableNode{
+			testNode{
+				id: 2,
+				children: []*testNode{
+					{
+						id: 2,
+						children: []*testNode{
+							{id: 2},
+							{id: 1},
+						},
+					},
+					{id: 1},
+				},
+			},
+			testNode{id: 3},
+			testNode{id: 1},
+		}
+
+		conf := conf
+		conf.DefaultDepth = 999
 		table, err := NewHierarchicalTable(conf, nodes, 10, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		table.SortBy(column1, false)
+		table.SortBy(column1, true)
 
 		expectedPaths := []nodePath{
-			nodePathFromIDs(4),
-			nodePathFromIDs(3),
-			nodePathFromIDs(2),
 			nodePathFromIDs(1),
+			nodePathFromIDs(2),
+			nodePathFromIDs(2, 1),
+			nodePathFromIDs(2, 2),
+			nodePathFromIDs(2, 2, 1),
+			nodePathFromIDs(2, 2, 2),
+			nodePathFromIDs(3),
 		}
 		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
 			t.Fatal(diff)
@@ -1040,4 +1042,60 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 			t.Fatal(diff)
 		}
 	})
+
+	t.Run("sort must be applied recursively", func(t *testing.T) {
+		nodes := []TableNode{
+			testNode{
+				id: 2,
+				children: []*testNode{
+					{
+						id: 2,
+						children: []*testNode{
+							{id: 2},
+							{id: 1},
+						},
+					},
+					{id: 1},
+				},
+			},
+			testNode{id: 3},
+			testNode{id: 1},
+		}
+
+		conf := conf
+		conf.DefaultDepth = 999
+		table, err := NewHierarchicalTable(conf, nodes, 10, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		table.SortBy(column1, true)
+		expectedPaths := []nodePath{
+			nodePathFromIDs(1),
+			nodePathFromIDs(2),
+			nodePathFromIDs(2, 1),
+			nodePathFromIDs(2, 2),
+			nodePathFromIDs(2, 2, 1),
+			nodePathFromIDs(2, 2, 2),
+			nodePathFromIDs(3),
+		}
+		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
+			t.Fatal(diff)
+		}
+
+		table.SortBy(column1, false)
+		expectedPaths = []nodePath{
+			nodePathFromIDs(3),
+			nodePathFromIDs(2),
+			nodePathFromIDs(2, 2),
+			nodePathFromIDs(2, 2, 2),
+			nodePathFromIDs(2, 2, 1),
+			nodePathFromIDs(2, 1),
+			nodePathFromIDs(1),
+		}
+		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
 }
