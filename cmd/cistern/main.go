@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path"
 
@@ -49,7 +50,7 @@ Please note that:
 To lift these restrictions, create a configuration file containing your credentials at the aforementioned location.
 `
 
-func main() {
+func Main(w io.Writer) error {
 	SetupSignalHandlers()
 
 	f := flag.NewFlagSet("cistern", flag.ContinueOnError)
@@ -59,8 +60,7 @@ func main() {
 	defaultCommit := "HEAD"
 	defaultRepository, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
-		os.Exit(1)
+		return err
 	}
 	versionFlag := f.Bool("version", false, "")
 	helpFlagShort := f.Bool("h", false, "")
@@ -69,28 +69,24 @@ func main() {
 	repoFlagShort := f.String("r", defaultRepository, "")
 
 	if err := f.Parse(os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
-		fmt.Fprintln(os.Stderr, usage)
-		os.Exit(1)
+		return fmt.Errorf("%s\n%s", err.Error(), usage)
 	}
 
 	if *versionFlag {
-		fmt.Fprintf(os.Stderr, "cistern %s\n", Version)
-		os.Exit(0)
+		_, err := fmt.Fprintf(w, "cistern %s\n", Version)
+		return err
 	}
 
 	if *helpFlag || *helpFlagShort {
-		fmt.Fprintln(os.Stderr, usage)
-		os.Exit(0)
+		_, err := fmt.Fprintln(w, usage)
+		return err
 	}
 
 	sha := defaultCommit
 	if commits := f.Args(); len(commits) == 1 {
 		sha = commits[0]
 	} else if len(commits) > 1 {
-		fmt.Fprintln(os.Stderr, "Error: at most one commit can be specified")
-		fmt.Fprintln(os.Stderr, usage)
-		os.Exit(1)
+		return fmt.Errorf("at most one commit can be specified\n%s", usage)
 	}
 
 	repo := *repoFlag
@@ -104,20 +100,25 @@ func main() {
 	case nil:
 		for _, g := range config.Providers.GitLab {
 			if g.Token == "" {
-				fmt.Fprintln(os.Stderr, "warning: cistern will not be able to access pipeline jobs on GitLab without an API access token")
+				_, err := fmt.Fprintln(w, "warning: cistern will not be able to access pipeline jobs on GitLab without an API access token")
+				if err != nil {
+					return err
+				}
 				break
 			}
 		}
 	case ErrMissingConf:
-		fmt.Fprintf(os.Stderr, warningNoConfigFileFormat, paths[0])
+		return fmt.Errorf(warningNoConfigFileFormat, paths[0])
 	default:
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
+		return err
 	}
 
-	ctx := context.Background()
-	if err := RunApplication(ctx, tcell.NewScreen, repo, sha, config); err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+	return RunApplication(context.Background(), tcell.NewScreen, repo, sha, config)
+}
+
+func main() {
+	if err := Main(os.Stderr); err != nil {
+		fmt.Fprintf(os.Stderr, "cistern: %s\n", err.Error())
 		os.Exit(1)
 	}
 }

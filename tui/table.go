@@ -476,10 +476,13 @@ func (t HierarchicalTable) headers() map[ColumnID]StyledString {
 	return values
 }
 
-func (t HierarchicalTable) styledString(values map[ColumnID]StyledString, prefix string) StyledString {
+func (t HierarchicalTable) styledString(values map[ColumnID]StyledString, prefix string, forceAlignLeft bool) StyledString {
 	paddedColumns := make([]StyledString, 0)
 	for _, id := range t.conf.Columns.IDs() {
 		alignment := t.conf.Columns[id].Alignment
+		if forceAlignLeft {
+			alignment = Left
+		}
 		v := values[id]
 		if t.conf.Columns[id].TreePrefix {
 			prefixedValue := NewStyledString(prefix)
@@ -528,14 +531,14 @@ func (t *HierarchicalTable) StyledStrings() []StyledString {
 	ss := make([]StyledString, 0)
 
 	if t.height > 0 {
-		s := t.styledString(t.headers(), "")
+		s := t.styledString(t.headers(), "", true)
 		s.Apply(t.conf.Header)
 		ss = append(ss, s)
 	}
 
 	if t.pageIndex.Valid && t.cursorIndex.Valid {
 		for i, row := range t.rows[t.pageIndex.Int:utils.MinInt(t.pageIndex.Int+t.PageSize(), len(t.rows))] {
-			s := t.styledString(row.values, row.prefix)
+			s := t.styledString(row.values, row.prefix, false)
 			if t.cursorIndex.Int == i+t.pageIndex.Int {
 				s.Apply(t.conf.Cursor)
 			}

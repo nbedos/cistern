@@ -40,7 +40,7 @@ Source
 T}@T{
 CI
 T}@T{
-url
+URL
 T}
 _
 T{
@@ -125,7 +125,7 @@ cistern feature/doc
 Specify the git repository to monitor.
 If REPOSITORY is the path of a local repository, cistern will monitor
 all the associated remotes.
-If REPOSITORY is a url, cistern will monitor the corresponding online
+If REPOSITORY is a URL, cistern will monitor the corresponding online
 repository.
 .PP
 If this option is not set, cistern will behave as if it had been set to
@@ -140,7 +140,7 @@ Examples:
 \f[C]
 # Monitor pipelines of the git repository in the current directory
 cistern
-# Monitor pipelines of the repository specified by a web url
+# Monitor pipelines of the repository specified by a web URL
 cistern -r https://gitlab.com/nbedos/cistern
 cistern -r github.com/nbedos/cistern
 # Git URLs are accepted
@@ -155,6 +155,37 @@ Show usage of cistern
 .SS \f[C]--version\f[R]
 .PP
 Print the version of cistern being run
+.SH COLUMNS
+.SS REF
+.PP
+Tag or branch associated to the pipeline
+.SS PIPELINE
+.PP
+Identifier of the pipeline
+.SS TYPE
+.PP
+Either \[lq]P\[rq] (Pipeline), \[lq]S\[rq] (Stage), \[lq]J\[rq] (Job) or
+\[lq]T\[rq] (Task)
+.SS STATE
+.PP
+State of the pipeline
+.SS XFAIL
+.PP
+Expected failure.
+Boolean indicating whether this step is allowed to fail without
+impacting the overall state of the pipeline
+.SS CREATED, STARTED, FINISHED
+.PP
+Date when the pipeline was created, started or finished
+.SS DURATION
+.PP
+Time it took for the pipeline to finish
+.SS NAME
+.PP
+Name of the provider followed by the name of the pipeline, if any
+.SS URL
+.PP
+URL of the step on the website of the provider
 .SH INTERACTIVE COMMANDS
 .PP
 Below are the default commands for interacting with cistern.
@@ -163,7 +194,7 @@ Below are the default commands for interacting with cistern.
 tab(@);
 lw(10.7n) lw(46.7n).
 T{
-key
+Key
 T}@T{
 Action
 T}
@@ -177,6 +208,16 @@ T{
 Down, k
 T}@T{
 Move cursor down by one line
+T}
+T{
+Right, l
+T}@T{
+Scroll right
+T}
+T{
+Left, h
+T}@T{
+Scroll left
 T}
 T{
 Page Up
@@ -276,72 +317,67 @@ v0.5.0 (https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md
 format.
 The configuration file is made of keys grouped together in tables.
 The specification of each table is given in the example below.
-.SS Example
+.SS Reference
 .PP
-This example describes and uses all existing configuration options.
+The complete format of the configuration file is described in a
+self-documenting example included in the release archives and also
+available on
+GitHub (https://github.com/nbedos/cistern/blob/master/cmd/cistern/cistern.toml)
+.SS Minimal example
+.PP
+This is a minimal example of a configuration file focused mostly on
+setting up credentials.
+It should be enough to get you started running cistern.
 .IP
 .nf
 \f[C]
 #### CISTERN CONFIGURATION FILE ####
-# This file is a complete, valid configuration file for cistern
-# and should be located at $XDG_CONFIG_HOME/cistern/cistern.toml
-# 
+# This is a configuration file for cistern that should be located at
+# $XDG_CONFIG_HOME/cistern/cistern.toml
+
+## GENERIC OPTIONS ##
+# List of columns displayed on screen. Available columns are 
+# \[dq]ref\[dq], \[dq]pipeline\[dq], \[dq]type\[dq], \[dq]state\[dq], \[dq]created\[dq], \[dq]started\[dq],
+# \[dq]finished\[dq], \[dq]duration\[dq], \[dq]xfail\[dq], \[dq]name\[dq], \[dq]url\[dq]
+columns = [\[dq]ref\[dq], \[dq]pipeline\[dq], \[dq]type\[dq], \[dq]state\[dq], \[dq]started\[dq], \[dq]duration\[dq], \[dq]name\[dq], \[dq]url\[dq]]
+
+# Name of the column used for sorting the table prefixed by an
+# optional \[dq]+\[dq] (ascending order) or \[dq]-\[dq] (descending order).
+sort = \[dq]-started\[dq]
+
 
 ## PROVIDERS ##
 [providers]
-# The \[aq]providers\[aq] table is used to define credentials for 
-# accessing online services. cistern relies on two types of
-# providers:
+# The sections below define credentials for accessing source 
+# providers (GitHub, GitLab) and CI providers (GitLab, Travis,
+# AppVeyor, Azure Devops, CircleCI).
 #
-#    - \[aq]source providers\[aq] are used for listing the CI pipelines
-#    associated to a given commit (GitHub and GitLab are source
-#    providers)
-#    - \[aq]CI providers\[aq] are used to get detailed information about
-#    CI pipelines (GitLab, AppVeyor, CircleCI, Travis and Azure
-#    Devops are CI providers)
-#
-# cistern requires credentials for at least one source provider and
-# one CI provider to run. Feel free to remove sections below 
-# as long as this rule is met.
-#
-# Note that for all providers, not setting an API token or 
-# setting \[ga]token = \[dq]\[dq]\[ga] will cause the provider to make
-# unauthenticated API requests. 
+# Feel free to remove any section as long as you leave one
+# section for a source provider and one for a CI provider.
+# 
+# When an API token is not set or set to the empty string,
+# cistern will still run but with some limitations:
+#     - GitHub: cistern will hit the rate-limit for
+#     unauthenticated requests in a few minutes
+#     - GitLab: cistern will NOT be able to access job of
+#     pipelines
 #
 
 ### GITHUB ###
 [[providers.github]]
 # GitHub API token (optional, string)
-#
-# Note: Unauthenticated API requests are heavily rate-limited by 
-# GitHub (60 requests per hour and per IP address) whereas 
-# authenticated clients benefit from a rate of 5000 requests per
-# hour. Providing an  API token is strongly encouraged: without
-# one, cistern will likely reach the rate limit in a matter of
-# minutes.
-#
 # GitHub token management: https://github.com/settings/tokens
 token = \[dq]\[dq]
 
 
 ### GITLAB ###
 [[providers.gitlab]]
-# nName shown by cistern for this provider
-# (optional, string, default: \[dq]gitlab\[dq])
-name = \[dq]gitlab\[dq]
-
-# GitLab instance url (optional, string, default: \[dq]https://gitlab.com\[dq])
+# GitLab instance URL (optional, string, default:
+# \[dq]https://gitlab.com\[dq])
 # (the GitLab instance must support GitLab REST API V4)
 url = \[dq]https://gitlab.com\[dq]
 
 # GitLab API token (optional, string)
-#
-# Note: GitLab prevents access to pipeline jobs for 
-# unauthenticated users meaning if you wish to use cistern
-# to view GitLab pipelines you will have to provide
-# appropriate credentials. This is true even for pipelines
-# of public repositories.
-#
 # gitlab.com token management:
 #     https://gitlab.com/profile/personal_access_tokens
 token = \[dq]\[dq]
@@ -349,16 +385,12 @@ token = \[dq]\[dq]
 
 ### TRAVIS CI ###
 [[providers.travis]]
-# nName shown by cistern for this provider
-# (optional, string, default: \[dq]travis\[dq])
-name = \[dq]travis\[dq]
-
-# url of the Travis instance. \[dq]org\[dq] and \[dq]com\[dq] can be used as
-# shorthands for the full url of travis.org and travis.com
+# URL of the Travis instance. \[dq]org\[dq] and \[dq]com\[dq] can be used as
+# shorthands for the full URL of travis.org and travis.com
 # (string, mandatory)
 url = \[dq]org\[dq]
 
-# API access token for the travis API (string, optional)
+# API access token for the travis API (string, optional).
 # Travis tokens are managed at:
 #    - https://travis-ci.org/account/preferences
 #    - https://travis-ci.com/account/preferences
@@ -367,17 +399,12 @@ token = \[dq]\[dq]
 
 # Define another account for accessing travis.com
 [[providers.travis]]
-name = \[dq]travis\[dq]
 url = \[dq]com\[dq]
 token = \[dq]\[dq]
 
 
 ### APPVEYOR ###
 [[providers.appveyor]]
-# nName shown by cistern for this provider
-# (optional, string, default: \[dq]appveyor\[dq])
-name = \[dq]appveyor\[dq]
-
 # AppVeyor API token (optional, string)
 # AppVeyor token managemement: https://ci.appveyor.com/api-keys
 token = \[dq]\[dq]
@@ -385,10 +412,6 @@ token = \[dq]\[dq]
 
 ### CIRCLECI ###
 [[providers.circleci]]
-# nName shown by cistern for this provider
-# (optional, string, default: \[dq]circleci\[dq])
-name = \[dq]circleci\[dq]
-
 # Circle CI API token (optional, string)
 # See https://circleci.com/account/api
 token = \[dq]\[dq]
@@ -396,10 +419,6 @@ token = \[dq]\[dq]
 
 ### AZURE DEVOPS ###
 [[providers.azure]]
-# nName shown by cistern for this provider
-# (optional, string, default: \[dq]azure\[dq])
-name = \[dq]azure\[dq]
-
 # Azure API token (optional, string)
 # Azure token management is done at https://dev.azure.com/ via
 # the user settings menu
@@ -449,10 +468,10 @@ Monitor pipelines of other repositories
 .IP
 .nf
 \f[C]
-# Show pipelines of a repository identified by a url or path
-cistern -r https://gitlab.com/nbedos/cistern        # Web url
-cistern -r git\[at]github.com:nbedos/cistern.git        # Git url
-cistern -r github.com/nbedos/cistern                # url without scheme
+# Show pipelines of a repository identified by a URL or path
+cistern -r https://gitlab.com/nbedos/cistern        # Web URL
+cistern -r git\[at]github.com:nbedos/cistern.git        # Git URL
+cistern -r github.com/nbedos/cistern                # URL without scheme
 cistern -r /home/user/repos/repo                  # Path to a repository
 
 # Specify both repository and git reference

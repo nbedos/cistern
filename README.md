@@ -49,7 +49,7 @@ Binary releases are made available for each version of `cistern`
 [here](https://github.com/nbedos/cistern/releases).
 
 Each release archive contains a statically linked executable named `cistern`, the manual page
-in HTML and roff format and a copy of the license. 
+in HTML and roff format, a copy of the license and a sample configuration file.
 
 ## Building from source
 ### Building automatically from source (recommended)

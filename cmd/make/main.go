@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -105,6 +106,26 @@ package main
 const manualPage = ` + "`%s`" + `
 `
 
+func copyFile(src, dst string) error {
+	inFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer inFile.Close()
+
+	outFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(outFile, inFile); err != nil {
+		outFile.Close()
+		return err
+	}
+
+	return outFile.Close()
+}
+
 func man(dir string, version string) error {
 	bs, err := ioutil.ReadFile("man.md")
 	if err != nil {
@@ -114,7 +135,7 @@ func man(dir string, version string) error {
 	markdown := strings.Replace(string(bs), "\\<version\\>", version, 1)
 
 	output := path.Join(dir, "cistern.man.html")
-	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", output))
+	fmt.Fprintf(os.Stderr, "Building %s...\n", output)
 	mdToHTML := exec.Command("pandoc", "-s", "-t", "html5", "--template", "pandoc_template.html", "-o", output)
 	mdToHTML.Stdin = bytes.NewBufferString(markdown)
 	mdToHTML.Stderr = os.Stderr
@@ -123,7 +144,7 @@ func man(dir string, version string) error {
 	}
 
 	output = path.Join(dir, "cistern.man.1")
-	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", output))
+	fmt.Fprintf(os.Stderr, "Building %s...\n", output)
 	mdToRoff := exec.Command("pandoc", "-s", "-t", "man", "-o", output)
 	mdToRoff.Stdin = bytes.NewBufferString(markdown)
 	mdToRoff.Stderr = os.Stderr
@@ -138,7 +159,7 @@ const licenseHeader = `Below is the license of cistern and of every package it u
 
 func license(dir string) error {
 	output := path.Join(dir, "LICENSE")
-	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", output))
+	fmt.Fprintf(os.Stderr, "Building %s...\n", output)
 	b := strings.Builder{}
 	b.WriteString(licenseHeader)
 	bs, err := ioutil.ReadFile("LICENSE")
@@ -219,12 +240,19 @@ func build(workdir string, env []string, versionnedDir bool) (string, error) {
 		return "", err
 	}
 
+	src := path.Join("cmd", "cistern", "cistern.toml")
+	dst := path.Join(dir, "cistern.toml")
+	fmt.Fprintf(os.Stderr, "Building %s...\n", dst)
+	if err := copyFile(src, dst); err != nil {
+		return "", err
+	}
+
 	return dir, nil
 }
 
 func compress(workdir string, dir string) (string, error) {
 	archivePath := dir + ".tar.gz"
-	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", path.Join(workdir, archivePath)))
+	fmt.Fprintf(os.Stderr, "Building %s...\n", path.Join(workdir, archivePath))
 	absoluteArchivePath := path.Join(workdir, archivePath)
 	cmd := exec.Command("tar", "-C", workdir, "-czf", absoluteArchivePath, dir)
 	cmd.Stderr = os.Stderr
@@ -266,7 +294,7 @@ func releases(dir string, env []string, OSesByArch map[string][]string) error {
 
 func releaseNotes(dir string, archives []string) error {
 	notes := path.Join(dir, "notes.md")
-	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", notes))
+	fmt.Fprintf(os.Stderr, "Building %s...\n", notes)
 
 	changelog, err := ioutil.ReadFile("CHANGELOG.md")
 	if err != nil {
@@ -356,7 +384,7 @@ func main() {
 		cmd.Env = append(os.Environ(), env...)
 		err = cmd.Run()
 	default:
-		fmt.Fprint(os.Stderr, fmt.Sprintf("unknow command: %q\n", os.Args[1]))
+		fmt.Fprintf(os.Stderr, "unknow command: %q\n", os.Args[1])
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(1)
 	}

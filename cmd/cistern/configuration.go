@@ -24,7 +24,7 @@ type Configuration struct {
 	Providers providers.Configuration `toml:"providers"`
 	Location  string                  `toml:"location" default:"Local"`
 	Columns   []string                `toml:"columns"`
-	Sort      string                  `toml:"sort" default:"-created"`
+	Sort      string                  `toml:"sort"`
 	Depth     int                     `toml:"depth" default:"2"`
 	Style     struct {
 		Theme   string                        `toml:"theme"`
@@ -109,6 +109,8 @@ var defaultTableConfiguration = tui.TableConfiguration{
 		},
 	},
 }
+
+const maxWidth = 999
 
 var defaultTableColumns = map[tui.ColumnID]tui.Column{
 	providers.ColumnRef: {
@@ -448,13 +450,12 @@ loop:
 
 	tconf.DefaultDepth = c.Depth
 
-
 	tconf.HeaderSuffixAscending = c.Style.Table.Ascending
 	if tconf.HeaderSuffixAscending == "" {
 		tconf.HeaderSuffixAscending = "▲"
 	}
 	tconf.HeaderSuffixDescending = c.Style.Table.Descending
-	if tconf.HeaderSuffixDescending == ""{
+	if tconf.HeaderSuffixDescending == "" {
 		tconf.HeaderSuffixDescending = "▼"
 	}
 

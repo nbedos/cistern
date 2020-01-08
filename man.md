@@ -84,6 +84,36 @@ Show usage of cistern
 ## `--version`
 Print the version of cistern being run
 
+# COLUMNS
+## REF
+Tag or branch associated to the pipeline
+
+## PIPELINE
+Identifier of the pipeline
+
+## TYPE
+Either "P" (Pipeline), "S" (Stage), "J" (Job) or "T" (Task)
+
+## STATE
+State of the pipeline
+
+## XFAIL
+Expected failure. Boolean indicating whether this step is allowed to fail without impacting the
+overall state of the pipeline
+
+## CREATED, STARTED, FINISHED
+Date when the pipeline was created, started or finished
+
+## DURATION
+Time it took for the pipeline to finish
+
+## NAME
+Name of the provider followed by the name of the pipeline, if any
+
+## URL
+URL of the step on the website of the provider
+
+
 # INTERACTIVE COMMANDS
 Below are the default commands for interacting with cistern.
 
@@ -93,6 +123,16 @@ Key        Action
 Up, j      Move cursor up by one line
 
 Down, k    Move cursor down by one line
+
+Right, l   Scroll right
+
+Left, h    Scroll left
+
+<          Move sort column left
+
+\>         Move sort column right
+
+!          Reverse sort order
 
 Page Up    Move cursor up by one screen
 
@@ -120,7 +160,7 @@ b          Open with default web browser
 
 q          Quit
 
-?              View manual page
+?          View manual page
 
 ----------------------------------------------------------
 
@@ -142,73 +182,63 @@ If `XDG_CONFIG_HOME` (resp. `XDG_CONFIG_DIRS`) is not set, cistern uses the defa
 
 ## Format
 cistern uses a configuration file in [TOML version v0.5.0](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md)
-format. The configuration file is made of keys grouped together in tables. The specification of
-each table is given in the example below.
+format. 
 
-## Example
-This example describes and uses all existing configuration options.
+The complete format of the configuration file is described in the example included in the
+release archives which is also available [on GitHub](https://github.com/nbedos/cistern/blob/master/cmd/cistern/cistern.toml)
+
+## Minimal example
+This is a minimal example of a configuration file focused mostly on setting up credentials.
+It should be enough to get you started running cistern.
 
 ```toml
 #### CISTERN CONFIGURATION FILE ####
-# This file is a complete, valid configuration file for cistern
-# and should be located at $XDG_CONFIG_HOME/cistern/cistern.toml
-# 
+# This is a configuration file for cistern that should be located at
+# $XDG_CONFIG_HOME/cistern/cistern.toml
+
+## GENERIC OPTIONS ##
+# List of columns displayed on screen. Available columns are 
+# "ref", "pipeline", "type", "state", "created", "started",
+# "finished", "duration", "xfail", "name", "url"
+columns = ["ref", "pipeline", "type", "state", "started", "duration", "name", "url"]
+
+# Name of the column used for sorting the table prefixed by an
+# optional "+" (ascending order) or "-" (descending order).
+sort = "-started"
+
 
 ## PROVIDERS ##
 [providers]
-# The 'providers' table is used to define credentials for 
-# accessing online services. cistern relies on two types of
-# providers:
+# The sections below define credentials for accessing source 
+# providers (GitHub, GitLab) and CI providers (GitLab, Travis,
+# AppVeyor, Azure Devops, CircleCI).
 #
-#    - 'source providers' are used for listing the CI pipelines
-#    associated to a given commit (GitHub and GitLab are source
-#    providers)
-#    - 'CI providers' are used to get detailed information about
-#    CI pipelines (GitLab, AppVeyor, CircleCI, Travis and Azure
-#    Devops are CI providers)
-#
-# cistern requires credentials for at least one source provider and
-# one CI provider to run. Feel free to remove sections below 
-# as long as this rule is met.
-#
-# Note that for all providers, not setting an API token or 
-# setting `token = ""` will cause the provider to make
-# unauthenticated API requests. 
+# Feel free to remove any section as long as you leave one
+# section for a source provider and one for a CI provider.
+# 
+# When an API token is not set or set to the empty string,
+# cistern will still run but with some limitations:
+#     - GitHub: cistern will hit the rate-limit for
+#     unauthenticated requests in a few minutes
+#     - GitLab: cistern will NOT be able to access pipeline
+#     jobs
 #
 
 ### GITHUB ###
 [[providers.github]]
 # GitHub API token (optional, string)
-#
-# Note: Unauthenticated API requests are heavily rate-limited by 
-# GitHub (60 requests per hour and per IP address) whereas 
-# authenticated clients benefit from a rate of 5000 requests per
-# hour. Providing an  API token is strongly encouraged: without
-# one, cistern will likely reach the rate limit in a matter of
-# minutes.
-#
 # GitHub token management: https://github.com/settings/tokens
 token = ""
 
 
 ### GITLAB ###
 [[providers.gitlab]]
-# Name shown by cistern for this provider
-# (optional, string, default: "gitlab")
-name = "gitlab"
-
-# GitLab instance URL (optional, string, default: "https://gitlab.com")
+# GitLab instance URL (optional, string, default:
+# "https://gitlab.com")
 # (the GitLab instance must support GitLab REST API V4)
 url = "https://gitlab.com"
 
 # GitLab API token (optional, string)
-#
-# Note: GitLab prevents access to pipeline jobs for 
-# unauthenticated users meaning if you wish to use cistern
-# to view GitLab pipelines you will have to provide
-# appropriate credentials. This is true even for pipelines
-# of public repositories.
-#
 # gitlab.com token management:
 #     https://gitlab.com/profile/personal_access_tokens
 token = ""
@@ -216,16 +246,12 @@ token = ""
 
 ### TRAVIS CI ###
 [[providers.travis]]
-# Name shown by cistern for this provider
-# (optional, string, default: "travis")
-name = "travis"
-
 # URL of the Travis instance. "org" and "com" can be used as
 # shorthands for the full URL of travis.org and travis.com
 # (string, mandatory)
 url = "org"
 
-# API access token for the travis API (string, optional)
+# API access token for the travis API (string, optional).
 # Travis tokens are managed at:
 #    - https://travis-ci.org/account/preferences
 #    - https://travis-ci.com/account/preferences
@@ -234,17 +260,12 @@ token = ""
 
 # Define another account for accessing travis.com
 [[providers.travis]]
-name = "travis"
 url = "com"
 token = ""
 
 
 ### APPVEYOR ###
 [[providers.appveyor]]
-# Name shown by cistern for this provider
-# (optional, string, default: "appveyor")
-name = "appveyor"
-
 # AppVeyor API token (optional, string)
 # AppVeyor token managemement: https://ci.appveyor.com/api-keys
 token = ""
@@ -252,10 +273,6 @@ token = ""
 
 ### CIRCLECI ###
 [[providers.circleci]]
-# Name shown by cistern for this provider
-# (optional, string, default: "circleci")
-name = "circleci"
-
 # Circle CI API token (optional, string)
 # See https://circleci.com/account/api
 token = ""
@@ -263,10 +280,6 @@ token = ""
 
 ### AZURE DEVOPS ###
 [[providers.azure]]
-# Name shown by cistern for this provider
-# (optional, string, default: "azure")
-name = "azure"
-
 # Azure API token (optional, string)
 # Azure token management is done at https://dev.azure.com/ via
 # the user settings menu
@@ -312,7 +325,7 @@ Monitor pipelines of other repositories
 cistern -r https://gitlab.com/nbedos/cistern        # Web URL
 cistern -r git@github.com:nbedos/cistern.git        # Git URL
 cistern -r github.com/nbedos/cistern                # URL without scheme
-cistern -r /home/user/repos/repo                  # Path to a repository
+cistern -r /home/user/repos/repo                    # Path to a repository
 
 # Specify both repository and git reference
 cistern -r github.com/nbedos/cistern master

@@ -785,7 +785,7 @@ func TestHierarchicalTable_headers(t *testing.T) {
 		expectedHeader := strings.Join([]string{"column1", "column2", "column", "olumn4"}, table.conf.Sep)
 		table.Resize(runewidth.StringWidth(expectedHeader), table.height)
 
-		header := table.styledString(table.headers(), "").String()
+		header := table.styledString(table.headers(), "", false).String()
 		if diff := cmp.Diff(expectedHeader, header); diff != "" {
 			t.Fatal(diff)
 		}
@@ -833,7 +833,7 @@ func TestHierarchicalTable_styledString(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		s := table.styledString(values, "").String()
+		s := table.styledString(values, "", false).String()
 		if diff := cmp.Diff("column1  column2  column3  column4", s); diff != "" {
 			t.Fatal(diff)
 		}
@@ -845,7 +845,7 @@ func TestHierarchicalTable_styledString(t *testing.T) {
 			t.Fatal(err)
 		}
 		table.HorizontalScroll(1)
-		s := table.styledString(values, "").String()
+		s := table.styledString(values, "", false).String()
 		if diff := cmp.Diff("column2  column3  column4", s); diff != "" {
 			t.Fatal(diff)
 		}
@@ -856,7 +856,7 @@ func TestHierarchicalTable_styledString(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		s := table.styledString(values, "").String()
+		s := table.styledString(values, "", false).String()
 		if diff := cmp.Diff("", s); diff != "" {
 			t.Fatal(diff)
 		}

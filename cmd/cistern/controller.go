@@ -531,5 +531,3 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 	return controller.Run(ctx, repo)
 }
 
-const maxWidth = 999
-
