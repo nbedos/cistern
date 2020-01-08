@@ -108,7 +108,7 @@ func Main(w io.Writer) error {
 			}
 		}
 	case ErrMissingConf:
-		return fmt.Errorf(warningNoConfigFileFormat, paths[0])
+		fmt.Fprintf(w, warningNoConfigFileFormat, paths[0])
 	default:
 		return err
 	}
