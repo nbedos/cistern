@@ -423,7 +423,6 @@ func (s Step) InheritedValues() []tui.ColumnID {
 	return []tui.ColumnID{ColumnRef, ColumnPipeline}
 }
 
-
 type StepStyle struct {
 	GitStyle
 	Provider tui.StyleTransform
@@ -529,6 +528,10 @@ type Pipelines []Pipeline
 
 func (ps Pipelines) Diff(others Pipelines) string {
 	return cmp.Diff(ps, others, cmp.AllowUnexported(Pipeline{}, Step{}))
+}
+
+func (p Pipeline) Less(other Pipeline) bool {
+	return p.ProviderHost < other.ProviderHost || (p.ProviderHost == other.ProviderHost && p.ID < other.ID)
 }
 
 // Return step identified by stepIDs
