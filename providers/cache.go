@@ -664,6 +664,7 @@ func token(token string, process []string) (string, error) {
 	cmd := exec.Command(process[0], process[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
 	bs, err := cmd.Output()
 	return strings.Trim(string(bs), "\r\n"), err
 }
