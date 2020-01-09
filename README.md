@@ -99,8 +99,10 @@ docker run -it "$CISTERN_DOCKER_IMAGE" -r github.com/nbedos/cistern
 ```
 
 # Configuration
-`cistern` requires access to various APIs. The corresponding credentials should be stored in a
-configuration file as described in the [manual page](https://nbedos.github.io/cistern/cistern.man).
+`cistern` requires access to various APIs and the corresponding credentials should be stored in a
+configuration file. A minimal example is given in the [manual page](https://nbedos.github.io/cistern/cistern.man)
+and a full example (which is also included in every release archive) is available
+[here](https://github.com/nbedos/cistern/blob/master/cmd/cistern/cistern.toml).
 
 If the configuration file is missing, `cistern` will run with the following limitations:
 * `cistern` will likely reach the [rate limit of the GitHub API](https://developer.github.com/v3/#rate-limiting)

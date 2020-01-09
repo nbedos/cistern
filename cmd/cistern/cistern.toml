@@ -32,6 +32,19 @@ depth = 2
 #
 # Note that for all providers, not setting an API token or setting `token = ""` will cause the
 # provider to make unauthenticated API requests.
+#
+# Also, every "token" key can be replaced by "token-from-process" which is a list of strings
+# consisting of the name of an executable to call followed by the arguments to be provided to it.
+# The process will inherit stdin and stderr (allowing for password prompts) and the output of the
+# process will be used as the value of the token.
+#
+# Examples:
+#        # Read token from environment variable
+#        token-from-process = ["bash", "-c", "echo $MY_API_TOKEN"]
+#
+#        # Read token from `pass` store
+#        token-from-process = ["pass", "ci/gitlab/cistern"]
+#
 
 ### GITHUB ###
 [[providers.github]]

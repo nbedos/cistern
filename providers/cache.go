@@ -616,35 +616,56 @@ type Cache struct {
 
 type Configuration struct {
 	GitLab []struct {
-		Name              string  `toml:"name" default:"gitlab"`
-		URL               string  `toml:"url"`
-		Token             string  `toml:"token"`
-		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+		Name              string   `toml:"name" default:"gitlab"`
+		URL               string   `toml:"url"`
+		Token             string   `toml:"token"`
+		TokenFromProcess  []string `toml:"token-from-process"`
+		RequestsPerSecond float64  `toml:"max-requests-per-second"`
 	}
 	GitHub []struct {
-		Token string `toml:"token"`
+		Token            string   `toml:"token"`
+		TokenFromProcess []string `toml:"token-from-process"`
 	}
 	CircleCI []struct {
-		Name              string  `toml:"name" default:"circleci"`
-		Token             string  `toml:"token"`
-		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+		Name              string   `toml:"name" default:"circleci"`
+		Token             string   `toml:"token"`
+		TokenFromProcess  []string `toml:"token-from-process"`
+		RequestsPerSecond float64  `toml:"max-requests-per-second"`
 	}
 	Travis []struct {
-		Name              string  `toml:"name" default:"travis"`
-		URL               string  `toml:"url"`
-		Token             string  `toml:"token"`
-		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+		Name              string   `toml:"name" default:"travis"`
+		URL               string   `toml:"url"`
+		Token             string   `toml:"token"`
+		TokenFromProcess  []string `toml:"token-from-process"`
+		RequestsPerSecond float64  `toml:"max-requests-per-second"`
 	}
 	AppVeyor []struct {
-		Name              string  `toml:"name" default:"appveyor"`
-		Token             string  `toml:"token"`
-		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+		Name              string   `toml:"name" default:"appveyor"`
+		Token             string   `toml:"token"`
+		TokenFromProcess  []string `toml:"token-from-process"`
+		RequestsPerSecond float64  `toml:"max-requests-per-second"`
 	}
 	Azure []struct {
-		Name              string  `toml:"name" default:"azure"`
-		Token             string  `toml:"token"`
-		RequestsPerSecond float64 `toml:"max_requests_per_second"`
+		Name              string   `toml:"name" default:"azure"`
+		Token             string   `toml:"token"`
+		TokenFromProcess  []string `toml:"token-from-process"`
+		RequestsPerSecond float64  `toml:"max-requests-per-second"`
 	}
+}
+
+func token(token string, process []string) (string, error) {
+	if len(process) == 0 {
+		return token, nil
+	}
+	if token != "" {
+		return "", errors.New("at most one of \"token\" and \"token-from-process\" must be set")
+	}
+
+	cmd := exec.Command(process[0], process[1:]...)
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+	bs, err := cmd.Output()
+	return strings.Trim(string(bs), "\r\n"), err
 }
 
 func (c Configuration) ToCache(ctx context.Context) (Cache, error) {
@@ -653,7 +674,11 @@ func (c Configuration) ToCache(ctx context.Context) (Cache, error) {
 
 	for i, conf := range c.GitLab {
 		id := fmt.Sprintf("gitlab-%d", i)
-		client, err := NewGitLabClient(id, conf.Name, conf.URL, conf.Token, conf.RequestsPerSecond)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client, err := NewGitLabClient(id, conf.Name, conf.URL, token, conf.RequestsPerSecond)
 		if err != nil {
 			return Cache{}, err
 		}
@@ -663,25 +688,41 @@ func (c Configuration) ToCache(ctx context.Context) (Cache, error) {
 
 	for i, conf := range c.GitHub {
 		id := fmt.Sprintf("github-%d", i)
-		client := NewGitHubClient(ctx, id, &conf.Token)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client := NewGitHubClient(ctx, id, &token)
 		source = append(source, client)
 	}
 
 	for i, conf := range c.CircleCI {
 		id := fmt.Sprintf("circleci-%d", i)
-		client := NewCircleCIClient(id, conf.Name, conf.Token, conf.RequestsPerSecond)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client := NewCircleCIClient(id, conf.Name, token, conf.RequestsPerSecond)
 		ci = append(ci, client)
 	}
 
 	for i, conf := range c.AppVeyor {
 		id := fmt.Sprintf("appveyor-%d", i)
-		client := NewAppVeyorClient(id, conf.Name, conf.Token, conf.RequestsPerSecond)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client := NewAppVeyorClient(id, conf.Name, token, conf.RequestsPerSecond)
 		ci = append(ci, client)
 	}
 
 	for i, conf := range c.Travis {
 		id := fmt.Sprintf("travis-%d", i)
-		client, err := NewTravisClient(id, conf.Name, conf.Token, conf.URL, conf.RequestsPerSecond)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client, err := NewTravisClient(id, conf.Name, token, conf.URL, conf.RequestsPerSecond)
 		if err != nil {
 			return Cache{}, err
 		}
@@ -690,7 +731,11 @@ func (c Configuration) ToCache(ctx context.Context) (Cache, error) {
 
 	for i, conf := range c.Azure {
 		id := fmt.Sprintf("azure-%d", i)
-		client := NewAzurePipelinesClient(id, conf.Name, conf.Token, conf.RequestsPerSecond)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client := NewAzurePipelinesClient(id, conf.Name, token, conf.RequestsPerSecond)
 		ci = append(ci, client)
 	}
 

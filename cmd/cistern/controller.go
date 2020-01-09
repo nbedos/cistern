@@ -480,12 +480,25 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 	return nil
 }
 
+const defaultStatus = "j:Down  k:Up  oO:Open  cC:Close  /:Search  v:Logs  b:Browser  ?:Help  q:Quit"
+
 func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, ref string, conf Configuration) error {
 	// FIXME Discard log until the status bar is implemented in order to hide the "Unsolicited response received on
 	//  idle HTTP channel" from GitLab's HTTP client
 	log.SetOutput(ioutil.Discard)
-	encoding.Register()
 
+	tableConfig, err := conf.TableConfig(defaultTableColumns)
+	if err != nil {
+		return err
+	}
+
+	// Keep this before NewTUI since it may use stdin/stderr for password prompt
+	cacheDB, err := conf.Providers.ToCache(ctx)
+	if err != nil {
+		return err
+	}
+
+	encoding.Register()
 	defaultStyle := tcell.StyleDefault
 	if conf.Style.Default != nil {
 		transform, err := conf.Style.Default.Parse()
@@ -494,14 +507,6 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		}
 		defaultStyle = transform(defaultStyle)
 	}
-
-	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  v:Logs  b:Browser  ?:Help  q:Quit"
-
-	tableConfig, err := conf.TableConfig(defaultTableColumns)
-	if err != nil {
-		return err
-	}
-
 	ui, err := tui.NewTUI(newScreen, defaultStyle)
 	if err != nil {
 		return err
@@ -512,11 +517,6 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		// in order to have them return an error in case of a panic.
 		ui.Finish()
 	}()
-
-	cacheDB, err := conf.Providers.ToCache(ctx)
-	if err != nil {
-		return err
-	}
 
 	controllerConf := ControllerConfiguration{
 		TableConfiguration: tableConfig,

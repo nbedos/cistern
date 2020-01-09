@@ -4,12 +4,13 @@
 
 ### Features
 
-* Column visibility, column order, sort order and all style attributes can now be set
+* User interface: Column visibility, column order, sort order and all style attributes can now be set
 in the configuration file (see the [sample configuration file included](https://github.com/nbedos/cistern/blob/master/cmd/cistern/cistern.toml) in the release archives for details)
-* Add new columns: created, finished, xfail and url
-* Support horizontal scrolling of table rows 
-* Support sorting pipelines by any column 
-* Monitor all remotes of local repositories instead of just 'origin' ([issue #3](https://github.com/nbedos/cistern/issues/3))
+* User interface: Add new columns: created, finished, xfail and url
+* User interface: Support horizontal scrolling of table rows 
+* User interface: Support sorting pipelines by any column 
+* Core: Monitor all remotes of local repositories instead of just 'origin' ([issue #3](https://github.com/nbedos/cistern/issues/3))
+* Configuration: Support setting API token from output of user-specified process ([issue #13](https://github.com/nbedos/cistern/issues/13))
 
 ### Bug fixes
 
