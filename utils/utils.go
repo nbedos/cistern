@@ -38,7 +38,7 @@ func Bounded(a, lower, upper int) int {
 	return MaxInt(lower, MinInt(a, upper))
 }
 
-func RepoHostOwnerAndName(repositoryURL string) (string, string, string, error) {
+func RepositoryHostAndSlug(repositoryURL string) (string, string, error) {
 	// Turn "git@host:path.git" into "host/path" so that it is compatible with url.Parse()
 	if strings.HasPrefix(repositoryURL, "git@") {
 		repositoryURL = strings.TrimPrefix(repositoryURL, "git@")
@@ -48,7 +48,7 @@ func RepoHostOwnerAndName(repositoryURL string) (string, string, string, error) 
 
 	u, err := url.Parse(repositoryURL)
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 	if u.Host == "" && !strings.Contains(repositoryURL, "://") {
 		// example.com/aaa/bbb is parsed as url.url{Host: "", Path:"example.com/aaa/bbb"}
@@ -56,18 +56,15 @@ func RepoHostOwnerAndName(repositoryURL string) (string, string, string, error) 
 		//
 		u, err = url.Parse("https://" + repositoryURL)
 		if err != nil {
-			return "", "", "", err
+			return "", "", err
 		}
 	}
 
-	components := strings.FieldsFunc(u.Path, func(c rune) bool { return c == '/' })
-	if len(components) < 2 {
-		err := fmt.Errorf("invalid repository path: %q (expected at least two components)",
-			u.String())
-		return "", "", "", err
+	if l := len(strings.FieldsFunc(u.Path, func(r rune) bool { return r == '/' })); l < 2 {
+		return "", "", fmt.Errorf("invalid repository path: %q (expected at least two path components)", repositoryURL)
 	}
 
-	return u.Hostname(), components[0], components[1], nil
+	return u.Hostname(), strings.Trim(u.Path, "/"), nil
 }
 
 type NullString struct {

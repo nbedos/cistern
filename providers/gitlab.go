@@ -53,14 +53,12 @@ func (c GitLabClient) Commit(ctx context.Context, repo string, ref string) (Comm
 		return Commit{}, ErrUnknownRepositoryURL
 	}
 
-	ref = url.PathEscape(ref)
-
 	select {
 	case <-c.rateLimiter:
 	case <-ctx.Done():
 		return Commit{}, ctx.Err()
 	}
-	gitlabCommit, _, err := c.remote.Commits.GetCommit(slug, url.PathEscape(ref), gitlab.WithContext(ctx))
+	gitlabCommit, _, err := c.remote.Commits.GetCommit(slug, ref, gitlab.WithContext(ctx))
 	if err != nil {
 		if err, ok := err.(*gitlab.ErrorResponse); ok {
 			switch err.Response.StatusCode {
@@ -224,12 +222,11 @@ func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (Pipeline, err
 }
 
 func (c GitLabClient) parseRepositoryURL(u string) (string, error) {
-	host, owner, repo, err := utils.RepoHostOwnerAndName(u)
+	host, slug, err := utils.RepositoryHostAndSlug(u)
 	if err != nil || host != c.remote.BaseURL().Hostname() {
 		return "", ErrUnknownRepositoryURL
 	}
 
-	slug := fmt.Sprintf("%s/%s", url.PathEscape(owner), url.PathEscape(repo))
 	return slug, nil
 }
 
@@ -243,14 +240,16 @@ func (c GitLabClient) parsePipelineURL(u string) (string, int, error) {
 		return "", 0, ErrUnknownPipelineURL
 	}
 
-	// url format: https://gitlab.com/nbedos/cistern/pipelines/97604657
+	// URL format:
+	//    https://gitlab.com/nbedos/cistern/pipelines/97604657
+	// OR https://gitlab.com/namespace/nbedos/cistern/pipelines/97604657
 	pathComponents := strings.FieldsFunc(v.EscapedPath(), func(c rune) bool { return c == '/' })
-	if len(pathComponents) < 4 || pathComponents[2] != "pipelines" {
+	if len(pathComponents) < 4 || pathComponents[len(pathComponents)-2] != "pipelines" {
 		return "", 0, ErrUnknownPipelineURL
 	}
 
-	slug := fmt.Sprintf("%s/%s", pathComponents[0], pathComponents[1])
-	id, err := strconv.Atoi(pathComponents[3])
+	slug := strings.Join(pathComponents[:len(pathComponents)-2], "/")
+	id, err := strconv.Atoi(pathComponents[len(pathComponents)-1])
 	if err != nil {
 		return "", 0, err
 	}
