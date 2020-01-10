@@ -118,240 +118,67 @@ var defaultTableColumns = map[tui.ColumnID]tui.Column{
 		Position:  1,
 		MaxWidth:  maxWidth,
 		Alignment: tui.Left,
-		Less: func(nodes []tui.TableNode, asc bool, v interface{}) func(i, j int) bool {
-			return func(i, j int) bool {
-				pi := nodes[i].(providers.Pipeline)
-				pj := nodes[j].(providers.Pipeline)
-				refi := pi.Values(v)[providers.ColumnRef]
-				refj := pj.Values(v)[providers.ColumnRef]
-
-				if asc {
-					return refi.String() < refj.String() || (refi.String() == refj.String() && pi.Less(pj))
-				} else {
-					return refj.String() > refi.String() || (refi.String() == refj.String() && pi.Less(pj))
-				}
-			}
-		},
 	},
 	providers.ColumnPipeline: {
 		Position:  2,
 		Header:    "PIPELINE",
 		MaxWidth:  maxWidth,
 		Alignment: tui.Right,
-		Less: func(nodes []tui.TableNode, asc bool, v interface{}) func(i, j int) bool {
-			return func(i, j int) bool {
-				pi := nodes[i].(providers.Pipeline)
-				pj := nodes[j].(providers.Pipeline)
-				IDi := pi.Values(v)[providers.ColumnPipeline]
-				IDj := pj.Values(v)[providers.ColumnPipeline]
-
-				if asc {
-					return IDi.String() < IDj.String() || (IDi.String() == IDj.String() && pi.Less(pj))
-				} else {
-					return IDi.String() > IDj.String() || (IDi.String() == IDj.String() && pi.Less(pj))
-				}
-			}
-		},
 	},
 	providers.ColumnType: {
 		Position:  3,
 		Header:    "TYPE",
 		MaxWidth:  maxWidth,
 		Alignment: tui.Left,
-		// The following sorting function has no interesting effect on the table since all Pipelines
-		// have the same type. We just include it for consistency.
-		Less: func(nodes []tui.TableNode, asc bool, v interface{}) func(i, j int) bool {
-			return func(i, j int) bool {
-				ni := nodes[i].(providers.Pipeline)
-				nj := nodes[j].(providers.Pipeline)
-
-				if asc {
-					return ni.Type < nj.Type || (ni.Type == nj.Type && ni.Less(nj))
-				} else {
-					return ni.Type > nj.Type || (ni.Type == nj.Type && ni.Less(nj))
-				}
-			}
-		},
 	},
 	providers.ColumnState: {
 		Position:  4,
 		Header:    "STATE",
 		MaxWidth:  maxWidth,
 		Alignment: tui.Left,
-		Less: func(nodes []tui.TableNode, asc bool, v interface{}) func(i, j int) bool {
-			return func(i, j int) bool {
-				ni := nodes[i].(providers.Pipeline)
-				nj := nodes[j].(providers.Pipeline)
-
-				if asc {
-					return ni.State < nj.State || (ni.State == nj.State && ni.Less(nj))
-				} else {
-					return ni.State > nj.State || (ni.State == nj.State && ni.Less(nj))
-				}
-			}
-		},
 	},
 	providers.ColumnAllowedFailure: {
 		Position:  5,
 		Header:    "XFAIL",
 		MaxWidth:  maxWidth,
 		Alignment: tui.Left,
-		Less: func(nodes []tui.TableNode, asc bool, v interface{}) func(i, j int) bool {
-			return func(i, j int) bool {
-				pi := nodes[i].(providers.Pipeline)
-				pj := nodes[j].(providers.Pipeline)
-				faili := pi.Values(v)[providers.ColumnAllowedFailure]
-				failj := pj.Values(v)[providers.ColumnAllowedFailure]
-
-				if asc {
-					return faili.String() < failj.String() || (faili.String() == failj.String() && pi.Less(pj))
-				} else {
-					return faili.String() > failj.String() || (faili.String() == failj.String() && pi.Less(pj))
-				}
-			}
-		},
 	},
 	providers.ColumnCreated: {
 		Position:  6,
 		Header:    "CREATED",
 		MaxWidth:  maxWidth,
 		Alignment: tui.Left,
-		Less: func(nodes []tui.TableNode, asc bool, v interface{}) func(i, j int) bool {
-			return func(i, j int) bool {
-				ni := nodes[i].(providers.Pipeline)
-				nj := nodes[j].(providers.Pipeline)
-
-				if asc {
-					return ni.CreatedAt.Before(nj.CreatedAt) || (ni.CreatedAt.Equal(nj.CreatedAt) && ni.Less(nj))
-				} else {
-					return ni.CreatedAt.After(nj.CreatedAt) || (ni.CreatedAt.Equal(nj.CreatedAt) && ni.Less(nj))
-				}
-			}
-		},
 	},
 	providers.ColumnStarted: {
 		Position:  7,
 		Header:    "STARTED",
 		MaxWidth:  maxWidth,
 		Alignment: tui.Left,
-		Less: func(nodes []tui.TableNode, asc bool, v interface{}) func(i, j int) bool {
-			return func(i, j int) bool {
-				pi := nodes[i].(providers.Pipeline)
-				pj := nodes[j].(providers.Pipeline)
-				ti := pi.StartedAt.Time
-				tj := pj.StartedAt.Time
-
-				// Assume that Null values are attributed to events that will occur in the
-				// future, so give them a maximal value
-				if !pi.StartedAt.Valid {
-					ti = time.Unix(1<<62, 0)
-				}
-
-				if !pj.StartedAt.Valid {
-					tj = time.Unix(1<<62, 0)
-				}
-
-				if asc {
-					return ti.Before(tj) || (ti.Equal(tj) && pi.Less(pj))
-				} else {
-					return ti.After(tj) || (ti.Equal(tj) && pi.Less(pj))
-				}
-			}
-		},
 	},
 	providers.ColumnFinished: {
 		Position:  8,
 		Header:    "FINISHED",
 		MaxWidth:  maxWidth,
 		Alignment: tui.Left,
-		Less: func(nodes []tui.TableNode, asc bool, v interface{}) func(i, j int) bool {
-			return func(i, j int) bool {
-				pi := nodes[i].(providers.Pipeline)
-				pj := nodes[j].(providers.Pipeline)
-				ti := pi.FinishedAt.Time
-				tj := pj.FinishedAt.Time
-
-				if !pi.FinishedAt.Valid {
-					ti = time.Unix(1<<62, 0)
-				}
-
-				if !pi.FinishedAt.Valid {
-					tj = time.Unix(1<<62, 0)
-				}
-
-				if asc {
-					return ti.Before(tj) || (ti.Equal(tj) && pi.Less(pj))
-				} else {
-					return ti.After(tj) || (ti.Equal(tj) && pi.Less(pj))
-				}
-			}
-		},
 	},
 	providers.ColumnDuration: {
-		Position:  10,
+		Position:  9,
 		Header:    "DURATION",
 		MaxWidth:  maxWidth,
 		Alignment: tui.Right,
-		Less: func(nodes []tui.TableNode, asc bool, v interface{}) func(i, j int) bool {
-			return func(i, j int) bool {
-				ni := nodes[i].(providers.Pipeline)
-				nj := nodes[j].(providers.Pipeline)
-
-				if !ni.Duration.Valid {
-					ni.Duration.Duration = 1<<63 - 1
-				}
-				if !nj.Duration.Valid {
-					nj.Duration.Duration = 1<<63 - 1
-				}
-
-				if asc {
-					return ni.Duration.Duration < nj.Duration.Duration || (ni.Duration.Duration == nj.Duration.Duration && ni.Less(nj))
-				} else {
-					return ni.Duration.Duration > nj.Duration.Duration || (ni.Duration.Duration == nj.Duration.Duration && ni.Less(nj))
-				}
-			}
-		},
 	},
 	providers.ColumnName: {
-		Position:   11,
+		Position:   10,
 		Header:     "NAME",
 		MaxWidth:   maxWidth,
 		Alignment:  tui.Left,
 		TreePrefix: true,
-		Less: func(nodes []tui.TableNode, asc bool, v interface{}) func(i, j int) bool {
-			return func(i, j int) bool {
-				pi := nodes[i].(providers.Pipeline)
-				pj := nodes[j].(providers.Pipeline)
-				namei := pi.Values(v)[providers.ColumnName]
-				namej := pj.Values(v)[providers.ColumnName]
-
-				if asc {
-					return namei.String() < namej.String() || (namei.String() == namej.String() && pi.Less(pj))
-				} else {
-					return namei.String() > namej.String() || (namei.String() == namej.String() && pi.Less(pj))
-				}
-			}
-		},
 	},
 	providers.ColumnWebURL: {
-		Position:  12,
+		Position:  11,
 		Header:    "URL",
 		MaxWidth:  maxWidth,
 		Alignment: tui.Left,
-		Less: func(nodes []tui.TableNode, asc bool, v interface{}) func(i, j int) bool {
-			return func(i, j int) bool {
-				pi := nodes[i].(providers.Pipeline)
-				pj := nodes[j].(providers.Pipeline)
-				urli := pi.Values(v)[providers.ColumnWebURL]
-				urlj := pj.Values(v)[providers.ColumnWebURL]
-
-				if asc {
-					return urli.String() < urlj.String() || (urli.String() == urlj.String() && pi.Less(pj))
-				} else {
-					return urli.String() > urlj.String() || (urli.String() == urlj.String() && pi.Less(pj))
-				}
-			}
-		},
 	},
 }
 

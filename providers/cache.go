@@ -531,10 +531,6 @@ func (ps Pipelines) Diff(others Pipelines) string {
 	return cmp.Diff(ps, others, cmp.AllowUnexported(Pipeline{}, Step{}))
 }
 
-func (p Pipeline) Less(other Pipeline) bool {
-	return p.ProviderHost < other.ProviderHost || (p.ProviderHost == other.ProviderHost && p.ID < other.ID)
-}
-
 // Return step identified by stepIDs
 func (p Pipeline) getStep(stepIDs []string) (Step, bool) {
 	step := p.Step
@@ -602,6 +598,96 @@ func (p Pipeline) Values(v interface{}) map[tui.ColumnID]tui.StyledString {
 	}
 
 	return values
+}
+
+func (s Step) Compare(t tui.TableNode, id tui.ColumnID, i interface{}) int {
+	other := t.(Step)
+	switch id {
+	case ColumnType, ColumnState, ColumnAllowedFailure, ColumnName, ColumnWebURL:
+		lhs, rhs := s.Values(i)[id].String(), other.Values(i)[id].String()
+		if lhs < rhs {
+			return -1
+		} else if lhs == rhs {
+			return 0
+		} else {
+			return 1
+		}
+
+	case ColumnCreated:
+		if s.CreatedAt.Before(other.CreatedAt) {
+			return -1
+		} else if s.CreatedAt.Equal(other.CreatedAt) {
+			return 0
+		} else {
+			return 1
+		}
+
+	case ColumnStarted, ColumnFinished:
+		var v, vOther utils.NullTime
+		if id == ColumnStarted {
+			v = s.StartedAt
+			vOther = other.StartedAt
+		} else {
+			v = s.FinishedAt
+			vOther = other.FinishedAt
+		}
+
+		// Assume that Null values are attributed to events that will occur in the
+		// future, so give them a maximal value
+		if !v.Valid {
+			v.Time = time.Unix(1<<62, 0)
+		}
+
+		if !vOther.Valid {
+			vOther.Time = time.Unix(1<<62, 0)
+		}
+
+		if v.Time.Before(vOther.Time) {
+			return -1
+		} else if v.Time.Equal(vOther.Time) {
+			return 0
+		} else {
+			return 1
+		}
+
+	case ColumnDuration:
+		v := s.Duration
+		vOther := other.Duration
+
+		if !v.Valid {
+			v.Duration = 1<<63 - 1
+		}
+		if !vOther.Valid {
+			vOther.Duration = 1<<63 - 1
+		}
+
+		if v.Duration < vOther.Duration {
+			return -1
+		} else if v.Duration == vOther.Duration {
+			return 0
+		} else {
+			return 1
+		}
+
+	default:
+		return 0
+	}
+}
+
+func (p Pipeline) Compare(other tui.TableNode, id tui.ColumnID, i interface{}) int {
+	switch q := other.(Pipeline); id {
+	case ColumnRef, ColumnPipeline, ColumnName:
+		lhs, rhs := p.Values(i)[id].String(), other.Values(i)[id].String()
+		if lhs < rhs {
+			return -1
+		} else if lhs == rhs {
+			return 0
+		} else {
+			return 1
+		}
+	default:
+		return p.Step.Compare(q.Step, id, i)
+	}
 }
 
 type Cache struct {
@@ -851,6 +937,12 @@ func (c Cache) Pipelines(ref string) []Pipeline {
 	for _, p := range c.pipelineByRef[ref] {
 		pipelines = append(pipelines, *p)
 	}
+
+	sort.Slice(pipelines, func(i, j int) bool {
+		pi := pipelines[i]
+		pj := pipelines[j]
+		return pi.ProviderHost < pj.ProviderHost || (pi.ProviderHost == pj.ProviderHost && pi.ID < pj.ID)
+	})
 
 	return pipelines
 }
