@@ -120,9 +120,9 @@ Below are the default commands for interacting with cistern.
 -----------------------------------------------------------------
 Key               Action
 ----------------  -----------------------------------------------
-Up, j, Ctrl-p     Move cursor up by one line
+Up, k, Ctrl-p     Move cursor up by one line
 
-Down, k, Ctrl-n   Move cursor down by one line
+Down, j, Ctrl-n   Move cursor down by one line
 
 Right, l          Scroll right
 

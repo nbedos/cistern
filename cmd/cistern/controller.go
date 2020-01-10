@@ -32,11 +32,11 @@ var keyBindings = []struct {
 	action string
 }{
 	{
-		keys:   []string{"Up", "j", "Ctrl-p"},
+		keys:   []string{"Up", "k", "Ctrl-p"},
 		action: "Move cursor up by one line",
 	},
 	{
-		keys:   []string{"Down", "k", "Ctrl-n"},
+		keys:   []string{"Down", "j", "Ctrl-n"},
 		action: "Move cursor down by one line",
 	},
 	{
