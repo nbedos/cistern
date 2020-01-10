@@ -5,7 +5,7 @@
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <meta name="author" content="Nicolas Bedos" />
-  <title>CISTERN(1) | version 0.2.0dev0-23-g9a477eb-linux-amd64</title>
+  <title>CISTERN(1) | version 0.2.0dev5-1-g7cb7365-dirty-linux-amd64</title>
   <style>
       code{white-space: pre-wrap;}
       span.smallcaps{font-variant: small-caps;}
@@ -19,7 +19,7 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">CISTERN(1) | version 0.2.0dev0-23-g9a477eb-linux-amd64</h1>
+<h1 class="title">CISTERN(1) | version 0.2.0dev5-1-g7cb7365-dirty-linux-amd64</h1>
 <p class="author">Nicolas Bedos</p>
 </header>
 <h1 id="name">NAME</h1>
@@ -139,9 +139,9 @@ cistern -r /home/user/repos/myrepo</code></pre>
 <p>URL of the step on the website of the provider</p>
 <h1 id="interactive-commands">INTERACTIVE COMMANDS</h1>
 <p>Below are the default commands for interacting with cistern.</p>
-<table style="width:82%;">
+<table style="width:92%;">
 <colgroup>
-<col style="width: 15%" />
+<col style="width: 25%" />
 <col style="width: 66%" />
 </colgroup>
 <thead>
@@ -152,11 +152,11 @@ cistern -r /home/user/repos/myrepo</code></pre>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">Up, j</td>
+<td style="text-align: left;">Up, j, Ctrl-p</td>
 <td style="text-align: left;">Move cursor up by one line</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">Down, k</td>
+<td style="text-align: left;">Down, k, Ctrl-n</td>
 <td style="text-align: left;">Move cursor down by one line</td>
 </tr>
 <tr class="odd">
@@ -168,12 +168,28 @@ cistern -r /home/user/repos/myrepo</code></pre>
 <td style="text-align: left;">Scroll left</td>
 </tr>
 <tr class="odd">
+<td style="text-align: left;">Ctrl-u</td>
+<td style="text-align: left;">Move cursor up by half a page</td>
+</tr>
+<tr class="even">
 <td style="text-align: left;">Page Up</td>
-<td style="text-align: left;">Move cursor up by one screen</td>
+<td style="text-align: left;">Move cursor up by one page</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Ctrl-d</td>
+<td style="text-align: left;">Move cursor down by half a page</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Page Down</td>
-<td style="text-align: left;">Move cursor down by one screen</td>
+<td style="text-align: left;">Move cursor down by one page</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Home</td>
+<td style="text-align: left;">Move cursor to the first line</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">End</td>
+<td style="text-align: left;">Move cursor to the last line</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">&lt;</td>
@@ -225,7 +241,7 @@ cistern -r /home/user/repos/myrepo</code></pre>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">b</td>
-<td style="text-align: left;">Open with default web browser</td>
+<td style="text-align: left;">Open associated web page in $BROWSER</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">q</td>
@@ -233,7 +249,7 @@ cistern -r /home/user/repos/myrepo</code></pre>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">?</td>
-<td style="text-align: left;">View manual page</td>
+<td style="text-align: left;">Show help for interactive commands</td>
 </tr>
 </tbody>
 </table>
@@ -357,7 +373,6 @@ token = &quot;&quot;
 <p>cistern relies on the following local executables:</p>
 <ul>
 <li><code>less</code> to view log files, unless <code>PAGER</code> is set</li>
-<li><code>man</code> to show the manual page</li>
 <li><code>git</code> (optional) to translate the abbreviated SHA identifier of a commit into a non-abbreviated SHA and also to support ‘insteadOf’ and ‘pushInsteadOf’ configuration options for remote URLs</li>
 </ul>
 <h1 id="examples">EXAMPLES</h1>

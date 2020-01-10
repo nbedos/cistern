@@ -30,9 +30,6 @@ import (
 
 const usage = `Usage:
 
-    Generate source code:
-        make man.go      # Create man.go file from man.md
-
     Test:
         make test        # Run unit tests
 
@@ -76,6 +73,7 @@ func version(env []string) (string, error) {
 func gitDescribe() (string, error) {
 	cmd := exec.Command("git", "describe", "--tags", "--dirty")
 	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
 	bs, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -256,6 +254,7 @@ func compress(workdir string, dir string) (string, error) {
 	absoluteArchivePath := path.Join(workdir, archivePath)
 	cmd := exec.Command("tar", "-C", workdir, "-czf", absoluteArchivePath, dir)
 	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
 	return absoluteArchivePath, cmd.Run()
 }
 
@@ -289,7 +288,16 @@ func releases(dir string, env []string, OSesByArch map[string][]string) error {
 
 	// Match sort order of files on the GitHub release page
 	sort.Strings(archives)
-	return releaseNotes(dir, archives)
+	if err := releaseNotes(dir, archives); err != nil {
+		return err
+	}
+
+	// Build manual page, sample configuration file
+	if _, err := build(dir, os.Environ(), false); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func releaseNotes(dir string, archives []string) error {
@@ -324,39 +332,6 @@ func releaseNotes(dir string, archives []string) error {
 	return ioutil.WriteFile(notes, []byte(content.String()), os.ModePerm)
 }
 
-func manGo() error {
-	bs, err := ioutil.ReadFile("man.md")
-	if err != nil {
-		return err
-	}
-
-	// Remove the version number since this causes a chicken and egg problem
-	// with the version number depending on the content of man.go which
-	// itself contains the version number which...
-	// Ideally man.go would be a temporary build artifact but this has the
-	// downside of requiring everyone to install pandoc to be able to compile
-	// cistern.
-	markdown := strings.Replace(string(bs), "version \\<version\\>", "", 1)
-
-	stdout := &bytes.Buffer{}
-	// FIXME Move this out of here and parametrize the path
-	fmt.Fprint(os.Stderr, "Building cmd/cistern/man.go...\n")
-	mdToGo := exec.Command("pandoc", "-s", "-t", "man")
-	mdToGo.Stdin = bytes.NewBufferString(markdown)
-	mdToGo.Stdout = stdout
-	mdToGo.Stderr = os.Stderr
-	if err := mdToGo.Run(); err != nil {
-		return err
-	}
-
-	manGo := fmt.Sprintf(manGoTemplate, strings.Replace(stdout.String(), "`", "\"` + \"`\" + `\"", -1))
-	if err := ioutil.WriteFile("cmd/cistern/man.go", []byte(manGo), os.ModePerm); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func main() {
 	env := []string{"GO111MODULE=on", "CGO_ENABLED=0"}
 
@@ -373,8 +348,6 @@ func main() {
 		_, err = build(buildDirectory, env, false)
 	case "release", "releases":
 		err = releases(buildDirectory, env, OSesByArch)
-	case "man.go":
-		err = manGo()
 	case "clean":
 		err = os.RemoveAll(buildDirectory)
 	case "test", "tests":

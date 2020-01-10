@@ -19,13 +19,141 @@ import (
 	"github.com/nbedos/cistern/utils"
 )
 
-type inputDestination int
+type focus int
 
 const (
-	inputNone inputDestination = iota
-	inputSearch
-	inputRef
+	table focus = iota
+	search
+	help
 )
+
+var keyBindings = []struct {
+	keys   []string
+	action string
+}{
+	{
+		keys:   []string{"Up", "j", "Ctrl-p"},
+		action: "Move cursor up by one line",
+	},
+	{
+		keys:   []string{"Down", "k", "Ctrl-n"},
+		action: "Move cursor down by one line",
+	},
+	{
+		keys:   []string{"Right", "l"},
+		action: "Scroll right",
+	},
+	{
+		keys:   []string{"Left", "h"},
+		action: "Scroll left",
+	},
+	{
+		keys:   []string{"Ctrl-u"},
+		action: "Move cursor up by half a page",
+	},
+	{
+		keys:   []string{"Page Up"},
+		action: "Move cursor up by one page",
+	},
+	{
+		keys:   []string{"Ctrl-d"},
+		action: "Move cursor down by half a page",
+	},
+	{
+		keys:   []string{"Page Down"},
+		action: "Move cursor down by one page",
+	},
+	{
+		keys:   []string{"Home"},
+		action: "Move cursor to the first line",
+	},
+	{
+		keys:   []string{"End"},
+		action: "Move cursor to the last line",
+	},
+	{
+		keys:   []string{"<"},
+		action: "Move sort column left",
+	},
+	{
+		keys:   []string{">"},
+		action: "Move sort column right",
+	},
+	{
+		keys:   []string{"!"},
+		action: "Reverse sort order",
+	},
+	{
+		keys:   []string{"o", "+"},
+		action: "Open the fold at the cursor",
+	},
+	{
+		keys:   []string{"O"},
+		action: "Open the fold at the cursor and all sub-folds",
+	},
+	{
+		keys:   []string{"c", "-"},
+		action: "Close the fold at the cursor",
+	},
+	{
+		keys:   []string{"C"},
+		action: "Close the fold at the cursor and all sub-folds",
+	},
+	{
+		keys:   []string{"/"},
+		action: "Open search prompt",
+	},
+	{
+		keys:   []string{"Escape"},
+		action: "Close search prompt",
+	},
+	{
+		keys:   []string{"Enter", "n"},
+		action: "Move to the next match",
+	},
+	{
+		keys:   []string{"N"},
+		action: "Move to the previous match",
+	},
+	{
+		keys:   []string{"v"},
+		action: "View the log of the job at the cursor",
+	},
+	{
+		keys:   []string{"b"},
+		action: "Open associated web page in $BROWSER",
+	},
+	{
+		keys:   []string{"q"},
+		action: "Quit",
+	},
+	{
+		keys:   []string{"?"},
+		action: "Show this window",
+	},
+}
+
+func helpScreen(emphasis tui.StyleTransform) []tui.StyledString {
+	ss := make([]tui.StyledString, 0)
+
+	ss = append(ss, tui.NewStyledString("Help for interactive commands", emphasis))
+	ss = append(ss, tui.StyledString{})
+	for _, b := range keyBindings {
+		keys := make([]tui.StyledString, 0)
+		for _, k := range b.keys {
+			keys = append(keys, tui.NewStyledString(k, emphasis))
+		}
+		line := tui.NewStyledString("   ")
+		line.AppendString(tui.Join(keys, tui.NewStyledString(", ")))
+		line.Fit(tui.Left, 20)
+		line.Append(b.action)
+		ss = append(ss, line)
+	}
+	ss = append(ss, tui.StyledString{})
+	ss = append(ss, tui.NewStyledString("Press 'q' to exit help screen"))
+
+	return ss
+}
 
 type ControllerConfiguration struct {
 	tui.TableConfiguration
@@ -33,24 +161,24 @@ type ControllerConfiguration struct {
 }
 
 type Controller struct {
-	tui              *tui.TUI
-	cache            providers.Cache
-	ref              string
-	width            int
-	height           int
-	header           *tui.TextArea
-	table            *tui.HierarchicalTable
-	tableSearch      string
-	status           *tui.StatusBar
-	inputDestination inputDestination
-	defaultStatus    string
-	help             string
-	style            providers.GitStyle
+	tui           *tui.TUI
+	cache         providers.Cache
+	ref           string
+	width         int
+	height        int
+	header        *tui.TextArea
+	table         *tui.HierarchicalTable
+	tableSearch   string
+	status        *tui.StatusBar
+	focus         focus
+	defaultStatus string
+	help          *tui.TextArea
+	style         providers.GitStyle
 }
 
 var ErrExit = errors.New("exit")
 
-func NewController(ui *tui.TUI, conf ControllerConfiguration, ref string, c providers.Cache, defaultStatus string, help string) (Controller, error) {
+func NewController(ui *tui.TUI, conf ControllerConfiguration, ref string, c providers.Cache, defaultStatus string) (Controller, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := ui.Size()
 	header, err := tui.NewTextArea(width, height)
@@ -63,12 +191,18 @@ func NewController(ui *tui.TUI, conf ControllerConfiguration, ref string, c prov
 		return Controller{}, err
 	}
 
-
 	status, err := tui.NewStatusBar(width, height)
 	if err != nil {
 		return Controller{}, err
 	}
 	status.Write(defaultStatus)
+
+	help, err := tui.NewTextArea(width, height)
+	if err != nil {
+		return Controller{}, err
+	}
+	bold := func(s tcell.Style) tcell.Style { return s.Bold(true) }
+	help.Write(helpScreen(bold)...)
 
 	return Controller{
 		tui:           ui,
@@ -80,7 +214,7 @@ func NewController(ui *tui.TUI, conf ControllerConfiguration, ref string, c prov
 		table:         &table,
 		status:        &status,
 		defaultStatus: defaultStatus,
-		help:          help,
+		help:          &help,
 		style:         conf.GitStyle,
 	}, nil
 }
@@ -190,9 +324,13 @@ func (c *Controller) refresh() {
 
 func (c Controller) text() []tui.StyledString {
 	ss := make([]tui.StyledString, 0)
-	for _, child := range []tui.Widget{c.header, c.table, c.status} {
-		for _, s := range child.StyledStrings() {
-			ss = append(ss, s)
+	if c.focus == help {
+		ss = c.help.StyledStrings()
+	} else {
+		for _, child := range []tui.Widget{c.header, c.table, c.status} {
+			for _, s := range child.StyledStrings() {
+				ss = append(ss, s)
+			}
 		}
 	}
 
@@ -234,6 +372,8 @@ func (c *Controller) SortByNextColumn(reverse bool) {
 func (c *Controller) resize(width int, height int) {
 	width = utils.MaxInt(width, 0)
 	height = utils.MaxInt(height, 0)
+	c.help.Resize(width, height)
+
 	headerHeight := utils.MinInt(utils.MinInt(len(c.header.Content)+2, 9), height)
 	tableHeight := utils.MaxInt(0, height-headerHeight-1)
 	statusHeight := height - headerHeight - tableHeight
@@ -283,24 +423,6 @@ func (c *Controller) viewLog(ctx context.Context) error {
 	}
 
 	return c.tui.Exec(ctx, pager, nil, &stdin)
-}
-
-func (c *Controller) viewHelp(ctx context.Context) error {
-	// TODO Allow user configuration of this command
-	// There is no standard way to make 'man' read from stdin
-	// so instead we write the man page to disk and invoke
-	// man with the '-l' option.
-	file, err := ioutil.TempFile("", "cistern_*.man.1")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(file.Name())
-
-	if _, err := file.WriteString(c.help); err != nil {
-		return err
-	}
-
-	return c.tui.Exec(ctx, "man", []string{"-l", file.Name()}, nil)
 }
 
 func (c Controller) activeStepPath() (providers.PipelineKey, []string, bool) {
@@ -353,125 +475,131 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 		sx, sy := ev.Size()
 		c.resize(sx, sy)
 	case *tcell.EventKey:
-		switch ev.Key() {
-		case tcell.KeyDown:
-			c.table.VerticalScroll(+1)
-		case tcell.KeyUp:
-			c.table.VerticalScroll(-1)
-		case tcell.KeyLeft:
-			c.table.HorizontalScroll(-1)
-		case tcell.KeyRight:
-			c.table.HorizontalScroll(+1)
-		case tcell.KeyPgDn:
-			c.table.VerticalScroll(c.table.PageSize())
-		case tcell.KeyPgUp:
-			c.table.VerticalScroll(-c.table.PageSize())
-		case tcell.KeyHome:
-			c.table.Top()
-		case tcell.KeyEnd:
-			c.table.Bottom()
-		case tcell.KeyEsc:
-			if c.inputDestination != inputNone {
-				c.inputDestination = inputNone
-				c.status.ShowInput = false
-			}
-		case tcell.KeyEnter:
-			if c.inputDestination != inputNone {
-				switch c.inputDestination {
-				case inputSearch:
-					c.tableSearch = c.status.InputBuffer
-					c.nextMatch()
-				case inputRef:
-					if ref := c.status.InputBuffer; ref != "" && ref != c.ref {
-						go func() {
-							select {
-							case refc <- ref:
-							case <-ctx.Done():
-							}
-						}()
-					}
+		switch c.focus {
+		case help:
+			switch ev.Key() {
+			case tcell.KeyDown, tcell.KeyCtrlN:
+				c.help.VerticalScroll(+1)
+			case tcell.KeyUp, tcell.KeyCtrlP:
+				c.help.VerticalScroll(-1)
+			case tcell.KeyCtrlD:
+				c.help.VerticalScroll(c.height / 2)
+			case tcell.KeyPgDn:
+				c.help.VerticalScroll(c.height)
+			case tcell.KeyCtrlU:
+				c.help.VerticalScroll(-c.height / 2)
+			case tcell.KeyPgUp:
+				c.help.VerticalScroll(-c.height)
+			case tcell.KeyRune:
+				switch ev.Rune() {
+				case 'q':
+					c.focus = table
+				case 'k':
+					c.help.VerticalScroll(-1)
+				case 'j':
+					c.help.VerticalScroll(+1)
 				}
-				c.inputDestination = inputNone
-				c.status.ShowInput = false
-			} else {
+			}
+		case search:
+			switch ev.Key() {
+			case tcell.KeyEnter:
+				c.tableSearch = c.status.InputBuffer
 				c.nextMatch()
-			}
-		case tcell.KeyCtrlU:
-			if c.inputDestination != inputNone {
+				c.focus = table
+				c.status.ShowInput = false
+			case tcell.KeyEsc:
+				c.focus = table
+				c.status.ShowInput = false
+			case tcell.KeyCtrlU:
 				c.status.InputBuffer = ""
-			}
-		case tcell.KeyBackspace, tcell.KeyBackspace2:
-			if c.inputDestination != inputNone {
+			case tcell.KeyBackspace, tcell.KeyBackspace2:
 				runes := []rune(c.status.InputBuffer)
 				if len(runes) > 0 {
 					c.status.InputBuffer = string(runes[:len(runes)-1])
 				}
-			}
-		case tcell.KeyRune:
-			if c.inputDestination != inputNone {
+			case tcell.KeyRune:
 				c.status.InputBuffer += string(ev.Rune())
-				break
 			}
-			switch keyRune := ev.Rune(); keyRune {
-			case 'b':
-				if err := c.openActiveRowInBrowser(); err != nil {
-					return err
-				}
-			case 'j':
-				c.table.VerticalScroll(+1)
-			case 'k':
-				c.table.VerticalScroll(-1)
-			case 'h':
-				c.table.HorizontalScroll(-1)
-			case 'l':
-				c.table.HorizontalScroll(+1)
-			case 'c':
-				c.table.SetTraversable(false, false)
-			case 'C', '-':
-				c.table.SetTraversable(false, true)
-			case 'o':
-				c.table.SetTraversable(true, false)
-			case 'O', '+':
-				c.table.SetTraversable(true, true)
-			case 'n', 'N':
-				if c.status.InputBuffer != "" {
-					_ = c.table.ScrollToNextMatch(c.status.InputBuffer, ev.Rune() == 'n')
-				}
-			case 'q':
-				return ErrExit
-			case '/':
-				c.inputDestination = inputSearch
-				c.status.ShowInput = true
-				c.status.InputPrefix = "/"
-				c.status.InputBuffer = ""
-			case 'r':
-				c.inputDestination = inputRef
-				c.status.ShowInput = true
-				c.status.InputBuffer = ""
-				c.status.InputPrefix = "ref: "
-			case 'u':
-				// TODO Fix controller.setRef to preserve traversable state
-				go func() {
-					select {
-					case refc <- c.ref:
-					case <-ctx.Done():
-					}
-				}()
-			case '?':
-				if err := c.viewHelp(ctx); err != nil {
-					return err
-				}
 
-			case 'v':
-				if err := c.viewLog(ctx); err != nil {
-					return err
+		case table:
+			switch ev.Key() {
+			case tcell.KeyDown, tcell.KeyCtrlN:
+				c.table.VerticalScroll(+1)
+			case tcell.KeyUp, tcell.KeyCtrlP:
+				c.table.VerticalScroll(-1)
+			case tcell.KeyLeft:
+				c.table.HorizontalScroll(-1)
+			case tcell.KeyRight:
+				c.table.HorizontalScroll(+1)
+			case tcell.KeyCtrlD:
+				c.table.VerticalScroll(c.table.PageSize() / 2)
+			case tcell.KeyPgDn:
+				c.table.VerticalScroll(c.table.PageSize())
+			case tcell.KeyCtrlU:
+				c.table.VerticalScroll(-c.table.PageSize() / 2)
+			case tcell.KeyPgUp:
+				c.table.VerticalScroll(-c.table.PageSize())
+			case tcell.KeyHome:
+				c.table.Top()
+			case tcell.KeyEnd:
+				c.table.Bottom()
+			case tcell.KeyEnter:
+				c.nextMatch()
+			case tcell.KeyRune:
+				switch keyRune := ev.Rune(); keyRune {
+				case 'b':
+					if err := c.openActiveRowInBrowser(); err != nil {
+						return err
+					}
+				case 'j':
+					c.table.VerticalScroll(+1)
+				case 'k':
+					c.table.VerticalScroll(-1)
+				case 'h':
+					c.table.HorizontalScroll(-1)
+				case 'l':
+					c.table.HorizontalScroll(+1)
+				case 'c':
+					c.table.SetTraversable(false, false)
+				case 'C', '-':
+					c.table.SetTraversable(false, true)
+				case 'o':
+					c.table.SetTraversable(true, false)
+				case 'O', '+':
+					c.table.SetTraversable(true, true)
+				case 'n', 'N':
+					if c.status.InputBuffer != "" {
+						_ = c.table.ScrollToNextMatch(c.status.InputBuffer, ev.Rune() == 'n')
+					}
+				case 'q':
+					return ErrExit
+				case '/':
+					c.focus = search
+					c.status.ShowInput = true
+					c.status.InputPrefix = "/"
+					c.status.InputBuffer = ""
+				case 'u':
+					// TODO Fix controller.setRef to preserve traversable state
+					go func() {
+						select {
+						case refc <- c.ref:
+						case <-ctx.Done():
+						}
+					}()
+				case '?':
+					c.focus = help
+
+				case 'v':
+					if err := c.viewLog(ctx); err != nil {
+						return err
+					}
+				case '>':
+					c.SortByNextColumn(false)
+				case '<':
+					c.SortByNextColumn(true)
+				case '!':
+					c.ReverseSortOrder()
 				}
-			case '>':
-				c.SortByNextColumn(false)
-			case '<':
-				c.SortByNextColumn(true)
-			case '!':
-				c.ReverseSortOrder()
 			}
 		}
 	}
@@ -523,11 +651,10 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		GitStyle:           tableConfig.NodeStyle.(providers.StepStyle).GitStyle,
 	}
 
-	controller, err := NewController(&ui, controllerConf, ref, cacheDB, defaultStatus, manualPage)
+	controller, err := NewController(&ui, controllerConf, ref, cacheDB, defaultStatus)
 	if err != nil {
 		return err
 	}
 
 	return controller.Run(ctx, repo)
 }
-

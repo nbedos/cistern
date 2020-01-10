@@ -11,28 +11,39 @@ import (
 	"github.com/nbedos/cistern/tui"
 )
 
+func setup() (Controller, func(), error) {
+	newScreen := func() (tcell.Screen, error) {
+		return tcell.NewSimulationScreen(""), nil
+	}
+	ui, err := tui.NewTUI(newScreen, tcell.StyleDefault)
+	if err != nil {
+		return Controller{}, nil, err
+	}
+	defer func() {
+
+	}()
+	c := providers.NewCache(nil, nil)
+	conf := ControllerConfiguration{
+		GitStyle: providers.GitStyle{
+			Location: time.UTC,
+		},
+	}
+	controller, err := NewController(&ui, conf, "", c, "")
+	if err != nil {
+		ui.Finish()
+		return Controller{}, nil, err
+	}
+
+	return controller, func() { ui.Finish() }, nil
+}
+
 func TestController_resize(t *testing.T) {
 	t.Run("resize to (0, 0) should not cause any error", func(t *testing.T) {
-		newScreen := func() (tcell.Screen, error) {
-			return tcell.NewSimulationScreen(""), nil
-		}
-		ui, err := tui.NewTUI(newScreen, tcell.StyleDefault)
+		controller, teardown, err := setup()
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			ui.Finish()
-		}()
-		c := providers.NewCache(nil, nil)
-		conf := ControllerConfiguration{
-			GitStyle: providers.GitStyle{
-				Location: time.UTC,
-			},
-		}
-		controller, err := NewController(&ui, conf, "", c, "", "")
-		if err != nil {
-			t.Fatal(err)
-		}
+		defer teardown()
 
 		// Must not panic
 		controller.resize(0, 0)
@@ -58,3 +69,4 @@ func TestRunApplication(t *testing.T) {
 		}
 	})
 }
+

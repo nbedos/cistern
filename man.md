@@ -117,50 +117,58 @@ URL of the step on the website of the provider
 # INTERACTIVE COMMANDS
 Below are the default commands for interacting with cistern.
 
-----------------------------------------------------------
-Key        Action
----------  -----------------------------------------------
-Up, j      Move cursor up by one line
+-----------------------------------------------------------------
+Key               Action
+----------------  -----------------------------------------------
+Up, j, Ctrl-p     Move cursor up by one line
 
-Down, k    Move cursor down by one line
+Down, k, Ctrl-n   Move cursor down by one line
 
-Right, l   Scroll right
+Right, l          Scroll right
 
-Left, h    Scroll left
+Left, h           Scroll left
 
-Page Up    Move cursor up by one screen
+Ctrl-u            Move cursor up by half a page
 
-Page Down  Move cursor down by one screen
+Page Up           Move cursor up by one page
 
-<          Move sort column left
+Ctrl-d            Move cursor down by half a page
 
-\>         Move sort column right
+Page Down         Move cursor down by one page
 
-!          Reverse sort order
+Home              Move cursor to the first line
 
-o, +       Open the fold at the cursor
+End               Move cursor to the last line
 
-O          Open the fold at the cursor and all sub-folds
+<                 Move sort column left
 
-c, -       Close the fold at the cursor
+\>                Move sort column right
 
-C          Close the fold at the cursor and all sub-folds
+!                 Reverse sort order
 
-/          Open search prompt
+o, +              Open the fold at the cursor
 
-Escape     Close search prompt
+O                 Open the fold at the cursor and all sub-folds
 
-Enter, n   Move to the next match
+c, -              Close the fold at the cursor
 
-N          Move to the previous match
+C                 Close the fold at the cursor and all sub-folds
 
-v          View the log of the job at the cursor<sup>\[a\]</sup>
+/                 Open search prompt
 
-b          Open with default web browser
+Escape            Close search prompt
 
-q          Quit
+Enter, n          Move to the next match
 
-?          View manual page
+N                 Move to the previous match
+
+v                 View the log of the job at the cursor<sup>\[a\]</sup>
+
+b                 Open associated web page in $BROWSER
+
+q                 Quit
+
+?                 Show help for interactive commands
 
 ----------------------------------------------------------
 
@@ -299,7 +307,6 @@ token = ""
 cistern relies on the following local executables:
 
 * `less` to view log files, unless `PAGER` is set
-* `man` to show the manual page
 * `git` (optional) to translate the abbreviated SHA identifier of a commit into
 a non-abbreviated SHA and also to support 'insteadOf' and 'pushInsteadOf'
 configuration options for remote URLs

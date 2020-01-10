@@ -10,6 +10,7 @@ type TextArea struct {
 	width   int
 	height  int
 	Content []StyledString
+	yOffset int
 }
 
 func NewTextArea(width, height int) (TextArea, error) {
@@ -23,25 +24,38 @@ func NewTextArea(width, height int) (TextArea, error) {
 	}, nil
 }
 
-func (s *TextArea) Write(lines ...StyledString) {
-	s.Content = lines
+func (t *TextArea) VerticalScroll(amount int) {
+	switch offset := t.yOffset + amount; {
+	case offset < 0:
+		t.yOffset = 0
+	case offset > len(t.Content) - t.height:
+		t.yOffset = utils.MaxInt(0, len(t.Content) - t.height)
+	default:
+		t.yOffset = offset
+	}
 }
 
-func (s *TextArea) Resize(width int, height int) {
-	s.width = utils.MaxInt(0, width)
-	s.height = utils.MaxInt(0, height)
+func (t *TextArea) Write(lines ...StyledString) {
+	t.Content = lines
 }
 
-func (s TextArea) StyledStrings() []StyledString {
+func (t *TextArea) Resize(width int, height int) {
+	t.width = utils.MaxInt(0, width)
+	t.height = utils.MaxInt(0, height)
+}
+
+func (t TextArea) StyledStrings() []StyledString {
 	ss := make([]StyledString, 0)
-	for _, line := range s.Content {
-		ss = append(ss, line)
-		if len(ss) >= s.height {
-			break
+	for i, line := range t.Content {
+		if i >= t.yOffset {
+			ss = append(ss, line)
+			if len(ss) >= t.height {
+				break
+			}
 		}
 	}
 
-	for len(ss) < s.height {
+	for len(ss) < t.height {
 		ss = append(ss, StyledString{})
 	}
 
