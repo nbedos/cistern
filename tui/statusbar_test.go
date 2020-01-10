@@ -1,6 +1,8 @@
 package tui
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestStatusBar_Write(t *testing.T) {
 	t.Run("status bar of height 0", func(t *testing.T) {
@@ -39,12 +41,12 @@ func TestStatusBar_Text(t *testing.T) {
 		message := "output"
 		s.Write(message)
 
-		texts := s.Text()
+		texts := s.StyledStrings()
 		if len(texts) != 1 {
 			t.Fatalf("expected len(texts) == %d but got %d", 1, len(texts))
 		}
 
-		if output := texts[0].S.String(); output != message {
+		if output := texts[0].String(); output !=  message {
 			t.Fatalf("expected %q but got %q", message, output)
 		}
 	})
@@ -58,12 +60,12 @@ func TestStatusBar_Text(t *testing.T) {
 		s.InputBuffer = message
 		s.ShowInput = true
 
-		texts := s.Text()
+		texts := s.StyledStrings()
 		if len(texts) != 1 {
 			t.Fatalf("expected len(texts) == %d but got %d", 1, len(texts))
 		}
 
-		if input := texts[0].S.String(); input != s.inputPrefix+message {
+		if input := texts[0].String(); input != s.InputPrefix+message {
 			t.Fatalf("expected %q but got %q", message, input)
 		}
 	})

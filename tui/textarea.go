@@ -3,14 +3,14 @@ package tui
 import (
 	"errors"
 
-	"github.com/nbedos/cistern/text"
 	"github.com/nbedos/cistern/utils"
 )
 
 type TextArea struct {
 	width   int
 	height  int
-	content []text.StyledString
+	Content []StyledString
+	yOffset int
 }
 
 func NewTextArea(width, height int) (TextArea, error) {
@@ -24,31 +24,40 @@ func NewTextArea(width, height int) (TextArea, error) {
 	}, nil
 }
 
-func (s *TextArea) Write(lines ...text.StyledString) {
-	s.content = lines
+func (t *TextArea) VerticalScroll(amount int) {
+	switch offset := t.yOffset + amount; {
+	case offset < 0:
+		t.yOffset = 0
+	case offset > len(t.Content) - t.height:
+		t.yOffset = utils.MaxInt(0, len(t.Content) - t.height)
+	default:
+		t.yOffset = offset
+	}
 }
 
-func (s TextArea) Size() (int, int) {
-	return s.width, s.height
+func (t *TextArea) Write(lines ...StyledString) {
+	t.Content = lines
 }
 
-func (s *TextArea) Resize(width int, height int) {
-	s.width = utils.MaxInt(0, width)
-	s.height = utils.MaxInt(0, height)
+func (t *TextArea) Resize(width int, height int) {
+	t.width = utils.MaxInt(0, width)
+	t.height = utils.MaxInt(0, height)
 }
 
-func (s TextArea) Text() []text.LocalizedStyledString {
-	texts := make([]text.LocalizedStyledString, 0)
-	for i, line := range s.content {
-		texts = append(texts, text.LocalizedStyledString{
-			X: 0,
-			Y: i,
-			S: line,
-		})
-		if len(texts) >= s.height {
-			break
+func (t TextArea) StyledStrings() []StyledString {
+	ss := make([]StyledString, 0)
+	for i, line := range t.Content {
+		if i >= t.yOffset {
+			ss = append(ss, line)
+			if len(ss) >= t.height {
+				break
+			}
 		}
 	}
 
-	return texts
+	for len(ss) < t.height {
+		ss = append(ss, StyledString{})
+	}
+
+	return ss
 }

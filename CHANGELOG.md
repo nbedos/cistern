@@ -2,13 +2,27 @@
 
 ## Next version
 
-* Feature: Monitor all remotes of local repositories instead of just 'origin' ([issue #3](https://github.com/nbedos/cistern/issues/3))
-* Bugfix: Lookup path if BROWSER is not a path itself ([issue #8](https://github.com/nbedos/cistern/issues/8))
-* Bugfix: Add support for 'insteadOf' and 'pushInsteadOf' configuration for remote URLs  ([issue #7](https://github.com/nbedos/cistern/issues/7))
-* Bugfix: Stages of Azure pipelines are now ordered
-* Bugfix: Properly handle arbitrary long GitLab namespaces ([issue #16](https://github.com/nbedos/cistern/issues/16))
-* Chore: Rewrite build script in go for improved maintainability
-* Chore: Rename repository
+### Features
+
+* User interface: Column visibility, column order, sort order and all style attributes can now be set
+in the configuration file (see the [sample configuration file included](https://github.com/nbedos/cistern/blob/master/cmd/cistern/cistern.toml) in the release archives for details)
+* User interface: Add new columns: created, finished, xfail and url
+* User interface: Support horizontal scrolling of table rows 
+* User interface: Support sorting pipelines by any column 
+* Core: Monitor all remotes of local repositories instead of just 'origin' ([issue #3](https://github.com/nbedos/cistern/issues/3))
+* Configuration: Support setting API token from output of user-specified process ([issue #13](https://github.com/nbedos/cistern/issues/13))
+
+### Bug fixes
+
+* Lookup path if BROWSER is not a path itself ([issue #8](https://github.com/nbedos/cistern/issues/8))
+* Add support for 'insteadOf' and 'pushInsteadOf' configuration for remote URLs  ([issue #7](https://github.com/nbedos/cistern/issues/7))
+* Stages of Azure pipelines are now ordered
+
+### Chores
+
+* Refactor table widget for improved maintainability
+* Rewrite build script in go for improved maintainability
+* Rename repository
 
 
 ## Version 0.1.2 (2019-12-20)

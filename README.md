@@ -11,37 +11,25 @@ results of your CI pipelines.  `cistern` stands for **C**ontinous
 `cistern` is currently in the initial development phase. Anything may change at any time and the API
 should not be considered stable.
 
-# Motivation
-I started working on `cistern` because I needed a simple way to use multiple CI providers for a single
-repository. I've always found it inconvenient to have to use a web browser to check why a pipeline
-failed and using multiple providers only makes this worse. I've also never found email or instant
-messaging notifications convenient for that purpose.
+# Features
 
-A local git repository contains information about where (GitHub, GitLab...) it is hosted
- and which commit is the most recent. Given a commit, online repository hosts are able to list
-all the pipelines associated to it. Then CI providers can provide detailed information about each
-pipeline. So really I should be able to run `git commit -m '<message>' && git push` and then call a
-utility that would show me the pipelines I just triggered, all their jobs with statuses updates in
-real time and an easy access to logs. This is what I would like `cistern` to be.
-
-# Features and limitations
 * **List pipelines associated to a commit of a GitHub or GitLab repository**: pipelines are shown in
-a tree view where expanding a pipeline will reveal its stages, jobs and tasks 
+a tree view where expanding a pipeline will reveal its stages, jobs and tasks
+* **Monitor status changes in quasi real time and view job logs** 
 * **Integration with Travis CI, AppVeyor, CircleCI, GitLab CI and Azure DevOps**: `cistern` is
 targeted at open source developers
-* **Monitor status changes in quasi real time**
-* **Open the web page of a pipeline by pressing a single key**: for quick access to the website of
-your CI provider if `cistern` does not cover a specific use case.
 
+# Limitations
 
-`cistern` currently has the following shortcomings, some or all of which may end up being fixed:
-* **UI configurability is non existent**: No custom key mappings, colors, column order or sort order
-* **Starting, restarting or canceling a pipeline is not possible**
+* **Starting, restarting or canceling a pipeline is not possible for now** ([issue #14](https://github.com/nbedos/cistern/issues/14))
 * **Compatibility is restricted to Unix systems**: all dependencies and the majority of the code base
 should work on Windows, but there are still a few Unixisms here and there.
 * **No integration with GitHub Actions**: GitHub does not currently allow access to action logs
 via their API
+* **Integrations are limited to CI providers**: Integration with Netlify, code coverage services, etc
+is currently considered out of scope 
 * **Git is the only version-control system supported**
+
 
 # Installation
 ## Binary releases
@@ -49,39 +37,44 @@ Binary releases are made available for each version of `cistern`
 [here](https://github.com/nbedos/cistern/releases).
 
 Each release archive contains a statically linked executable named `cistern`, the manual page
-in HTML and roff format and a copy of the license. 
+in HTML and groff man format, a copy of the license and a sample configuration file.
 
 ## Building from source
 ### Building automatically from source (recommended)
-This method requires a UNIX system with golang >= 1.11, git and pandoc.
+This method requires a UNIX system with golang >= 1.11, git and [pandoc](https://pandoc.org/installing.html).
 ```shell
 git clone git@github.com:nbedos/cistern.git
 cd cistern
 # Compile and run build script
-GO111MODULE=on go run ./cmd/make cistern
+export GO111MODULE=on
+go run ./cmd/make cistern
 ```
 
-If all went well you should find the executable located at `./build/cistern` as well as two versions
-of the manual page:
-* `./build/cistern.man.1` (roff format)
-* `./build/cistern.man.html`
+If all went well you should find the following content in the `./build/` directory: 
+
+Filename           | Content
+------------------ | ---
+`cistern`          | statically linked executable
+`cistern.man.1`    | manual page (groff man format)
+`cistern.man.html` | manual page (HTML format)
+`cistern.toml`     | sample configuration file
+`LICENSE`          | copy of the license
 
 ### Building manually from source
-This method requires a UNIX system with golang >= 1.11 and git.
+This method is provided for users that do not wish to install [pandoc](https://pandoc.org/installing.html)
+on their system. It requires a UNIX system with golang >= 1.11 and git.
 ```shell
 git clone git@github.com:nbedos/cistern.git
 cd cistern
 mkdir build
-BUILD_VERSION="$(git describe --tags --dirty)_$(go env GOOS)/$(go env GOARCH)" && \
-GO111MODULE=on && \
-go build -ldflags "-X main.Version=$BUILD_VERSION" -o build/cistern cmd/cistern/
+export CISTERN_VERSION="$(git describe --tags --dirty)_$(go env GOOS)/$(go env GOARCH)"
+export GO111MODULE=on
+go build -ldflags "-X main.Version=$CISTERN_VERSION" -o build/cistern ./cmd/cistern
 ```
 
 At this point you should find the executable located at `./build/cistern`.
 
-Note that this method ignores eventual changes made to the file `man.md` and won't build the manual
-page. It is provided for users that do not wish to install `pandoc` on their system. In any case
-the manual page is made available for each [release](https://github.com/nbedos/cistern/releases). 
+
 
 ### Building a Docker image
 This method requires access to Docker 17.05 or higher since it relies on a multi-stage build.
@@ -99,8 +92,10 @@ docker run -it "$CISTERN_DOCKER_IMAGE" -r github.com/nbedos/cistern
 ```
 
 # Configuration
-`cistern` requires access to various APIs. The corresponding credentials should be stored in a
-configuration file as described in the [manual page](https://nbedos.github.io/cistern/cistern.man).
+`cistern` requires access to various APIs and the corresponding credentials should be stored in a
+configuration file. A minimal example is given in the [manual page](https://nbedos.github.io/cistern/cistern.man)
+and a full example (which is also included in every release archive) is available
+[here](https://github.com/nbedos/cistern/blob/master/cmd/cistern/cistern.toml).
 
 If the configuration file is missing, `cistern` will run with the following limitations:
 * `cistern` will likely reach the [rate limit of the GitHub API](https://developer.github.com/v3/#rate-limiting)
@@ -111,6 +106,8 @@ In most cases running without a configuration file should still work well enough
 testing the application without having to bother with personal access tokens.
 
 # Usage
+See the [manual page](https://nbedos.github.io/cistern/cistern.man) for more detailed information.
+
 ```
 usage: cistern [-r REPOSITORY | --repository REPOSITORY] [COMMIT]
        cistern -h | --help
@@ -166,12 +163,10 @@ cistern -r /home/user/repos/repo                    # Path to a repository
 cistern -r github.com/nbedos/cistern master
 ```
 
-More information is available in the [manual page](https://nbedos.github.io/cistern/cistern.man).
-
-
 ## Support
 Questions, bug reports and feature requests are welcome and should be submitted as
 [issues](https://github.com/nbedos/cistern/issues).
+
 
 ## Contributing
 Pull requests are welcome. If you foresee that a PR will take any significant amount of your time,

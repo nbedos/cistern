@@ -1,0 +1,177 @@
+#### CISTERN CONFIGURATION FILE ####
+# This is a configuration file for cistern that should be located at
+# $XDG_CONFIG_HOME/cistern/cistern.toml
+
+
+## GENERIC OPTIONS ##
+# List of columns to be displayed on screen. Available columns are "ref", "pipeline", "type",
+# "state", "created", "started", "finished", "duration", "xfail", "name", "url"
+columns = ["ref", "pipeline", "type", "state", "started", "duration", "name", "url"]
+
+# Name of the column used for sorting the table prefixed by an optional "+" (ascending order) or
+# "-" (descending order).
+sort = "-started"
+
+# Default depth of the pipeline trees shown on screen
+depth = 2
+
+
+
+## PROVIDERS ##
+[providers]
+# The 'providers' table is used to define credentials for accessing online services. cistern
+# relies on two types of providers:
+#
+#    - 'source providers' are used for listing the CI pipelines associated to a given commit
+#    (GitHub and GitLab are source providers)
+#    - 'CI providers' are used to get detailed information about CI pipelines (GitLab, AppVeyor,
+#    CircleCI, Travis and Azure Devops are CI providers)
+#
+# cistern requires credentials for at least one source provider and one CI provider to run.
+# Feel free to remove any section below as long as this rule is met.
+#
+# Note that for all providers, not setting an API token or setting `token = ""` will cause the
+# provider to make unauthenticated API requests.
+#
+# Also, every "token" key can be replaced by "token-from-process" which is a list of strings
+# consisting of the name of an executable to call followed by the arguments to be provided to it.
+# The process will inherit stdin and stderr (allowing for password prompts) and the output of the
+# process will be used as the value of the token.
+#
+# Examples:
+#        # Read token from environment variable
+#        token-from-process = ["bash", "-c", "echo $MY_API_TOKEN"]
+#
+#        # Read token from `pass` store
+#        token-from-process = ["pass", "ci/gitlab/cistern"]
+#
+
+### GITHUB ###
+[[providers.github]]
+# GitHub API token (optional, string)
+# (although the token is optional, without one cistern will likely reach the rate-limit of the
+# GitHub API in a few minutes). GitHub token management: https://github.com/settings/tokens
+token = ""
+
+
+### GITLAB ###
+[[providers.gitlab]]
+# Name shown by cistern for this provider (optional, string, default: "gitlab")
+name = "gitlab"
+
+# GitLab instance URL (optional, string, default: "https://gitlab.com")
+# (the GitLab instance must support GitLab REST API V4)
+url = "https://gitlab.com"
+
+# GitLab API token (optional, string)
+#
+# Note: GitLab prevents access to pipeline jobs for unauthenticated users meaning if you wish
+# to use cistern to view GitLab pipelines you will have to provide a personal access token.
+#
+# gitlab.com token management: https://gitlab.com/profile/personal_access_tokens
+token = ""
+
+
+### TRAVIS CI ###
+[[providers.travis]]
+# Name shown by cistern for this provider (optional, string, default: "travis")
+name = "travis"
+
+# URL of the Travis instance. "org" and "com" can be used as shorthands for the full URL
+# of travis.org and travis.com (string, mandatory)
+url = "org"
+
+# API access token for the travis API (string, optional). Travis tokens are managed at:
+#    - https://travis-ci.org/account/preferences
+#    - https://travis-ci.com/account/preferences
+token = ""
+
+
+# Define another account for accessing travis.com
+[[providers.travis]]
+name = "travis"
+url = "com"
+token = ""
+
+
+### APPVEYOR ###
+[[providers.appveyor]]
+# Name shown by cistern for this provider (optional, string, default: "appveyor")
+name = "appveyor"
+
+# AppVeyor API token (optional, string)
+# AppVeyor token managemement: https://ci.appveyor.com/api-keys
+token = ""
+
+
+### CIRCLECI ###
+[[providers.circleci]]
+# Name shown by cistern for this provider (optional, string, default: "circleci")
+name = "circleci"
+
+# Circle CI API token (optional, string)
+# See https://circleci.com/account/api
+token = ""
+
+
+### AZURE DEVOPS ###
+[[providers.azure]]
+# Name shown by cistern for this provider
+# (optional, string, default: "azure")
+name = "azure"
+
+# Azure API token (optional, string)
+# Azure token management is done at https://dev.azure.com/ via
+# the user settings menu
+token = ""
+
+
+
+## STYLE ##
+[style]
+# Color theme (string, optional, either "default" or "monochrome")
+theme = "default"
+
+# Sort indicator (ascending order, string, optional)
+table.ascending = "▲"
+
+# Sort indicator (descending order, string, optional)
+table.descending = "▼"
+
+# The following keys can be used to further customize the appearance of cistern:
+#
+#    Table header:             style.table.header
+#    Active row:               style.table.cursor
+#    Name of CI providers:     style.table.provider
+#    Pipeline statuses:        style.table.status.canceled
+#                              style.table.status.failed
+#                              style.table.status.manual
+#                              style.table.status.passed
+#                              style.table.status.pending
+#                              style.table.status.running
+#                              style.table.status.skipped
+#   Hash of git commits:       style.git.sha
+#   Git branch:                style.git.branch
+#   Git tag:                   style.git.tag
+#   Git head:                  style.git.head
+#
+#   The following example shows how to customize the table header.
+#   All the other keys listed above follow the exact same format.
+#
+#       [style.table.header]
+#       # All the keys listed below are optional.
+#       # Text color either in hexadecimal format or written as
+#       # "colorX" where X is in the range 0-7 or 0-15 depending
+#       #  on the configuration of your terminal
+#       foreground = "color1"
+#       # Background color
+#       background = "#ee0000"
+#       bold = true
+#       underlined = true
+#       reversed = false
+#       blink = true
+#       dimmed = false
+#
+# Note that some style attributes or combinations of attributes
+# may not work on some terminals.
+#

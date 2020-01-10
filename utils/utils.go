@@ -38,32 +38,6 @@ func Bounded(a, lower, upper int) int {
 	return MaxInt(lower, MinInt(a, upper))
 }
 
-type TreeNode interface {
-	Children() []TreeNode
-	Traversable() bool
-	SetTraversable(traversable bool, recursive bool)
-}
-
-func DepthFirstTraversal(node TreeNode, traverseAll bool) []TreeNode {
-	explored := make([]TreeNode, 0)
-	toBeExplored := []TreeNode{node}
-
-	for len(toBeExplored) > 0 {
-		node = toBeExplored[len(toBeExplored)-1]
-		toBeExplored = toBeExplored[:len(toBeExplored)-1]
-		if traverseAll || node.Traversable() {
-			children := node.Children()
-			for i := len(children) - 1; i >= 0; i-- {
-				toBeExplored = append(toBeExplored, children[i])
-			}
-		}
-
-		explored = append(explored, node)
-	}
-
-	return explored
-}
-
 func RepositoryHostAndSlug(repositoryURL string) (string, string, error) {
 	// Turn "git@host:path.git" into "host/path" so that it is compatible with url.Parse()
 	if strings.HasPrefix(repositoryURL, "git@") {
@@ -77,8 +51,8 @@ func RepositoryHostAndSlug(repositoryURL string) (string, string, error) {
 		return "", "", err
 	}
 	if u.Host == "" && !strings.Contains(repositoryURL, "://") {
-		// example.com/aaa/bbb is parsed as url.URL{Host: "", Path:"example.com/aaa/bbb"}
-		// but we expect url.URL{Host: "example.com", Path:"/aaa/bbb"}. Adding a scheme fixes this.
+		// example.com/aaa/bbb is parsed as url.url{Host: "", Path:"example.com/aaa/bbb"}
+		// but we expect url.url{Host: "example.com", Path:"/aaa/bbb"}. Adding a scheme fixes this.
 		//
 		u, err = url.Parse("https://" + repositoryURL)
 		if err != nil {
@@ -91,15 +65,6 @@ func RepositoryHostAndSlug(repositoryURL string) (string, string, error) {
 	}
 
 	return u.Hostname(), strings.Trim(u.Path, "/"), nil
-}
-
-func Prefix(s string, prefix string) string {
-	builder := strings.Builder{}
-	for _, line := range strings.Split(s, "\n") {
-		builder.WriteString(fmt.Sprintf("%s%s\n", prefix, line))
-	}
-
-	return builder.String()
 }
 
 type NullString struct {

@@ -2,104 +2,28 @@ package tui
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
-	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
-	"time"
+	"strconv"
+	"strings"
 
 	"github.com/gdamore/tcell"
-	"github.com/gdamore/tcell/encoding"
-	"github.com/nbedos/cistern/cache"
-	"github.com/nbedos/cistern/text"
 )
-
-var ErrNoProvider = errors.New("list of providers must not be empty")
-
-func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, ref string, CIProviders []cache.CIProvider, SourceProviders []cache.SourceProvider, loc *time.Location, help string) (err error) {
-	if len(CIProviders) == 0 || len(SourceProviders) == 0 {
-		return ErrNoProvider
-	}
-	// FIXME Discard log until the status bar is implemented in order to hide the "Unsolicited response received on
-	//  idle HTTP channel" from GitLab's HTTP client
-	log.SetOutput(ioutil.Discard)
-	encoding.Register()
-
-	defaultStyle := tcell.StyleDefault
-	styleSheet := text.StyleSheet{
-		text.TableHeader: func(s tcell.Style) tcell.Style {
-			return s.Bold(true).Reverse(true)
-		},
-		text.ActiveRow: func(s tcell.Style) tcell.Style {
-			return s.Background(tcell.ColorSilver).Foreground(tcell.ColorBlack).Bold(false).Underline(false).Blink(false)
-		},
-		text.Provider: func(s tcell.Style) tcell.Style {
-			return s.Bold(true)
-		},
-		text.StatusFailed: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorMaroon).Bold(false)
-		},
-		text.StatusPassed: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorGreen).Bold(false)
-		},
-		text.StatusRunning: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorOlive).Bold(false)
-		},
-		text.StatusSkipped: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorGray).Bold(false)
-		},
-		text.GitSha: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorOlive)
-		},
-		text.GitBranch: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorTeal).Bold(false)
-		},
-		text.GitTag: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorYellow).Bold(false)
-		},
-		text.GitHead: func(s tcell.Style) tcell.Style {
-			return s.Foreground(tcell.ColorAqua)
-		},
-	}
-	defaultStatus := "j:Down  k:Up  oO:Open  cC:Close  /:Search  v:Logs  b:Browser  ?:Help  q:Quit"
-
-	ui, err := NewTUI(newScreen, defaultStyle, styleSheet)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		// If another goroutine panicked this wouldn't run so we'd be left with a garbled screen.
-		// The alternative would be to defer a call to recover for every goroutine that we launch
-		// in order to have them return an error in case of a panic.
-		ui.Finish()
-	}()
-
-	cacheDB := cache.NewCache(CIProviders, SourceProviders)
-
-	controller, err := NewController(&ui, ref, cacheDB, loc, defaultStatus, help)
-	if err != nil {
-		return err
-	}
-
-	return controller.Run(ctx, repo)
-}
 
 type TUI struct {
 	newScreen    func() (tcell.Screen, error)
 	screen       tcell.Screen
 	defaultStyle tcell.Style
-	styleSheet   text.StyleSheet
-	eventc       chan tcell.Event
+	Eventc       chan tcell.Event
 }
 
-func NewTUI(newScreen func() (tcell.Screen, error), defaultStyle tcell.Style, styleSheet text.StyleSheet) (TUI, error) {
+func NewTUI(newScreen func() (tcell.Screen, error), defaultStyle tcell.Style) (TUI, error) {
 	ui := TUI{
 		newScreen:    newScreen,
 		defaultStyle: defaultStyle,
-		styleSheet:   styleSheet,
-		eventc:       make(chan tcell.Event),
+		Eventc:       make(chan tcell.Event),
 	}
 	err := ui.init()
 
@@ -130,7 +54,7 @@ func (t TUI) Finish() {
 }
 
 func (t TUI) Events() <-chan tcell.Event {
-	return t.eventc
+	return t.Eventc
 }
 
 func (t TUI) Size() (int, int) {
@@ -144,13 +68,15 @@ func (t TUI) poll() {
 		if event == nil {
 			break
 		}
-		t.eventc <- event
+		t.Eventc <- event
 	}
 }
 
-func (t TUI) Draw(texts ...text.LocalizedStyledString) {
+func (t TUI) Draw(ss ...StyledString) {
 	t.screen.Clear()
-	text.Draw(texts, t.screen, t.defaultStyle, t.styleSheet)
+	for y, s := range ss {
+		s.Draw(t.screen, y, t.defaultStyle)
+	}
 	t.screen.Show()
 }
 
@@ -171,3 +97,87 @@ func (t *TUI) Exec(ctx context.Context, name string, args []string, stdin io.Rea
 	err = cmd.Run()
 	return err
 }
+
+type StyleTransform func(s tcell.Style) tcell.Style
+
+func (t StyleTransform) On(other StyleTransform) StyleTransform {
+	if other == nil {
+		return t
+	}
+	return func(s tcell.Style) tcell.Style {
+		return t(other(s))
+	}
+}
+
+type StyleTransformDefinition struct {
+	Foreground *string `toml:"foreground"`
+	Background *string `toml:"background"`
+	Bold       *bool   `toml:"bold"`
+	Underlined *bool   `toml:"underlined"`
+	Reversed   *bool   `toml:"reversed"`
+	Dimmed     *bool   `toml:"dimmed"`
+	Blink      *bool   `toml:"blink"`
+}
+
+func (s StyleTransformDefinition) Parse() (StyleTransform, error) {
+	parseColor := func(s string) (tcell.Color, error) {
+		s = strings.Trim(strings.ToLower(s), " ")
+
+		if strings.HasPrefix(s, "color") {
+			s = strings.TrimPrefix(s, "color")
+			if n, err := strconv.Atoi(s); err == nil {
+				return tcell.Color(n), nil
+			}
+		} else if c, ok := tcell.ColorNames[s]; ok {
+			return c, nil
+		} else if len(s) == 7 && s[0] == '#' {
+			if n, err := strconv.ParseInt(s[1:], 16, 32); err == nil {
+				return tcell.NewHexColor(int32(n)), nil
+			}
+		}
+
+		return tcell.Color(0), fmt.Errorf("failed to parse color from string %q", s)
+	}
+
+	var err error
+	var fg, bg tcell.Color
+
+	if s.Foreground != nil {
+		if fg, err = parseColor(*s.Foreground); err != nil {
+			return nil, err
+		}
+	}
+
+	if s.Background != nil {
+		if bg, err = parseColor(*s.Foreground); err != nil {
+			return nil, err
+		}
+	}
+
+	return func(style tcell.Style) tcell.Style {
+		if s.Foreground != nil {
+			style = style.Foreground(fg)
+		}
+		if s.Background != nil {
+			style = style.Background(bg)
+		}
+		if s.Bold != nil {
+			style = style.Bold(*s.Bold)
+		}
+		if s.Underlined != nil {
+			style = style.Underline(*s.Underlined)
+		}
+		if s.Dimmed != nil {
+			style = style.Dim(*s.Dimmed)
+		}
+		if s.Blink != nil {
+			style = style.Blink(*s.Blink)
+		}
+		if s.Reversed != nil {
+			style = style.Reverse(*s.Reversed)
+		}
+		return style
+	}, nil
+}
+
+

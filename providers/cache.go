@@ -1,4 +1,4 @@
-package cache
+package providers
 
 import (
 	"context"
@@ -7,28 +7,29 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/google/go-cmp/cmp"
-	"github.com/nbedos/cistern/text"
+	"github.com/nbedos/cistern/tui"
 	"github.com/nbedos/cistern/utils"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 )
 
-var ErrUnknownRepositoryURL = errors.New("unknown repository URL")
-var ErrUnknownPipelineURL = errors.New("unknown pipeline URL")
+var ErrUnknownRepositoryURL = errors.New("unknown repository url")
+var ErrUnknownPipelineURL = errors.New("unknown pipeline url")
 var ErrUnknownGitReference = errors.New("unknown git reference")
 
 type CIProvider interface {
-	// Unique identifier of the provider instance among all other instances
+	// Unique identifier of the Provider instance among all other instances
 	ID() string
-	// Host part of the URL of the provider
+	// Host part of the url of the Provider
 	Host() string
-	// Display name of the provider
+	// Display nName of the Provider
 	Name() string
 	// FIXME Replace stepID by stepIDs
 	Log(ctx context.Context, step Step) (string, error)
@@ -36,13 +37,13 @@ type CIProvider interface {
 }
 
 type SourceProvider interface {
-	// Unique identifier of the provider instance among all other instances
+	// Unique identifier of the Provider instance among all other instances
 	ID() string
 	RefStatuses(ctx context.Context, url string, ref string, sha string) ([]string, error)
 	Commit(ctx context.Context, repo string, sha string) (Commit, error)
 }
 
-// Poll provider at increasing interval for the URL of statuses associated to "ref"
+// Poll Provider at increasing interval for the url of statuses associated to "ref"
 func monitorRefStatuses(ctx context.Context, p SourceProvider, b backoff.ExponentialBackOff, url string, ref string, commitc chan<- Commit) error {
 	b.Reset()
 
@@ -141,12 +142,15 @@ func Aggregate(steps []Step) Step {
 
 	s := Step{
 		State:      first.State.merge(last.State),
-		CreatedAt:  utils.MinNullTime(first.CreatedAt, last.CreatedAt),
 		StartedAt:  utils.MinNullTime(first.StartedAt, last.StartedAt),
 		FinishedAt: utils.MaxNullTime(first.FinishedAt, last.FinishedAt),
 		Children:   steps,
 	}
 
+	s.CreatedAt = first.CreatedAt
+	if last.CreatedAt.Before(s.CreatedAt) {
+		s.CreatedAt = last.CreatedAt
+	}
 	s.Duration = utils.NullSub(s.FinishedAt, s.StartedAt)
 	s.UpdatedAt = first.UpdatedAt
 	if last.UpdatedAt.After(s.UpdatedAt) {
@@ -172,43 +176,51 @@ type Commit struct {
 	Statuses []string
 }
 
-func (c Commit) Strings() []text.StyledString {
-	var title text.StyledString
-	commit := text.NewStyledString(fmt.Sprintf("commit %s", c.Sha), text.GitSha)
+type GitStyle struct {
+	Location *time.Location
+	SHA      tui.StyleTransform
+	Head     tui.StyleTransform
+	Branch   tui.StyleTransform
+	Tag      tui.StyleTransform
+}
+
+func (c Commit) StyledStrings(conf GitStyle) []tui.StyledString {
+	var title tui.StyledString
+	commit := tui.NewStyledString(fmt.Sprintf("commit %s", c.Sha), conf.SHA)
 	if len(c.Branches) > 0 || len(c.Tags) > 0 {
-		refs := make([]text.StyledString, 0, len(c.Branches)+len(c.Tags))
+		refs := make([]tui.StyledString, 0, len(c.Branches)+len(c.Tags))
 		for _, tag := range c.Tags {
-			refs = append(refs, text.NewStyledString(fmt.Sprintf("tag: %s", tag), text.GitTag))
+			refs = append(refs, tui.NewStyledString(fmt.Sprintf("tag: %s", tag), conf.Tag))
 		}
 		for _, branch := range c.Branches {
 			if branch == c.Head {
-				var s text.StyledString
-				s.Append("HEAD -> ", text.GitHead)
-				s.Append(branch, text.GitBranch)
-				refs = append([]text.StyledString{s}, refs...)
+				var s tui.StyledString
+				s.Append("HEAD -> ", conf.Head)
+				s.Append(branch, conf.Branch)
+				refs = append([]tui.StyledString{s}, refs...)
 			} else {
-				refs = append(refs, text.NewStyledString(branch, text.GitBranch))
+				refs = append(refs, tui.NewStyledString(branch, conf.Branch))
 			}
 		}
 
-		title = text.Join([]text.StyledString{
+		title = tui.Join([]tui.StyledString{
 			commit,
-			text.NewStyledString(" (", text.GitSha),
-			text.Join(refs, text.NewStyledString(", ", text.GitSha)),
-			text.NewStyledString(")", text.GitSha),
-		}, text.NewStyledString(""))
+			tui.NewStyledString(" (", conf.SHA),
+			tui.Join(refs, tui.NewStyledString(", ", conf.SHA)),
+			tui.NewStyledString(")", conf.SHA),
+		}, tui.NewStyledString(""))
 	} else {
 		title = commit
 	}
 
-	texts := []text.StyledString{
+	texts := []tui.StyledString{
 		title,
-		text.NewStyledString(fmt.Sprintf("Author: %s", c.Author)),
-		text.NewStyledString(fmt.Sprintf("Date: %s", c.Date.Truncate(time.Second).Local().String())),
-		text.NewStyledString(""),
+		tui.NewStyledString(fmt.Sprintf("Author: %s", c.Author)),
+		tui.NewStyledString(fmt.Sprintf("Date: %s", c.Date.Truncate(time.Second).In(conf.Location).String())),
+		tui.NewStyledString(""),
 	}
 	for _, line := range strings.Split(c.Message, "\n") {
-		texts = append(texts, text.NewStyledString("    "+line))
+		texts = append(texts, tui.NewStyledString("    "+line))
 		break
 	}
 
@@ -223,7 +235,7 @@ func RemotesAndCommit(path string, ref string) ([]string, Commit, error) {
 	// /home/user/localrepo/github.com/owner/repo which will inevitably lead to
 	// /home/user/localrepo which is not what the user expected since the user was
 	// referring to the online repository https://github.com/owner/repo. So instead
-	// we bail out early if the path is invalid, meaning it's not a local path but a URL.
+	// we bail out early if the path is invalid, meaning it's not a local path but a url.
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			err = ErrUnknownRepositoryURL
@@ -316,7 +328,7 @@ func RemotesAndCommit(path string, ref string) ([]string, Commit, error) {
 		// Try calling the local git binary to get the list of push URLs for
 		// this remote.  For now this is better than what go-git offers since
 		// it takes into account insteadOf and pushInsteadOf configuration
-		// options. If it fails, use the URL list provided by go-git.
+		// options. If it fails, use the url list provided by go-git.
 		//
 		// Remove this once the following issue is fixed:
 		//    https://github.com/src-d/go-git/issues/1266/
@@ -356,7 +368,7 @@ type Step struct {
 	Type         StepType
 	State        State
 	AllowFailure bool
-	CreatedAt    utils.NullTime
+	CreatedAt    time.Time
 	StartedAt    utils.NullTime
 	FinishedAt   utils.NullTime
 	UpdatedAt    time.Time
@@ -380,6 +392,120 @@ func (s Step) Map(f func(Step) Step) Step {
 	return s
 }
 
+const (
+	ColumnRef tui.ColumnID = iota
+	ColumnPipeline
+	ColumnType
+	ColumnState
+	ColumnCreated
+	ColumnStarted
+	ColumnFinished
+	ColumnUpdated
+	ColumnDuration
+	ColumnName
+	ColumnWebURL
+	ColumnAllowedFailure
+)
+
+func (s Step) NodeID() interface{} {
+	return s.ID
+}
+
+func (s Step) NodeChildren() []tui.TableNode {
+	children := make([]tui.TableNode, 0)
+	for _, child := range s.Children {
+		children = append(children, child)
+	}
+
+	return children
+}
+
+func (s Step) InheritedValues() []tui.ColumnID {
+	return []tui.ColumnID{ColumnRef, ColumnPipeline}
+}
+
+type StepStyle struct {
+	GitStyle
+	Provider tui.StyleTransform
+	Status   struct {
+		Failed   tui.StyleTransform
+		Canceled tui.StyleTransform
+		Passed   tui.StyleTransform
+		Running  tui.StyleTransform
+		Pending  tui.StyleTransform
+		Skipped  tui.StyleTransform
+		Manual   tui.StyleTransform
+	}
+}
+
+func (s Step) Values(v interface{}) map[tui.ColumnID]tui.StyledString {
+	conf := v.(StepStyle)
+
+	timeToString := func(t time.Time) string {
+		return t.In(conf.Location).Truncate(time.Second).Format("Jan 2 15:04")
+	}
+
+	nullTimeToString := func(t utils.NullTime) tui.StyledString {
+		s := "-"
+		if t.Valid {
+			s = timeToString(t.Time)
+		}
+		return tui.NewStyledString(s)
+	}
+
+	var typeChar string
+	switch s.Type {
+	case StepPipeline:
+		typeChar = "P"
+	case StepStage:
+		typeChar = "S"
+	case StepJob:
+		typeChar = "J"
+	case StepTask:
+		typeChar = "T"
+	}
+
+	state := tui.NewStyledString(string(s.State))
+	switch s.State {
+	case Failed:
+		state.Apply(conf.Status.Failed)
+	case Canceled:
+		state.Apply(conf.Status.Canceled)
+	case Passed:
+		state.Apply(conf.Status.Passed)
+	case Running:
+		state.Apply(conf.Status.Running)
+	case Pending:
+		state.Apply(conf.Status.Pending)
+	case Skipped:
+		state.Apply(conf.Status.Skipped)
+	case Manual:
+		state.Apply(conf.Status.Manual)
+	}
+
+	webURL := "-"
+	if s.WebURL.Valid {
+		webURL = s.WebURL.String
+	}
+
+	allowedFailure := "no"
+	if s.AllowFailure {
+		allowedFailure = "yes"
+	}
+	return map[tui.ColumnID]tui.StyledString{
+		ColumnType:           tui.NewStyledString(typeChar),
+		ColumnState:          state,
+		ColumnAllowedFailure: tui.NewStyledString(allowedFailure),
+		ColumnCreated:        tui.NewStyledString(timeToString(s.CreatedAt)),
+		ColumnStarted:        nullTimeToString(s.StartedAt),
+		ColumnFinished:       nullTimeToString(s.FinishedAt),
+		ColumnUpdated:        tui.NewStyledString(timeToString(s.UpdatedAt)),
+		ColumnDuration:       tui.NewStyledString(s.Duration.String()),
+		ColumnName:           tui.NewStyledString(s.Name),
+		ColumnWebURL:         tui.NewStyledString(webURL),
+	}
+}
+
 type GitReference struct {
 	SHA   string
 	Ref   string
@@ -389,14 +515,40 @@ type GitReference struct {
 type Pipeline struct {
 	Number       string
 	providerID   string
-	providerHost string
-	GitReference // FIXME Remove?
+	ProviderHost string
+	ProviderName string
+	GitReference
 	Step
 }
 
 func (p Pipeline) Diff(other Pipeline) string {
-	options := cmp.AllowUnexported(Pipeline{})
-	return cmp.Diff(p, other, options)
+	return cmp.Diff(p, other, cmp.AllowUnexported(Pipeline{}, Step{}))
+}
+
+type Pipelines []Pipeline
+
+func (ps Pipelines) Diff(others Pipelines) string {
+	return cmp.Diff(ps, others, cmp.AllowUnexported(Pipeline{}, Step{}))
+}
+
+// Return step identified by stepIDs
+func (p Pipeline) getStep(stepIDs []string) (Step, bool) {
+	step := p.Step
+	for _, id := range stepIDs {
+		exists := false
+		for _, childStep := range step.Children {
+			if childStep.ID == id {
+				exists = true
+				step = childStep
+				break
+			}
+		}
+		if !exists {
+			return Step{}, false
+		}
+	}
+
+	return step, true
 }
 
 type PipelineKey struct {
@@ -406,8 +558,135 @@ type PipelineKey struct {
 
 func (p Pipeline) Key() PipelineKey {
 	return PipelineKey{
-		ProviderHost: p.providerHost,
+		ProviderHost: p.ProviderHost,
 		ID:           p.Step.ID,
+	}
+}
+
+func (p Pipeline) NodeID() interface{} {
+	return p.Key()
+}
+
+func (p Pipeline) InheritedValues() []tui.ColumnID {
+	return nil
+}
+
+func (p Pipeline) Values(v interface{}) map[tui.ColumnID]tui.StyledString {
+	conf := v.(StepStyle)
+
+	values := p.Step.Values(conf)
+
+	number := p.Number
+	if number == "" {
+		number = p.ID
+	}
+	if _, err := strconv.Atoi(number); err == nil {
+		number = "#" + number
+	}
+	values[ColumnPipeline] = tui.NewStyledString(number)
+
+	name := tui.NewStyledString(p.ProviderName, conf.Provider)
+	if p.Name != "" {
+		name.Append(fmt.Sprintf(": %s", p.Name))
+	}
+	values[ColumnName] = name
+
+	if p.IsTag {
+		values[ColumnRef] = tui.NewStyledString(p.Ref, conf.Tag)
+	} else {
+		values[ColumnRef] = tui.NewStyledString(p.Ref, conf.Branch)
+	}
+
+	return values
+}
+
+func (s Step) Compare(t tui.TableNode, id tui.ColumnID, i interface{}) int {
+	other := t.(Step)
+	switch id {
+	case ColumnType, ColumnState, ColumnAllowedFailure, ColumnName, ColumnWebURL:
+		lhs, rhs := s.Values(i)[id].String(), other.Values(i)[id].String()
+		if lhs < rhs {
+			return -1
+		} else if lhs == rhs {
+			return 0
+		} else {
+			return 1
+		}
+
+	case ColumnCreated:
+		if s.CreatedAt.Before(other.CreatedAt) {
+			return -1
+		} else if s.CreatedAt.Equal(other.CreatedAt) {
+			return 0
+		} else {
+			return 1
+		}
+
+	case ColumnStarted, ColumnFinished:
+		var v, vOther utils.NullTime
+		if id == ColumnStarted {
+			v = s.StartedAt
+			vOther = other.StartedAt
+		} else {
+			v = s.FinishedAt
+			vOther = other.FinishedAt
+		}
+
+		// Assume that Null values are attributed to events that will occur in the
+		// future, so give them a maximal value
+		if !v.Valid {
+			v.Time = time.Unix(1<<62, 0)
+		}
+
+		if !vOther.Valid {
+			vOther.Time = time.Unix(1<<62, 0)
+		}
+
+		if v.Time.Before(vOther.Time) {
+			return -1
+		} else if v.Time.Equal(vOther.Time) {
+			return 0
+		} else {
+			return 1
+		}
+
+	case ColumnDuration:
+		v := s.Duration
+		vOther := other.Duration
+
+		if !v.Valid {
+			v.Duration = 1<<63 - 1
+		}
+		if !vOther.Valid {
+			vOther.Duration = 1<<63 - 1
+		}
+
+		if v.Duration < vOther.Duration {
+			return -1
+		} else if v.Duration == vOther.Duration {
+			return 0
+		} else {
+			return 1
+		}
+
+	default:
+		return 0
+	}
+}
+
+func (p Pipeline) Compare(other tui.TableNode, id tui.ColumnID, i interface{}) int {
+	switch q := other.(Pipeline); id {
+	case ColumnRef, ColumnPipeline, ColumnName:
+		lhs, rhs := p.Values(i)[id].String(), other.Values(i)[id].String()
+		if lhs < rhs {
+			return -1
+		} else if lhs == rhs {
+			return 0
+		} else {
+			return 1
+		}
+	default:
+		return p.Step.Compare(q.Step, id, i)
 	}
 }
 
@@ -420,6 +699,141 @@ type Cache struct {
 	pipelineByKey map[PipelineKey]*Pipeline
 	pipelineByRef map[string]map[PipelineKey]*Pipeline
 }
+
+type Configuration struct {
+	GitLab []struct {
+		Name              string   `toml:"name" default:"gitlab"`
+		URL               string   `toml:"url"`
+		Token             string   `toml:"token"`
+		TokenFromProcess  []string `toml:"token-from-process"`
+		RequestsPerSecond float64  `toml:"max-requests-per-second"`
+	}
+	GitHub []struct {
+		Token            string   `toml:"token"`
+		TokenFromProcess []string `toml:"token-from-process"`
+	}
+	CircleCI []struct {
+		Name              string   `toml:"name" default:"circleci"`
+		Token             string   `toml:"token"`
+		TokenFromProcess  []string `toml:"token-from-process"`
+		RequestsPerSecond float64  `toml:"max-requests-per-second"`
+	}
+	Travis []struct {
+		Name              string   `toml:"name" default:"travis"`
+		URL               string   `toml:"url"`
+		Token             string   `toml:"token"`
+		TokenFromProcess  []string `toml:"token-from-process"`
+		RequestsPerSecond float64  `toml:"max-requests-per-second"`
+	}
+	AppVeyor []struct {
+		Name              string   `toml:"name" default:"appveyor"`
+		Token             string   `toml:"token"`
+		TokenFromProcess  []string `toml:"token-from-process"`
+		RequestsPerSecond float64  `toml:"max-requests-per-second"`
+	}
+	Azure []struct {
+		Name              string   `toml:"name" default:"azure"`
+		Token             string   `toml:"token"`
+		TokenFromProcess  []string `toml:"token-from-process"`
+		RequestsPerSecond float64  `toml:"max-requests-per-second"`
+	}
+}
+
+func token(token string, process []string) (string, error) {
+	if len(process) == 0 {
+		return token, nil
+	}
+	if token != "" {
+		return "", errors.New("at most one of \"token\" and \"token-from-process\" must be set")
+	}
+
+	cmd := exec.Command(process[0], process[1:]...)
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
+	bs, err := cmd.Output()
+	return strings.Trim(string(bs), "\r\n"), err
+}
+
+func (c Configuration) ToCache(ctx context.Context) (Cache, error) {
+	source := make([]SourceProvider, 0)
+	ci := make([]CIProvider, 0)
+
+	for i, conf := range c.GitLab {
+		id := fmt.Sprintf("gitlab-%d", i)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client, err := NewGitLabClient(id, conf.Name, conf.URL, token, conf.RequestsPerSecond)
+		if err != nil {
+			return Cache{}, err
+		}
+		source = append(source, client)
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.GitHub {
+		id := fmt.Sprintf("github-%d", i)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client := NewGitHubClient(ctx, id, &token)
+		source = append(source, client)
+	}
+
+	for i, conf := range c.CircleCI {
+		id := fmt.Sprintf("circleci-%d", i)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client := NewCircleCIClient(id, conf.Name, token, conf.RequestsPerSecond)
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.AppVeyor {
+		id := fmt.Sprintf("appveyor-%d", i)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client := NewAppVeyorClient(id, conf.Name, token, conf.RequestsPerSecond)
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.Travis {
+		id := fmt.Sprintf("travis-%d", i)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client, err := NewTravisClient(id, conf.Name, token, conf.URL, conf.RequestsPerSecond)
+		if err != nil {
+			return Cache{}, err
+		}
+		ci = append(ci, client)
+	}
+
+	for i, conf := range c.Azure {
+		id := fmt.Sprintf("azure-%d", i)
+		token, err := token(conf.Token, conf.TokenFromProcess)
+		if err != nil {
+			return Cache{}, err
+		}
+		client := NewAzurePipelinesClient(id, conf.Name, token, conf.RequestsPerSecond)
+		ci = append(ci, client)
+	}
+
+	if len(ci) == 0 || len(source) == 0 {
+		return Cache{}, ErrNoProvider
+	}
+
+	return NewCache(ci, source), nil
+}
+
+var ErrNoProvider = errors.New("list of providers must not be empty")
 
 func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache {
 	providersByAccountID := make(map[string]CIProvider, len(CIProviders))
@@ -439,16 +853,16 @@ func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache 
 
 var ErrObsoleteBuild = errors.New("build to save is older than current build in cache")
 
-// Store build in cache. If a build from the same provider and with the same ID is
+// Store build in  If a build from the same Provider and with the same ID is
 // already stored in cache, it will be overwritten if the build to save is more recent
-// than the build in cache. If the build to save is older than the build in cache,
+// than the build in  If the build to save is older than the build in cache,
 // SavePipeline will return ErrObsoleteBuild.
 func (c *Cache) SavePipeline(ref string, p Pipeline) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	existingBuild, exists := c.pipelineByKey[p.Key()]
-	// UpdatedAt refers to the last update of the build and does not reflect an eventual
+	// updatedAt refers to the last update of the build and does not reflect an eventual
 	// update of a job so default to always updating an active build
 	if exists && !p.State.IsActive() && !p.UpdatedAt.After(existingBuild.UpdatedAt) {
 		// Point ref to existingBuild
@@ -472,7 +886,7 @@ func (c *Cache) SavePipeline(ref string, p Pipeline) error {
 	return nil
 }
 
-// Store commit in cache. If a commit with the same SHA exists, merge
+// Store commit in  If a commit with the same SHA exists, merge
 // both commits.
 func (c *Cache) SaveCommit(ref string, commit Commit) {
 	c.mutex.Lock()
@@ -516,18 +930,7 @@ func (c Cache) Commit(ref string) (Commit, bool) {
 	return commit, exists
 }
 
-func (c Cache) Pipelines() []Pipeline {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	pipelines := make([]Pipeline, 0, len(c.pipelineByKey))
-	for _, build := range c.pipelineByKey {
-		pipelines = append(pipelines, *build)
-	}
-
-	return pipelines
-}
-
-func (c Cache) PipelinesByRef(ref string) []Pipeline {
+func (c Cache) Pipelines(ref string) []Pipeline {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	pipelines := make([]Pipeline, 0, len(c.pipelineByRef[ref]))
@@ -535,10 +938,16 @@ func (c Cache) PipelinesByRef(ref string) []Pipeline {
 		pipelines = append(pipelines, *p)
 	}
 
+	sort.Slice(pipelines, func(i, j int) bool {
+		pi := pipelines[i]
+		pj := pipelines[j]
+		return pi.ProviderHost < pj.ProviderHost || (pi.ProviderHost == pj.ProviderHost && pi.ID < pj.ID)
+	})
+
 	return pipelines
 }
 
-// Poll provider at increasing interval for information about the CI pipeline identified by the URL
+// Poll Provider at increasing interval for information about the CI pipeline identified by the url
 // u. A message is sent on the channel 'updates' each time the cache is updated with new information
 // for this specific pipeline.
 func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref string, updates chan<- time.Time) error {
@@ -565,7 +974,8 @@ func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref
 			return err
 		}
 		pipeline.providerID = p.ID()
-		pipeline.providerHost = p.Host()
+		pipeline.ProviderHost = p.Host()
+		pipeline.ProviderName = p.Name()
 
 		switch err := c.SavePipeline(ref, pipeline); err {
 		case nil:
@@ -581,11 +991,11 @@ func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref
 			b.Reset()
 		case ErrObsoleteBuild:
 			// This error means that the build object we wanted to save was last updated by
-			// the CI provider at the same time or before the one already saved in cache with the
-			// same ID, so cache.SavePipeline rejected or request to store our build.
+			// the CI Provider at the same time or before the one already saved in cache with the
+			// same ID, so SavePipeline rejected or request to store our build.
 			// It's OK. In particular, since builds returned by BuildFromURL never contain
 			// logs, it prevents us from overwriting a build that may have logs (these would have
-			// been committed to the cache by a call to cache.SaveJob() after the user asks to
+			// been committed to the cache by a call to SaveJob() after the user asks to
 			// view the logs of a job) by a build with no log.
 		default:
 			return err
@@ -599,9 +1009,9 @@ func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref
 	return nil
 }
 
-// Ask all providers to monitor the CI pipeline identified by the URL u. A message is sent on the
+// Ask all providers to monitor the CI pipeline identified by the url u. A message is sent on the
 // channel 'updates' each time the cache is updated with new information for this specific pipeline.
-// If no provider is able to handle the specified URL, ErrUnknownPipelineURL is returned.
+// If no Provider is able to handle the specified url, ErrUnknownPipelineURL is returned.
 func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref string, updates chan<- time.Time) error {
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
@@ -611,13 +1021,13 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 		go func(p CIProvider) {
 			defer wg.Done()
 			// Almost all calls will return immediately with ErrUnknownPipelineURL. Other calls won't,
-			// meaning these providers can handle the URL they've been given. These calls
+			// meaning these providers can handle the url they've been given. These calls
 			// will run longer or possibly never return unless their context is canceled or
 			// they encounter an error.
 			err := c.monitorPipeline(ctx, p, u, ref, updates)
 			if err != nil {
 				if err != ErrUnknownPipelineURL && err != context.Canceled {
-					err = fmt.Errorf("provider %s: monitorPipeline failed with %v (%s)", p.ID(), err, u)
+					err = fmt.Errorf("Provider %s: monitorPipeline failed with %v (%s)", p.ID(), err, u)
 				}
 				errc <- err
 			}
@@ -650,8 +1060,8 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 	return err
 }
 
-// Ask all providers to monitor the statuses of 'ref'. The URL of each status is written on the
-// channel urlc once. If no provider is able to handle the specified URL, ErrUnknownRepositoryURL
+// Ask all providers to monitor the statuses of 'ref'. The url of each status is written on the
+// channel urlc once. If no Provider is able to handle the specified url, ErrUnknownRepositoryURL
 // is returned.
 func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref string, commitc chan<- Commit, b backoff.ExponentialBackOff) error {
 	repositoryURLs, commit, err := RemotesAndCommit(repo, ref)
@@ -664,7 +1074,7 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref 
 		}
 		ref = commit.Sha
 	case ErrUnknownRepositoryURL:
-		// The path does not refer to a local repository so it probably is a URL
+		// The path does not refer to a local repository so it probably is a url
 		repositoryURLs = []string{repo}
 	default:
 		return err
@@ -767,7 +1177,7 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURL string, ref 
 	go func() {
 		defer wg.Done()
 		urls := make(map[string]struct{})
-		// Ask for monitoring of each URL
+		// Ask for monitoring of each url
 		for commit := range commitc {
 			c.SaveCommit(ref, commit)
 			wg.Add(1)
@@ -787,7 +1197,7 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURL string, ref 
 						defer wg.Done()
 						err := c.broadcastMonitorPipeline(ctx, u, ref, updates)
 						// Ignore ErrUnknownPipelineURL. This error means that we don't integrate
-						// with the application that created that particular URL. No need to report
+						// with the application that created that particular url. No need to report
 						// this up the chain, though it's nice to know our request couldn't be handled.
 						if err != ErrUnknownPipelineURL {
 							errc <- err
@@ -834,57 +1244,28 @@ func (c *Cache) Step(key PipelineKey, stepIDs []string) (Step, bool) {
 		return Step{}, false
 	}
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	step := p.Step
-	for _, ID := range stepIDs {
-		exists := false
-		for _, childStep := range step.Children {
-			if childStep.ID == ID {
-				exists = true
-				step = childStep
-				break
-			}
-		}
-		if !exists {
-			return Step{}, false
-		}
-	}
-
-	return step, true
+	return p.getStep(stepIDs)
 }
 
-func (c *Cache) Log(ctx context.Context, key taskKey) (string, error) {
+var ErrNoLogHere = errors.New("no log is associated to this row")
+
+func (c *Cache) Log(ctx context.Context, key PipelineKey, stepIDs []string) (string, error) {
 	var err error
-	pKey := PipelineKey{
-		ProviderHost: key.providerHost,
-		ID:           key.stepIDs[0].String,
-	}
 
-	// TODO Simplify all this
-	stepIDs := make([]string, 0)
-	for _, ID := range key.stepIDs[1:] {
-		if ID.Valid {
-			stepIDs = append(stepIDs, ID.String)
-		} else {
-			break
-		}
-	}
-
-	step, exists := c.Step(pKey, stepIDs)
+	step, exists := c.Step(key, stepIDs)
 	if !exists {
-		return "", fmt.Errorf("no matching step for %v %v", key, key.stepIDs)
+		return "", fmt.Errorf("no matching step for %v %v", key, stepIDs)
 	}
 
 	log := step.Log.Content.String
 	if !step.Log.Content.Valid {
-		pipeline, exists := c.Pipeline(pKey)
+		pipeline, exists := c.Pipeline(key)
 		if !exists {
 
 		}
 		provider, exists := c.ciProvidersByID[pipeline.providerID]
 		if !exists {
-			return "", fmt.Errorf("no matching provider found in cache for account ID %q", pipeline.providerID)
+			return "", fmt.Errorf("no matching Provider found in cache for account ID %q", pipeline.providerID)
 		}
 
 		log, err = provider.Log(ctx, step)

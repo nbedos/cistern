@@ -1,150 +1,463 @@
 package tui
 
 import (
-	"context"
 	"errors"
-	"time"
+	"fmt"
+	"sort"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/mattn/go-runewidth"
-	"github.com/nbedos/cistern/cache"
-	"github.com/nbedos/cistern/text"
 	"github.com/nbedos/cistern/utils"
 )
 
-type Table struct {
-	source     cache.HierarchicalTabularDataSource
-	nodes      []cache.HierarchicalTabularSourceRow
-	rows       []cache.HierarchicalTabularSourceRow
-	topLine    int
-	activeLine int
-	height     int
-	width      int
-	sep        string
-	maxWidths  map[string]int
-	location   *time.Location
+type nodeID interface{}
+
+type TableNode interface {
+	// Unique identifier of this node among its siblings
+	NodeID() interface{}
+	NodeChildren() []TableNode
+	Values(v interface{}) map[ColumnID]StyledString
+	InheritedValues() []ColumnID
+	Compare(other TableNode, id ColumnID, v interface{}) int
 }
 
-func NewTable(source cache.HierarchicalTabularDataSource, width int, height int, loc *time.Location) (Table, error) {
+func (n *innerTableNode) setPrefix(parent string, isLastChild bool) {
+	if parent == "" {
+		switch {
+		case len(n.children) == 0:
+			n.prefix = " "
+		case n.traversable:
+			n.prefix = "-"
+		default:
+			n.prefix = "+"
+		}
+		for i, child := range n.children {
+			child.setPrefix(" ", i == len(n.children)-1)
+		}
+	} else {
+		n.prefix = parent
+		if isLastChild {
+			n.prefix += "└─"
+		} else {
+			n.prefix += "├─"
+		}
+
+		if len(n.children) == 0 || n.traversable {
+			n.prefix += "─ "
+		} else {
+			n.prefix += "+ "
+		}
+
+		for i, child := range n.children {
+			if childIsLastChild := i == len(n.children)-1; isLastChild {
+				child.setPrefix(parent+"    ", childIsLastChild)
+			} else {
+				child.setPrefix(parent+"│   ", childIsLastChild)
+			}
+		}
+	}
+}
+
+type Column struct {
+	Header     string
+	Position   int
+	MaxWidth   int
+	Alignment  Alignment
+	TreePrefix bool
+}
+
+type ColumnID int
+
+type ColumnConfiguration map[ColumnID]Column
+
+func (c ColumnConfiguration) IDs() []ColumnID {
+	ids := make([]ColumnID, 0, len(c))
+	for id := range c {
+		ids = append(ids, id)
+	}
+
+	sort.Slice(ids, func(i, j int) bool {
+		return c[ids[i]].Position < c[ids[j]].Position
+	})
+
+	return ids
+}
+
+type nullInt struct {
+	Valid bool
+	Int   int
+}
+
+func (i nullInt) Diff(other nullInt) string {
+	return cmp.Diff(i, other, cmp.AllowUnexported(nullInt{}))
+}
+
+const maxTreeDepth = 10
+
+type nodePath struct {
+	ids [maxTreeDepth]nodeID
+	len int
+}
+
+func nodePathFromIDs(ids ...nodeID) nodePath {
+	return nodePath{}.append(ids...)
+}
+
+func (p nodePath) append(ids ...nodeID) nodePath {
+	for _, id := range ids {
+		if p.len >= len(p.ids) {
+			panic(fmt.Sprintf("path length cannot exceed %d", len(p.ids)))
+		}
+
+		p.ids[p.len] = id
+		p.len++
+	}
+	return p
+}
+
+type innerTableNode struct {
+	path        nodePath
+	prefix      string
+	traversable bool
+	values      map[ColumnID]StyledString
+	children    []*innerTableNode
+}
+
+func (n innerTableNode) depthFirstTraversal(traverseAll bool) []*innerTableNode {
+	explored := make([]*innerTableNode, 0)
+	toBeExplored := []*innerTableNode{&n}
+
+	for len(toBeExplored) > 0 {
+		node := toBeExplored[len(toBeExplored)-1]
+		toBeExplored = toBeExplored[:len(toBeExplored)-1]
+		if traverseAll || node.traversable {
+			for i := len(node.children) - 1; i >= 0; i-- {
+				toBeExplored = append(toBeExplored, node.children[i])
+			}
+		}
+		explored = append(explored, node)
+	}
+
+	return explored
+}
+
+func (t HierarchicalTable) toInnerTableNode(n TableNode, parent innerTableNode, traversable map[nodePath]bool, depth int) innerTableNode {
+	path := parent.path.append(n.NodeID())
+	s := innerTableNode{
+		path:        path,
+		values:      n.Values(t.conf.NodeStyle),
+		traversable: traversable[path],
+	}
+
+	if isTraversable, exists := traversable[path]; exists {
+		s.traversable = isTraversable
+	} else if depth > 0 {
+		s.traversable = true
+	}
+
+	for _, c := range n.InheritedValues() {
+		s.values[c] = parent.values[c]
+	}
+
+	children := n.NodeChildren()
+	t.sortSlice(children)
+	for _, child := range children {
+		innerNode := t.toInnerTableNode(child, s, traversable, depth-1)
+		s.children = append(s.children, &innerNode)
+	}
+
+	return s
+}
+
+func (n *innerTableNode) Map(f func(n *innerTableNode)) {
+	f(n)
+
+	for _, child := range n.children {
+		child.Map(f)
+	}
+}
+
+func (t *HierarchicalTable) lookup(path nodePath) *innerTableNode {
+	children := make([]*innerTableNode, 0, len(t.innerNodes))
+	for i := range t.innerNodes {
+		children = append(children, &t.innerNodes[i])
+	}
+
+pathLoop:
+	for i := 0; i < path.len; i++ {
+		for _, c := range children {
+			if c.path.ids[i] == path.ids[i] {
+				if c.path == path {
+					return c
+				}
+				children = c.children
+				continue pathLoop
+			}
+		}
+		return nil
+	}
+
+	return nil
+}
+
+type Order struct {
+	Valid     bool
+	ID        ColumnID
+	Ascending bool
+}
+
+type TableConfiguration struct {
+	Sep                    string
+	Cursor                 StyleTransform
+	Header                 StyleTransform
+	HeaderSuffixAscending  string
+	HeaderSuffixDescending string
+	Columns                ColumnConfiguration
+	DefaultDepth           int
+	NodeStyle              interface{}
+	Order
+}
+
+type HierarchicalTable struct {
+	outterNodes []TableNode
+	// List of the top-level innerNodes
+	innerNodes []innerTableNode
+	// Depth first traversal of all the top-level innerNodes. Needs updating if `innerNodes` or `traversable` changes
+	rows []*innerTableNode
+	// Index in `rows` of the first node of the current page
+	pageIndex nullInt
+	// Index in `rows` of the node where the cursor is located
+	cursorIndex  nullInt
+	height       int
+	width        int
+	conf         TableConfiguration
+	columnWidth  map[ColumnID]int
+	order        Order
+	scrolled     bool
+	columnOffset int
+}
+
+func NewHierarchicalTable(conf TableConfiguration, nodes []TableNode, width int, height int) (HierarchicalTable, error) {
 	if width < 0 || height < 0 {
-		return Table{}, errors.New("table width and height must be >= 0")
+		return HierarchicalTable{}, errors.New("table width and height must be >= 0")
 	}
 
-	table := Table{
-		source:    source,
-		height:    height,
-		width:     width,
-		maxWidths: make(map[string]int),
-		sep:       "  ", // FIXME Move this out of here
-		location:  loc,
+	table := HierarchicalTable{
+		height:      height,
+		width:       width,
+		conf:        conf,
+		columnWidth: make(map[ColumnID]int),
 	}
 
-	table.Refresh()
+	table.Replace(nodes)
+	if conf.Order.Valid {
+		table.SortBy(conf.ID, conf.Order.Ascending)
+	}
 
 	return table, nil
 }
 
-func (t Table) NbrRows() int {
+func (t HierarchicalTable) Configuration() TableConfiguration {
+	return t.conf
+}
+
+func (t HierarchicalTable) Order() Order {
+	return t.order
+}
+
+func (t HierarchicalTable) depthFirstTraversal(traverseAll bool) []*innerTableNode {
+	explored := make([]*innerTableNode, 0)
+	for _, n := range t.innerNodes {
+		explored = append(explored, n.depthFirstTraversal(traverseAll)...)
+	}
+
+	return explored
+}
+
+// Number of rows visible on screen
+func (t HierarchicalTable) PageSize() int {
 	return utils.MaxInt(0, t.height-1)
 }
 
-func (t *Table) computeMaxWidths() {
-	for _, header := range t.source.Headers() {
-		t.maxWidths[header] = utils.MaxInt(t.maxWidths[header], runewidth.StringWidth(header))
-	}
-	for _, row := range t.rows {
-		for header, value := range row.Tabular(t.location) {
-			t.maxWidths[header] = utils.MaxInt(t.maxWidths[header], value.Length())
-		}
-	}
-}
-
-func (t *Table) Refresh() {
-	// Save traversable state of current nodes
-	traversables := make(map[interface{}]bool)
-	for i := range t.nodes {
-		rowTraversal := utils.DepthFirstTraversal(t.nodes[i], true)
-		for j := range rowTraversal {
-			row := rowTraversal[j].(cache.HierarchicalTabularSourceRow)
-			traversables[row.Key()] = row.Traversable()
-		}
+func (t *HierarchicalTable) computeTraversal() {
+	// Save current paths of page and cursor
+	var pageNodePath nodePath
+	if t.pageIndex.Valid {
+		pageNodePath = t.rows[t.pageIndex.Int].path
 	}
 
-	// Fetch all nodes from DataSource and restore traversable state
-	nodes := t.source.Rows()
-	t.nodes = make([]cache.HierarchicalTabularSourceRow, 0, len(nodes))
-	for _, node := range nodes {
-		for _, childRow := range utils.DepthFirstTraversal(node, true) {
-			childRow := childRow.(cache.HierarchicalTabularSourceRow)
-			traversable, exists := traversables[childRow.Key()]
-			childRow.SetTraversable(traversable || !exists, false)
-		}
-		t.nodes = append(t.nodes, node)
+	cursorIndex := t.cursorIndex
+	var cursorNodePath nodePath
+	if t.cursorIndex.Valid {
+		cursorNodePath = t.rows[t.cursorIndex.Int].path
 	}
 
-	// Traverse all nodes in depth-first order to build t.rows
-	var activeKey interface{} = nil
-	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
-		activeKey = t.rows[t.activeLine].Key()
+	// Update node prefixes
+	for i := range t.innerNodes {
+		t.innerNodes[i].setPrefix("", false)
 	}
-	t.rows = make([]cache.HierarchicalTabularSourceRow, 0, len(t.nodes))
-	for _, node := range t.nodes {
-		cache.Prefix(node, "", true)
-		for _, childRow := range utils.DepthFirstTraversal(node, false) {
-			t.rows = append(t.rows, childRow.(cache.HierarchicalTabularSourceRow))
-			// change t.activeline so that the same row stays active, except if t.activeLine == 0
-			if t.activeLine != 0 && activeKey != nil && t.rows[len(t.rows)-1].Key() == activeKey {
-				t.activeLine = len(t.rows) - 1
+
+	// Reset page and cursor indexes
+	t.pageIndex = nullInt{}
+	t.cursorIndex = nullInt{}
+
+	t.rows = t.depthFirstTraversal(false)
+
+	// Adjust value of pageIndex and cursorIndex
+	for i, row := range t.rows {
+		if row.path == pageNodePath {
+			t.pageIndex = nullInt{
+				Valid: true,
+				Int:   i,
+			}
+		}
+
+		// Track the row the cursor was on, unless it was on the first row and the user never
+		// scrolled. This prevents the cursor from moving around when increasingly more rows are
+		// loaded into the table but the user has not interacted with the table yet.
+		if row.path == cursorNodePath && (t.scrolled || (cursorIndex.Valid && cursorIndex.Int > 0)) {
+			t.cursorIndex = nullInt{
+				Valid: true,
+				Int:   i,
 			}
 		}
 	}
 
-	if len(t.rows) == 0 {
-		t.topLine = 0
-		t.activeLine = 0
-	} else {
-		t.topLine = utils.Bounded(t.topLine, 0, len(t.rows)-1)
-		if t.NbrRows() == 0 {
-			t.activeLine = t.topLine
-		} else {
-			t.activeLine = utils.Bounded(t.activeLine, t.topLine, t.topLine+t.NbrRows())
+	if len(t.rows) > 0 {
+		// If no matching row was found or if all rows fit on screen, move the top page to the
+		// first row
+		if !t.pageIndex.Valid || len(t.rows) <= t.PageSize() {
+			t.pageIndex = nullInt{
+				Valid: true,
+				Int:   0,
+			}
+		}
+
+		// If no matching row was found, move the cursor to the first row of the page
+		if !t.cursorIndex.Valid {
+			t.cursorIndex = t.pageIndex
+		}
+
+		// Show as many rows as possible on screen
+		if t.cursorIndex.Int-t.pageIndex.Int+1 < t.PageSize() {
+			t.pageIndex.Int = utils.MaxInt(0, t.cursorIndex.Int-t.PageSize()+1)
+		}
+
+		// Adjust pageIndex so that the cursor is always on screen
+		lowerBound := utils.Bounded(t.cursorIndex.Int-t.PageSize()+1, 0, len(t.rows)-1)
+		t.pageIndex.Int = utils.Bounded(t.pageIndex.Int, lowerBound, t.cursorIndex.Int)
+	}
+
+	for id, value := range t.headers() {
+		t.columnWidth[id] = utils.MaxInt(t.columnWidth[id], value.Length())
+	}
+
+	for _, row := range t.rows {
+		for _, id := range t.conf.Columns.IDs() {
+			w := row.values[id].Length()
+			if t.conf.Columns[id].TreePrefix {
+				w += runewidth.StringWidth(row.prefix)
+			}
+			t.columnWidth[id] = utils.MaxInt(t.columnWidth[id], w)
 		}
 	}
-
-	t.computeMaxWidths()
 }
 
-func (t *Table) SetTraversable(open bool, recursive bool) {
-	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
-		t.rows[t.activeLine].SetTraversable(open, recursive)
-		t.Refresh() // meh. That's simpler but not needed
+func (t *HierarchicalTable) sortSlice(nodes []TableNode) {
+	if t.order.Valid {
+		indexById := make(map[interface{}]int)
+		for i, child := range nodes {
+			indexById[child.NodeID()] = i
+		}
+		sort.Slice(nodes, func(i, j int) bool {
+			c := nodes[i].Compare(nodes[j], t.order.ID, t.conf.NodeStyle)
+			if c == 0 {
+				if t.order.Ascending {
+					return indexById[nodes[i].NodeID()] < indexById[nodes[j].NodeID()]
+				} else {
+					return indexById[nodes[i].NodeID()] > indexById[nodes[j].NodeID()]
+				}
+			} else {
+				return (c < 0 && t.order.Ascending) || (c > 0 && !t.order.Ascending)
+			}
+		})
 	}
 }
 
-func (t *Table) Scroll(amount int) {
-	activeLine := utils.Bounded(t.activeLine+amount, 0, len(t.rows)-1)
+func (t *HierarchicalTable) Replace(nodes []TableNode) {
+	// Defensive copy to preserve the initial sort order
+	t.outterNodes = make([]TableNode, len(nodes))
+	copy(t.outterNodes, nodes)
+
+	// Save traversable state
+	traversable := make(map[nodePath]bool, 0)
+	for _, node := range t.depthFirstTraversal(true) {
+		traversable[node.path] = node.traversable
+	}
+
+	t.sortSlice(nodes)
+
+	// Copy node hierarchy and compute the path of each node along the way
+	t.innerNodes = make([]innerTableNode, 0, len(nodes))
+	for _, n := range nodes {
+		innerNode := t.toInnerTableNode(n, innerTableNode{}, traversable, t.conf.DefaultDepth)
+		t.innerNodes = append(t.innerNodes, innerNode)
+	}
+
+	t.computeTraversal()
+}
+
+func (t *HierarchicalTable) SetTraversable(traversable bool, recursive bool) {
+	if t.cursorIndex.Valid {
+		if n := t.lookup(t.rows[t.cursorIndex.Int].path); n != nil {
+			if recursive {
+				n.Map(func(node *innerTableNode) {
+					node.traversable = traversable
+				})
+			} else {
+				n.traversable = traversable
+			}
+		}
+		t.computeTraversal()
+	}
+}
+
+func (t *HierarchicalTable) HorizontalScroll(amount int) {
+	t.columnOffset = utils.Bounded(t.columnOffset+amount, 0, len(t.conf.Columns.IDs())-1)
+}
+
+func (t *HierarchicalTable) VerticalScroll(amount int) {
+	if !t.cursorIndex.Valid || !t.pageIndex.Valid {
+		return
+	}
+	if amount != 0 {
+		t.scrolled = true
+	}
+
+	t.cursorIndex.Int = utils.Bounded(t.cursorIndex.Int+amount, 0, len(t.rows)-1)
+
 	switch {
-	case activeLine < t.topLine:
-		t.topLine = activeLine
-		t.activeLine = activeLine
-	case activeLine > t.topLine+t.NbrRows()-1:
-		scrollAmount := activeLine - (t.topLine + t.NbrRows() - 1)
-		t.topLine = utils.Bounded(t.topLine+scrollAmount, 0, len(t.rows)-1)
-		t.activeLine = t.topLine + t.NbrRows() - 1
-	default:
-		t.activeLine = activeLine
+	case t.cursorIndex.Int < t.pageIndex.Int:
+		// VerticalScroll up
+		t.pageIndex.Int = t.cursorIndex.Int
+	case t.cursorIndex.Int > t.pageIndex.Int+t.PageSize()-1:
+		// VerticalScroll down
+		scrollAmount := t.cursorIndex.Int - (t.pageIndex.Int + t.PageSize() - 1)
+		t.pageIndex.Int = utils.Bounded(t.pageIndex.Int+scrollAmount, 0, len(t.rows)-1)
+		t.cursorIndex.Int = t.pageIndex.Int + t.PageSize() - 1
 	}
 }
 
-func (t *Table) Top() {
-	t.Scroll(-len(t.rows))
+func (t *HierarchicalTable) Top() {
+	t.VerticalScroll(-len(t.rows))
 }
 
-func (t *Table) Bottom() {
-	t.Scroll(len(t.rows))
+func (t *HierarchicalTable) Bottom() {
+	t.VerticalScroll(len(t.rows))
 }
 
-func (t *Table) NextMatch(s string, ascending bool) bool {
-	if len(t.rows) == 0 {
+func (t *HierarchicalTable) ScrollToNextMatch(s string, ascending bool) bool {
+	if !t.cursorIndex.Valid {
 		return false
 	}
 
@@ -152,15 +465,15 @@ func (t *Table) NextMatch(s string, ascending bool) bool {
 	if !ascending {
 		step = -1
 	}
-	start := utils.Modulo(t.activeLine+step, len(t.rows))
+
+	start := utils.Modulo(t.cursorIndex.Int+step, len(t.rows))
 	next := func(i int) int {
 		return utils.Modulo(i+step, len(t.rows))
 	}
-	for i := start; i != t.activeLine; i = next(i) {
-		row := t.rows[i]
-		for _, styledString := range row.Tabular(t.location) {
-			if styledString.Contains(s) {
-				t.Scroll(i - t.activeLine)
+	for i := start; i != t.cursorIndex.Int; i = next(i) {
+		for id := range t.conf.Columns {
+			if t.rows[i].values[id].Contains(s) {
+				t.VerticalScroll(i - t.cursorIndex.Int)
 				return true
 			}
 		}
@@ -169,87 +482,116 @@ func (t *Table) NextMatch(s string, ascending bool) bool {
 	return false
 }
 
-func (t Table) stringFromColumns(values map[string]text.StyledString, header bool) text.StyledString {
-	paddedColumns := make([]text.StyledString, len(t.source.Headers()))
-	for j, name := range t.source.Headers() {
-		alignment := text.Left
-		if !header {
-			alignment = t.source.Alignment()[name]
+func (t HierarchicalTable) headers() map[ColumnID]StyledString {
+	values := make(map[ColumnID]StyledString)
+	for id, column := range t.conf.Columns {
+		suffix := ""
+		if t.order.Valid && t.order.ID == id {
+			if t.order.Ascending {
+				suffix = t.conf.HeaderSuffixAscending
+			} else {
+				suffix = t.conf.HeaderSuffixDescending
+			}
 		}
-		paddedColumns[j] = values[name]
-		paddedColumns[j].Align(alignment, t.maxWidths[name])
+		values[id] = NewStyledString(column.Header + suffix)
 	}
+	return values
+}
 
-	line := text.Join(paddedColumns, text.NewStyledString(t.sep))
-	line.Align(text.Left, t.width)
+func (t HierarchicalTable) styledString(values map[ColumnID]StyledString, prefix string, forceAlignLeft bool) StyledString {
+	paddedColumns := make([]StyledString, 0)
+	for _, id := range t.conf.Columns.IDs() {
+		alignment := t.conf.Columns[id].Alignment
+		if forceAlignLeft {
+			alignment = Left
+		}
+		v := values[id]
+		if t.conf.Columns[id].TreePrefix {
+			prefixedValue := NewStyledString(prefix)
+			prefixedValue.AppendString(v)
+			v = prefixedValue
+		}
+		w := utils.MinInt(t.columnWidth[id], t.conf.Columns[id].MaxWidth)
+		v.Fit(alignment, w)
+		paddedColumns = append(paddedColumns, v)
+	}
+	if len(paddedColumns) > 0 {
+		if t.columnOffset >= 0 && t.columnOffset < len(paddedColumns) {
+			paddedColumns = paddedColumns[t.columnOffset:]
+		} else {
+			paddedColumns = nil
+		}
+	}
+	line := Join(paddedColumns, NewStyledString(t.conf.Sep))
+	line.Fit(Left, t.width)
 
 	return line
 }
 
-func (t Table) Size() (int, int) {
-	return t.width, t.height
-}
+func (t *HierarchicalTable) Resize(width int, height int) {
+	t.width = utils.MaxInt(0, width)
+	t.height = utils.MaxInt(0, height)
 
-func (t *Table) Resize(width int, height int) {
-	width = utils.MaxInt(width, 0)
-	height = utils.MaxInt(height, 0)
-
-	if height == 0 {
-		t.activeLine = 0
+	if t.PageSize() > 0 {
+		if t.cursorIndex.Valid && t.pageIndex.Valid {
+			upperBound := utils.Bounded(t.pageIndex.Int+t.PageSize()-1, 0, len(t.rows)-1)
+			t.cursorIndex.Int = utils.Bounded(t.cursorIndex.Int, t.pageIndex.Int, upperBound)
+		} else if len(t.rows) > 0 {
+			t.pageIndex = nullInt{
+				Valid: true,
+				Int:   0,
+			}
+			t.cursorIndex = t.pageIndex
+		}
 	} else {
-		t.activeLine = utils.Bounded(t.activeLine, t.topLine, t.topLine+height-1)
+		t.cursorIndex = nullInt{}
+		t.pageIndex = nullInt{}
 	}
-	t.width, t.height = width, height
 }
 
-func (t *Table) Text() []text.LocalizedStyledString {
-	texts := make([]text.LocalizedStyledString, 0, len(t.rows))
+func (t *HierarchicalTable) StyledStrings() []StyledString {
+	ss := make([]StyledString, 0)
 
 	if t.height > 0 {
-		headers := make(map[string]text.StyledString)
-		for _, header := range t.source.Headers() {
-			headers[header] = text.NewStyledString(header)
-		}
-
-		s := t.stringFromColumns(headers, true)
-		s.Add(text.TableHeader)
-		texts = append(texts, text.LocalizedStyledString{
-			X: 0,
-			Y: 0,
-			S: s,
-		})
+		s := t.styledString(t.headers(), "", true)
+		s.Apply(t.conf.Header)
+		ss = append(ss, s)
 	}
 
-	for i := 0; i < t.NbrRows() && t.topLine+i < len(t.rows); i++ {
-		row := t.rows[t.topLine+i]
-		s := text.LocalizedStyledString{
-			X: 0,
-			Y: i + 1,
-			S: t.stringFromColumns(row.Tabular(t.location), false),
+	if t.pageIndex.Valid && t.cursorIndex.Valid {
+		for i, row := range t.rows[t.pageIndex.Int:utils.MinInt(t.pageIndex.Int+t.PageSize(), len(t.rows))] {
+			s := t.styledString(row.values, row.prefix, false)
+			if t.cursorIndex.Int == i+t.pageIndex.Int {
+				s.Apply(t.conf.Cursor)
+			}
+			ss = append(ss, s)
 		}
-
-		if t.topLine+i == t.activeLine {
-			s.S.Add(text.ActiveRow)
-		}
-
-		texts = append(texts, s)
 	}
 
-	return texts
+	for len(ss) < t.height {
+		ss = append(ss, StyledString{})
+	}
+
+	return ss
 }
 
-func (t Table) ActiveRowURL() utils.NullString {
-	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
-		return t.rows[t.activeLine].URL()
+func (t *HierarchicalTable) ActiveNodePath() []interface{} {
+	if !t.cursorIndex.Valid {
+		return nil
 	}
-	return utils.NullString{}
+
+	path := t.rows[t.cursorIndex.Int].path
+	slicedPath := make([]interface{}, 0)
+	for _, id := range path.ids[:path.len] {
+		slicedPath = append(slicedPath, id)
+	}
+
+	return slicedPath
 }
 
-func (t *Table) ActiveRowLog(ctx context.Context) (string, error) {
-	if t.activeLine >= 0 && t.activeLine < len(t.rows) {
-		key := t.rows[t.activeLine].Key()
-		return t.source.Log(ctx, key)
-	}
-
-	return "", cache.ErrNoLogHere
+func (t *HierarchicalTable) SortBy(id ColumnID, ascending bool) {
+	t.order.Valid = true
+	t.order.ID = id
+	t.order.Ascending = ascending
+	t.Replace(t.outterNodes)
 }

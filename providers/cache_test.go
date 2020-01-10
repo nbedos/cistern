@@ -1,4 +1,4 @@
-package cache
+package providers
 
 import (
 	"context"
@@ -93,7 +93,7 @@ func TestAggregateStatuses(t *testing.T) {
 }
 
 func TestCache_Save(t *testing.T) {
-	t.Run("Saved build must be returned by Pipeline()", func(t *testing.T) {
+	t.Run("Saved build must be returned by pipeline()", func(t *testing.T) {
 		c := NewCache(nil, nil)
 		p := Pipeline{
 			Step: Step{
@@ -160,12 +160,12 @@ func TestCache_Save(t *testing.T) {
 	})
 }
 
-func TestCache_Builds(t *testing.T) {
+func TestCache_Pipeline(t *testing.T) {
 	ids := []string{"1", "2", "3", "4"}
 	c := NewCache(nil, nil)
 	for _, id := range ids {
 		p := Pipeline{
-			providerHost: "host",
+			ProviderHost: "host",
 			Step: Step{
 				ID: id,
 			},
@@ -187,248 +187,7 @@ func TestCache_Builds(t *testing.T) {
 	}
 }
 
-/*
-type mockProvider struct {
-	id     string
-	builds []Build
-}
-
-func (p mockProvider) ID() string { return p.id }
-func (p mockProvider) Log(ctx context.Context, repository Repository, jobID string) (string, error) {
-	return "log\n", nil
-}
-func (p mockProvider) BuildFromURL(ctx context.Context, u string) (Pipeline, error) {
-	return Pipeline{}, nil
-}
-
-func TestCache_WriteLog(t *testing.T) {
-	t.Run("log not saved in cache must be retrieved from provider", func(t *testing.T) {
-		c := NewCache([]CIProvider{
-			mockProvider{
-				id: "provider1",
-			},
-			mockProvider{
-				id: "provider2",
-			},
-		}, nil)
-
-		pipelines := []Pipeline{
-			{
-				Repository: &Repository{
-					Provider: Provider{
-						ID: "provider1",
-					},
-				},
-				Step: Step{
-					ID: "1",
-					Children: []Step{
-						{
-							ID:    "1",
-							State: Passed,
-							Log: utils.NullString{
-								Valid: false,
-							},
-						},
-					},
-				},
-			},
-			{
-				Repository: &Repository{
-					Provider: Provider{
-						ID: "provider1",
-					},
-				},
-				Step: Step{
-					ID: "2",
-				},
-			},
-			{
-				Repository: &Repository{
-					Provider: Provider{
-						ID: "provider1",
-					},
-				},
-				Step: Step{
-					ID: "3",
-				},
-			},
-			{
-				Repository: &Repository{
-					Provider: Provider{
-						ID: "provider1",
-					},
-				},
-				Step: Step{
-					ID: "4",
-				},
-			},
-		}
-
-		for _, p := range pipelines {
-			if err := c.SavePipeline("", p); err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		buf := bytes.Buffer{}
-		key := PipelineKey{
-			providerHost: "provider1",
-			ID:         "1",
-		}
-		if err := c.ActiveRowLog(context.Background(), key, []string{"0", "1"}, &buf); err != nil {
-			t.Fatal(err)
-		}
-
-		// Value return by provider.Log()
-		expected := "log\n"
-		if buf.String() != expected {
-			t.Fatalf("expected %q but got %q", expected, buf.String())
-		}
-
-	})
-
-	t.Run("log saved in cache must be returned as is", func(t *testing.T) {
-		c := NewCache([]CIProvider{mockProvider{id: "provider1"}}, nil)
-		pipelines := []Pipeline{
-			{
-				Repository: &Repository{
-					Provider: Provider{
-						ID: "provider1",
-					},
-				},
-				Step: Step{
-					ID: "1",
-					Children: []Step{
-						{
-							ID:    "1",
-							State: Passed,
-							Log: utils.NullString{
-								Valid:  true,
-								String: "log1\n",
-							},
-						},
-					},
-				},
-			},
-			{
-				Repository: &Repository{
-					Provider: Provider{
-						ID: "provider1",
-					},
-				},
-				Step: Step{
-					ID: "2",
-				},
-			},
-			{
-				Repository: &Repository{
-					Provider: Provider{
-						ID: "provider1",
-					},
-				},
-				Step: Step{
-					ID: "3",
-				},
-			},
-			{
-				Repository: &Repository{
-					Provider: Provider{
-						ID: "provider1",
-					},
-				},
-				Step: Step{
-					ID: "4",
-				},
-			},
-		}
-
-		for _, p := range pipelines {
-			if err := c.SavePipeline("", p); err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		buf := bytes.Buffer{}
-		if err := c.ActiveRowLog(context.Background(), "provider1", "1", 0, "1", &buf); err != nil {
-			t.Fatal(err)
-		}
-
-		expected := builds[0].Jobs[0].Log.String
-		if buf.String() != expected {
-			t.Fatalf("expected %q but got %q", expected, buf.String())
-		}
-
-	})
-
-	t.Run("requesting log of non existent job must return an error", func(t *testing.T) {
-		c := NewCache([]CIProvider{mockProvider{id: "provider1"}}, nil)
-		build := Build{
-			Repository: &Repository{
-				Provider: Provider{
-					ID: "provider1",
-				},
-			},
-			ID: "1",
-			Jobs: []*Job{
-				{
-					ID:    "1",
-					State: Passed,
-					Log: utils.NullString{
-						Valid:  true,
-						String: "log1\n",
-					},
-				},
-			},
-		}
-		if err := c.SavePipeline("", build); err != nil {
-			t.Fatal(err)
-		}
-
-		testCases := []struct {
-			name      string
-			accountID string
-			buildID   string
-			stageID   int
-			jobID     string
-		}{
-			{
-				name:      "unknown provider",
-				buildID:   "1",
-				accountID: "404",
-				stageID:   0,
-				jobID:     "1",
-			},
-			{
-				name:      "unknown build",
-				accountID: "provider1",
-				buildID:   "2",
-				stageID:   0,
-				jobID:     "1",
-			},
-			{
-				name:      "unknown stage",
-				accountID: "provider1",
-				buildID:   "1",
-				stageID:   1,
-			},
-			{
-				name:      "unknown job",
-				accountID: "provider1",
-				buildID:   "1",
-				jobID:     "404",
-			},
-		}
-
-		for _, testCase := range testCases {
-			err := c.ActiveRowLog(context.Background(), testCase.accountID, testCase.buildID, testCase.stageID, testCase.jobID, nil)
-			if err == nil {
-				t.Fatal("expected error but got nil")
-			}
-		}
-	})
-}*/
-
-func TestCache_BuildsByRef(t *testing.T) {
+func TestCache_Pipelines(t *testing.T) {
 	c := NewCache(nil, nil)
 
 	pipelines := []Pipeline{
@@ -465,23 +224,23 @@ func TestCache_BuildsByRef(t *testing.T) {
 		},
 	}
 	for _, p := range pipelines {
-		if err := c.SavePipeline("", p); err != nil {
+		if err := c.SavePipeline("ref2", p); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	expected := []Pipeline{pipelines[1], pipelines[2]}
-	buildRef2 := c.Pipelines()
+	buildRef2 := c.Pipelines("ref2")
 	sortPipelines(expected)
 	sortPipelines(buildRef2)
 
-	if diff := cmp.Diff(expected, buildRef2, cmp.AllowUnexported(Pipeline{})); len(diff) > 0 {
+	if diff := Pipelines(expected).Diff(buildRef2); len(diff) > 0 {
 		t.Fatal(diff)
 	}
 
 	// Build with ID 1 must have moved from ref1 to ref2
-	if len(c.PipelinesByRef("ref1")) != 0 {
-		t.Fatalf("expected empty list but got %+v", c.PipelinesByRef("ref1"))
+	if len(c.Pipelines("ref1")) != 0 {
+		t.Fatalf("expected empty list but got %+v", c.Pipelines("ref1"))
 	}
 }
 
@@ -517,7 +276,7 @@ func createRepository(t *testing.T, remotes []config.RemoteConfig) (string, stri
 	}
 	sha, err := w.Commit("message", &git.CommitOptions{
 		Author: &object.Signature{
-			Name:  "name",
+			Name:  "nName",
 			Email: "email",
 			When:  time.Date(2019, 19, 12, 21, 49, 0, 0, time.UTC),
 		},
@@ -616,7 +375,7 @@ func TestRemotesAndCommit(t *testing.T) {
 
 		expectedCommit := Commit{
 			Sha:      sha,
-			Author:   "name <email>",
+			Author:   "nName <email>",
 			Date:     time.Date(2019, 19, 12, 21, 49, 0, 0, time.UTC),
 			Message:  "message",
 			Branches: []string{"master"},
@@ -678,7 +437,7 @@ func (p testProvider) Commit(ctx context.Context, repo, sha string) (Commit, err
 
 func TestCache_monitorRefStatus(t *testing.T) {
 	ctx := context.Background()
-	p := testProvider{"provider", "url", 0}
+	p := testProvider{"Provider", "url", 0}
 	commitc := make(chan Commit)
 	errc := make(chan error)
 
@@ -774,4 +533,21 @@ func TestCache_broadcastMonitorRefStatus(t *testing.T) {
 	if diff := cmp.Diff(statuses, expectedStatuses); len(diff) > 0 {
 		t.Fatal(diff)
 	}
+}
+
+func TestConfiguration_TokenFromProcess(t *testing.T) {
+	t.Run("token from environment variables", func(t* testing.T){
+		envVar := "CITOP_TEST_TOKEN_FROM_ENV_VAR"
+		if err := os.Setenv(envVar, "token"); err != nil {
+			t.Fatal(err)
+		}
+
+		token, err := token("", []string{"sh", "-c", "echo $" + envVar})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if token != "token" {
+			t.Fatalf("expected %q but got %q", "token", token)
+		}
+	})
 }

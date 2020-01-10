@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -28,9 +29,6 @@ import (
 )
 
 const usage = `Usage:
-
-    Generate source code:
-        make man.go      # Create man.go file from man.md
 
     Test:
         make test        # Run unit tests
@@ -49,7 +47,7 @@ Note: This script relies on the following local executables: go, git, tar and pa
 // Location of the directory where build artifacts are stored
 const buildDirectory = "build"
 
-// Name or path for the go executable
+// nName or path for the go executable
 var goBin = "go"
 
 // List of OS + architecture targets for releases
@@ -75,6 +73,7 @@ func version(env []string) (string, error) {
 func gitDescribe() (string, error) {
 	cmd := exec.Command("git", "describe", "--tags", "--dirty")
 	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
 	bs, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -105,6 +104,26 @@ package main
 const manualPage = ` + "`%s`" + `
 `
 
+func copyFile(src, dst string) error {
+	inFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer inFile.Close()
+
+	outFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(outFile, inFile); err != nil {
+		outFile.Close()
+		return err
+	}
+
+	return outFile.Close()
+}
+
 func man(dir string, version string) error {
 	bs, err := ioutil.ReadFile("man.md")
 	if err != nil {
@@ -114,7 +133,7 @@ func man(dir string, version string) error {
 	markdown := strings.Replace(string(bs), "\\<version\\>", version, 1)
 
 	output := path.Join(dir, "cistern.man.html")
-	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", output))
+	fmt.Fprintf(os.Stderr, "Building %s...\n", output)
 	mdToHTML := exec.Command("pandoc", "-s", "-t", "html5", "--template", "pandoc_template.html", "-o", output)
 	mdToHTML.Stdin = bytes.NewBufferString(markdown)
 	mdToHTML.Stderr = os.Stderr
@@ -123,7 +142,7 @@ func man(dir string, version string) error {
 	}
 
 	output = path.Join(dir, "cistern.man.1")
-	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", output))
+	fmt.Fprintf(os.Stderr, "Building %s...\n", output)
 	mdToRoff := exec.Command("pandoc", "-s", "-t", "man", "-o", output)
 	mdToRoff.Stdin = bytes.NewBufferString(markdown)
 	mdToRoff.Stderr = os.Stderr
@@ -138,7 +157,7 @@ const licenseHeader = `Below is the license of cistern and of every package it u
 
 func license(dir string) error {
 	output := path.Join(dir, "LICENSE")
-	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", output))
+	fmt.Fprintf(os.Stderr, "Building %s...\n", output)
 	b := strings.Builder{}
 	b.WriteString(licenseHeader)
 	bs, err := ioutil.ReadFile("LICENSE")
@@ -219,15 +238,23 @@ func build(workdir string, env []string, versionnedDir bool) (string, error) {
 		return "", err
 	}
 
+	src := path.Join("cmd", "cistern", "cistern.toml")
+	dst := path.Join(dir, "cistern.toml")
+	fmt.Fprintf(os.Stderr, "Building %s...\n", dst)
+	if err := copyFile(src, dst); err != nil {
+		return "", err
+	}
+
 	return dir, nil
 }
 
 func compress(workdir string, dir string) (string, error) {
 	archivePath := dir + ".tar.gz"
-	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", path.Join(workdir, archivePath)))
+	fmt.Fprintf(os.Stderr, "Building %s...\n", path.Join(workdir, archivePath))
 	absoluteArchivePath := path.Join(workdir, archivePath)
 	cmd := exec.Command("tar", "-C", workdir, "-czf", absoluteArchivePath, dir)
 	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
 	return absoluteArchivePath, cmd.Run()
 }
 
@@ -261,12 +288,21 @@ func releases(dir string, env []string, OSesByArch map[string][]string) error {
 
 	// Match sort order of files on the GitHub release page
 	sort.Strings(archives)
-	return releaseNotes(dir, archives)
+	if err := releaseNotes(dir, archives); err != nil {
+		return err
+	}
+
+	// Build manual page, sample configuration file
+	if _, err := build(dir, os.Environ(), false); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func releaseNotes(dir string, archives []string) error {
 	notes := path.Join(dir, "notes.md")
-	fmt.Fprint(os.Stderr, fmt.Sprintf("Building %s...\n", notes))
+	fmt.Fprintf(os.Stderr, "Building %s...\n", notes)
 
 	changelog, err := ioutil.ReadFile("CHANGELOG.md")
 	if err != nil {
@@ -296,39 +332,6 @@ func releaseNotes(dir string, archives []string) error {
 	return ioutil.WriteFile(notes, []byte(content.String()), os.ModePerm)
 }
 
-func manGo() error {
-	bs, err := ioutil.ReadFile("man.md")
-	if err != nil {
-		return err
-	}
-
-	// Remove the version number since this causes a chicken and egg problem
-	// with the version number depending on the content of man.go which
-	// itself contains the version number which...
-	// Ideally man.go would be a temporary build artifact but this has the
-	// downside of requiring everyone to install pandoc to be able to compile
-	// cistern.
-	markdown := strings.Replace(string(bs), "version \\<version\\>", "", 1)
-
-	stdout := &bytes.Buffer{}
-	// FIXME Move this out of here and parametrize the path
-	fmt.Fprint(os.Stderr, "Building cmd/cistern/man.go...\n")
-	mdToGo := exec.Command("pandoc", "-s", "-t", "man")
-	mdToGo.Stdin = bytes.NewBufferString(markdown)
-	mdToGo.Stdout = stdout
-	mdToGo.Stderr = os.Stderr
-	if err := mdToGo.Run(); err != nil {
-		return err
-	}
-
-	manGo := fmt.Sprintf(manGoTemplate, strings.Replace(stdout.String(), "`", "\"` + \"`\" + `\"", -1))
-	if err := ioutil.WriteFile("cmd/cistern/man.go", []byte(manGo), os.ModePerm); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func main() {
 	env := []string{"GO111MODULE=on", "CGO_ENABLED=0"}
 
@@ -345,8 +348,6 @@ func main() {
 		_, err = build(buildDirectory, env, false)
 	case "release", "releases":
 		err = releases(buildDirectory, env, OSesByArch)
-	case "man.go":
-		err = manGo()
 	case "clean":
 		err = os.RemoveAll(buildDirectory)
 	case "test", "tests":
@@ -356,7 +357,7 @@ func main() {
 		cmd.Env = append(os.Environ(), env...)
 		err = cmd.Run()
 	default:
-		fmt.Fprint(os.Stderr, fmt.Sprintf("unknow command: %q\n", os.Args[1]))
+		fmt.Fprintf(os.Stderr, "unknow command: %q\n", os.Args[1])
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(1)
 	}

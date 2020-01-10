@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/google/go-github/v28/github"
-	"github.com/nbedos/cistern/cache"
 	"github.com/nbedos/cistern/utils"
 	"golang.org/x/oauth2"
 )
@@ -43,7 +42,7 @@ func (c GitHubClient) parseRepositoryURL(url string) (string, string, error) {
 	host, slug, err := utils.RepositoryHostAndSlug(url)
 	expectedHost := strings.TrimPrefix(c.client.BaseURL.Hostname(), "api.")
 	if err != nil || !strings.Contains(host, expectedHost) {
-		return "", "", cache.ErrUnknownRepositoryURL
+		return "", "", ErrUnknownRepositoryURL
 	}
 
 	components := strings.FieldsFunc(slug, func(c rune) bool { return c == '/' })
@@ -56,10 +55,10 @@ func (c GitHubClient) parseRepositoryURL(url string) (string, string, error) {
 	return owner, repo, nil
 }
 
-func (c GitHubClient) Commit(ctx context.Context, repo string, ref string) (cache.Commit, error) {
+func (c GitHubClient) Commit(ctx context.Context, repo string, ref string) (Commit, error) {
 	owner, repo, err := c.parseRepositoryURL(repo)
 	if err != nil {
-		return cache.Commit{}, cache.ErrUnknownRepositoryURL
+		return Commit{}, ErrUnknownRepositoryURL
 	}
 
 	owner = url.PathEscape(owner)
@@ -71,16 +70,16 @@ func (c GitHubClient) Commit(ctx context.Context, repo string, ref string) (cach
 		if e, ok := err.(*github.ErrorResponse); ok {
 			switch e.Response.StatusCode {
 			case 404:
-				err = cache.ErrUnknownRepositoryURL
+				err = ErrUnknownRepositoryURL
 			case 422:
-				err = cache.ErrUnknownGitReference
+				err = ErrUnknownGitReference
 			}
 		}
-		return cache.Commit{}, err
+		return Commit{}, err
 	}
 
 	githubCommit := repoCommit.Commit
-	commit := cache.Commit{
+	commit := Commit{
 		Sha:     repoCommit.GetSHA(),
 		Author:  fmt.Sprintf("%s <%s>", githubCommit.GetAuthor().GetName(), githubCommit.GetAuthor().GetEmail()),
 		Date:    githubCommit.GetAuthor().GetDate(),
@@ -89,7 +88,7 @@ func (c GitHubClient) Commit(ctx context.Context, repo string, ref string) (cach
 
 	branches, _, err := c.client.Repositories.ListBranchesHeadCommit(ctx, owner, repo, commit.Sha)
 	if err != nil {
-		return cache.Commit{}, err
+		return Commit{}, err
 	}
 	for _, branch := range branches {
 		commit.Branches = append(commit.Branches, branch.GetName())
@@ -99,7 +98,7 @@ func (c GitHubClient) Commit(ctx context.Context, repo string, ref string) (cach
 	for {
 		tags, resp, err := c.client.Repositories.ListTags(ctx, owner, repo, &opt)
 		if err != nil {
-			return cache.Commit{}, err
+			return Commit{}, err
 		}
 
 		for _, tag := range tags {
@@ -191,7 +190,7 @@ func (c GitHubClient) RefStatuses(ctx context.Context, u string, ref string, sha
 			case *github.ErrorResponse:
 				switch errResp.Response.StatusCode {
 				case 404:
-					e = cache.ErrUnknownRepositoryURL
+					e = ErrUnknownRepositoryURL
 				case 422:
 					// Do not fail if the remote has no knowledge of a commit associated to the
 					// specified SHA, simply return an empty url list
