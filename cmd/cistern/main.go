@@ -99,7 +99,7 @@ func Main(w io.Writer) error {
 	switch err {
 	case nil:
 		for _, g := range config.Providers.GitLab {
-			if g.Token == "" {
+			if g.Token == "" && len(g.TokenFromProcess) == 0 {
 				_, err := fmt.Fprintln(w, "warning: cistern will not be able to access pipeline jobs on GitLab without an API access token")
 				if err != nil {
 					return err
