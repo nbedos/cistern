@@ -49,6 +49,14 @@ func (t *TUI) init() error {
 	return nil
 }
 
+func (t TUI) Clear() {
+	t.screen.Clear()
+}
+
+func (t TUI) Show() {
+	t.screen.Show()
+}
+
 func (t TUI) Finish() {
 	t.screen.Fini()
 }
@@ -72,14 +80,6 @@ func (t TUI) poll() {
 	}
 }
 
-func (t TUI) Draw(ss ...StyledString) {
-	t.screen.Clear()
-	for y, s := range ss {
-		s.Draw(t.screen, y, t.defaultStyle)
-	}
-	t.screen.Show()
-}
-
 func (t *TUI) Exec(ctx context.Context, name string, args []string, stdin io.Reader) error {
 	var err error
 	t.Finish()
@@ -96,6 +96,17 @@ func (t *TUI) Exec(ctx context.Context, name string, args []string, stdin io.Rea
 
 	err = cmd.Run()
 	return err
+}
+
+func (t *TUI) Window(x, y, width, height int) Window {
+	return &subScreen{
+		style:  t.defaultStyle,
+		screen: t.screen,
+		x:      x,
+		y:      y,
+		width:  width,
+		height: height,
+	}
 }
 
 type StyleTransform func(s tcell.Style) tcell.Style
@@ -179,5 +190,3 @@ func (s StyleTransformDefinition) Parse() (StyleTransform, error) {
 		return style
 	}, nil
 }
-
-

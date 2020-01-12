@@ -478,18 +478,6 @@ func TestCache_broadcastMonitorRefStatus(t *testing.T) {
 		&testProvider{"other", "other", 0},
 	})
 
-	repositoryPath, sha := createRepository(t, []config.RemoteConfig{
-		{
-			Name: "origin",
-			URLs: []string{"origin1", "origin2"},
-		},
-		{
-			Name: "other",
-			URLs: []string{"other1"},
-		},
-	})
-	defer os.RemoveAll(repositoryPath)
-
 	commitc := make(chan Commit)
 	errc := make(chan error)
 	b := backoff.ExponentialBackOff{
@@ -502,7 +490,7 @@ func TestCache_broadcastMonitorRefStatus(t *testing.T) {
 	}
 
 	go func() {
-		err := c.broadcastMonitorRefStatus(ctx, repositoryPath, sha, commitc, b)
+		err := c.broadcastMonitorRefStatus(ctx, []string{"origin1", "origin2", "other1"}, "sha", commitc, b)
 		close(commitc)
 		errc <- err
 		close(errc)
@@ -534,4 +522,3 @@ func TestCache_broadcastMonitorRefStatus(t *testing.T) {
 		t.Fatal(diff)
 	}
 }
-

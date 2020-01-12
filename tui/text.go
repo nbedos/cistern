@@ -4,25 +4,7 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/gdamore/tcell"
 	"github.com/mattn/go-runewidth"
-)
-
-type Class int
-
-const (
-	DefaultClass Class = iota
-	TableHeader
-	ActiveRow
-	GitSha
-	GitTag
-	GitBranch
-	GitHead
-	StatusPassed
-	StatusRunning
-	StatusFailed
-	StatusSkipped
-	Provider
 )
 
 type elementaryString struct {
@@ -128,16 +110,15 @@ func (s *StyledString) Fit(alignment Alignment, width int) {
 	}
 
 	if paddingWidth := width - s.Length(); paddingWidth > 0 {
-		if len(s.components) > 0 {
-			padding := strings.Repeat(" ", paddingWidth)
-			switch alignment {
-			case Left:
-				c := &s.components[len(s.components)-1].Content
-				*c = *c + padding
-			case Right:
-				c := &s.components[0].Content
-				*c = padding + *c
-			}
+		padding := elementaryString{
+			Content: strings.Repeat(" ", paddingWidth),
+		}
+		switch alignment {
+		case Left:
+			s.components = append(s.components, padding)
+		case Right:
+			s.components = append([]elementaryString{padding}, s.components...)
+
 		}
 	}
 }
@@ -162,21 +143,6 @@ func NewStyledString(content string, ts ...StyleTransform) StyledString {
 		s.Apply(t)
 	}
 	return s
-}
-
-func (s StyledString) Draw(screen tcell.Screen, y int, style tcell.Style) {
-	x := 0
-	for _, component := range s.components {
-		s := style
-		if component.Transform != nil {
-			s = component.Transform(s)
-		}
-
-		for _, r := range component.Content {
-			screen.SetContent(x, y, r, nil, s)
-			x += runewidth.RuneWidth(r)
-		}
-	}
 }
 
 type Alignment int

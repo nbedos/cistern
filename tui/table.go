@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/gdamore/tcell"
 	"github.com/google/go-cmp/cmp"
 	"github.com/mattn/go-runewidth"
 	"github.com/nbedos/cistern/utils"
@@ -219,7 +220,7 @@ type TableConfiguration struct {
 }
 
 type HierarchicalTable struct {
-	outterNodes []TableNode
+	outerNodes []TableNode
 	// List of the top-level innerNodes
 	innerNodes []innerTableNode
 	// Depth first traversal of all the top-level innerNodes. Needs updating if `innerNodes` or `traversable` changes
@@ -251,18 +252,10 @@ func NewHierarchicalTable(conf TableConfiguration, nodes []TableNode, width int,
 
 	table.Replace(nodes)
 	if conf.Order.Valid {
-		table.SortBy(conf.ID, conf.Order.Ascending)
+		table.sortBy(conf.ID, conf.Order.Ascending)
 	}
 
 	return table, nil
-}
-
-func (t HierarchicalTable) Configuration() TableConfiguration {
-	return t.conf
-}
-
-func (t HierarchicalTable) Order() Order {
-	return t.order
 }
 
 func (t HierarchicalTable) depthFirstTraversal(traverseAll bool) []*innerTableNode {
@@ -275,7 +268,7 @@ func (t HierarchicalTable) depthFirstTraversal(traverseAll bool) []*innerTableNo
 }
 
 // Number of rows visible on screen
-func (t HierarchicalTable) PageSize() int {
+func (t HierarchicalTable) pageSize() int {
 	return utils.MaxInt(0, t.height-1)
 }
 
@@ -326,7 +319,7 @@ func (t *HierarchicalTable) computeTraversal() {
 	if len(t.rows) > 0 {
 		// If no matching row was found or if all rows fit on screen, move the top page to the
 		// first row
-		if !t.pageIndex.Valid || len(t.rows) <= t.PageSize() {
+		if !t.pageIndex.Valid || len(t.rows) <= t.pageSize() {
 			t.pageIndex = nullInt{
 				Valid: true,
 				Int:   0,
@@ -339,12 +332,12 @@ func (t *HierarchicalTable) computeTraversal() {
 		}
 
 		// Show as many rows as possible on screen
-		if t.cursorIndex.Int-t.pageIndex.Int+1 < t.PageSize() {
-			t.pageIndex.Int = utils.MaxInt(0, t.cursorIndex.Int-t.PageSize()+1)
+		if t.cursorIndex.Int-t.pageIndex.Int+1 < t.pageSize() {
+			t.pageIndex.Int = utils.MaxInt(0, t.cursorIndex.Int-t.pageSize()+1)
 		}
 
 		// Adjust pageIndex so that the cursor is always on screen
-		lowerBound := utils.Bounded(t.cursorIndex.Int-t.PageSize()+1, 0, len(t.rows)-1)
+		lowerBound := utils.Bounded(t.cursorIndex.Int-t.pageSize()+1, 0, len(t.rows)-1)
 		t.pageIndex.Int = utils.Bounded(t.pageIndex.Int, lowerBound, t.cursorIndex.Int)
 	}
 
@@ -386,8 +379,8 @@ func (t *HierarchicalTable) sortSlice(nodes []TableNode) {
 
 func (t *HierarchicalTable) Replace(nodes []TableNode) {
 	// Defensive copy to preserve the initial sort order
-	t.outterNodes = make([]TableNode, len(nodes))
-	copy(t.outterNodes, nodes)
+	t.outerNodes = make([]TableNode, len(nodes))
+	copy(t.outerNodes, nodes)
 
 	// Save traversable state
 	traversable := make(map[nodePath]bool, 0)
@@ -407,7 +400,7 @@ func (t *HierarchicalTable) Replace(nodes []TableNode) {
 	t.computeTraversal()
 }
 
-func (t *HierarchicalTable) SetTraversable(traversable bool, recursive bool) {
+func (t *HierarchicalTable) setTraversable(traversable bool, recursive bool) {
 	if t.cursorIndex.Valid {
 		if n := t.lookup(t.rows[t.cursorIndex.Int].path); n != nil {
 			if recursive {
@@ -422,11 +415,11 @@ func (t *HierarchicalTable) SetTraversable(traversable bool, recursive bool) {
 	}
 }
 
-func (t *HierarchicalTable) HorizontalScroll(amount int) {
+func (t *HierarchicalTable) horizontalScroll(amount int) {
 	t.columnOffset = utils.Bounded(t.columnOffset+amount, 0, len(t.conf.Columns.IDs())-1)
 }
 
-func (t *HierarchicalTable) VerticalScroll(amount int) {
+func (t *HierarchicalTable) verticalScroll(amount int) {
 	if !t.cursorIndex.Valid || !t.pageIndex.Valid {
 		return
 	}
@@ -438,22 +431,14 @@ func (t *HierarchicalTable) VerticalScroll(amount int) {
 
 	switch {
 	case t.cursorIndex.Int < t.pageIndex.Int:
-		// VerticalScroll up
+		// verticalScroll up
 		t.pageIndex.Int = t.cursorIndex.Int
-	case t.cursorIndex.Int > t.pageIndex.Int+t.PageSize()-1:
-		// VerticalScroll down
-		scrollAmount := t.cursorIndex.Int - (t.pageIndex.Int + t.PageSize() - 1)
+	case t.cursorIndex.Int > t.pageIndex.Int+t.pageSize()-1:
+		// verticalScroll down
+		scrollAmount := t.cursorIndex.Int - (t.pageIndex.Int + t.pageSize() - 1)
 		t.pageIndex.Int = utils.Bounded(t.pageIndex.Int+scrollAmount, 0, len(t.rows)-1)
-		t.cursorIndex.Int = t.pageIndex.Int + t.PageSize() - 1
+		t.cursorIndex.Int = t.pageIndex.Int + t.pageSize() - 1
 	}
-}
-
-func (t *HierarchicalTable) Top() {
-	t.VerticalScroll(-len(t.rows))
-}
-
-func (t *HierarchicalTable) Bottom() {
-	t.VerticalScroll(len(t.rows))
 }
 
 func (t *HierarchicalTable) ScrollToNextMatch(s string, ascending bool) bool {
@@ -473,7 +458,7 @@ func (t *HierarchicalTable) ScrollToNextMatch(s string, ascending bool) bool {
 	for i := start; i != t.cursorIndex.Int; i = next(i) {
 		for id := range t.conf.Columns {
 			if t.rows[i].values[id].Contains(s) {
-				t.VerticalScroll(i - t.cursorIndex.Int)
+				t.verticalScroll(i - t.cursorIndex.Int)
 				return true
 			}
 		}
@@ -532,9 +517,9 @@ func (t *HierarchicalTable) Resize(width int, height int) {
 	t.width = utils.MaxInt(0, width)
 	t.height = utils.MaxInt(0, height)
 
-	if t.PageSize() > 0 {
+	if t.pageSize() > 0 {
 		if t.cursorIndex.Valid && t.pageIndex.Valid {
-			upperBound := utils.Bounded(t.pageIndex.Int+t.PageSize()-1, 0, len(t.rows)-1)
+			upperBound := utils.Bounded(t.pageIndex.Int+t.pageSize()-1, 0, len(t.rows)-1)
 			t.cursorIndex.Int = utils.Bounded(t.cursorIndex.Int, t.pageIndex.Int, upperBound)
 		} else if len(t.rows) > 0 {
 			t.pageIndex = nullInt{
@@ -549,30 +534,22 @@ func (t *HierarchicalTable) Resize(width int, height int) {
 	}
 }
 
-func (t *HierarchicalTable) StyledStrings() []StyledString {
-	ss := make([]StyledString, 0)
-
+func (t HierarchicalTable) Draw(w Window) {
 	if t.height > 0 {
 		s := t.styledString(t.headers(), "", true)
 		s.Apply(t.conf.Header)
-		ss = append(ss, s)
+		w.Draw(0, 0, s)
 	}
 
 	if t.pageIndex.Valid && t.cursorIndex.Valid {
-		for i, row := range t.rows[t.pageIndex.Int:utils.MinInt(t.pageIndex.Int+t.PageSize(), len(t.rows))] {
+		for i, row := range t.rows[t.pageIndex.Int:utils.MinInt(t.pageIndex.Int+t.pageSize(), len(t.rows))] {
 			s := t.styledString(row.values, row.prefix, false)
 			if t.cursorIndex.Int == i+t.pageIndex.Int {
 				s.Apply(t.conf.Cursor)
 			}
-			ss = append(ss, s)
+			w.Draw(0, i+1, s)
 		}
 	}
-
-	for len(ss) < t.height {
-		ss = append(ss, StyledString{})
-	}
-
-	return ss
 }
 
 func (t *HierarchicalTable) ActiveNodePath() []interface{} {
@@ -589,9 +566,82 @@ func (t *HierarchicalTable) ActiveNodePath() []interface{} {
 	return slicedPath
 }
 
-func (t *HierarchicalTable) SortBy(id ColumnID, ascending bool) {
+func (t *HierarchicalTable) sortBy(id ColumnID, ascending bool) {
 	t.order.Valid = true
 	t.order.ID = id
 	t.order.Ascending = ascending
-	t.Replace(t.outterNodes)
+	t.Replace(t.outerNodes)
+}
+
+func (t *HierarchicalTable) sortByNextColumn(reverse bool) {
+	if order := t.order; order.Valid {
+		ids := t.conf.Columns.IDs()
+		for i, id := range ids {
+			if id == order.ID {
+				j := i + 1
+				if reverse {
+					j = i - 1
+				}
+				nextID := ids[utils.Modulo(j, len(ids))]
+				t.sortBy(nextID, order.Ascending)
+				return
+			}
+		}
+	}
+}
+
+func (t *HierarchicalTable) reverseSortOrder() {
+	if order := t.order; order.Valid {
+		t.sortBy(order.ID, !order.Ascending)
+	}
+}
+
+func (t *HierarchicalTable) Process(ev *tcell.EventKey) {
+	switch ev.Key() {
+	case tcell.KeyDown, tcell.KeyCtrlN:
+		t.verticalScroll(+1)
+	case tcell.KeyUp, tcell.KeyCtrlP:
+		t.verticalScroll(-1)
+	case tcell.KeyLeft:
+		t.horizontalScroll(-1)
+	case tcell.KeyRight:
+		t.horizontalScroll(+1)
+	case tcell.KeyCtrlD:
+		t.verticalScroll(t.pageSize() / 2)
+	case tcell.KeyPgDn, tcell.KeyCtrlF:
+		t.verticalScroll(t.pageSize())
+	case tcell.KeyCtrlU:
+		t.verticalScroll(-t.pageSize() / 2)
+	case tcell.KeyPgUp, tcell.KeyCtrlB:
+		t.verticalScroll(-t.pageSize())
+	case tcell.KeyHome:
+		t.verticalScroll(-len(t.rows))
+	case tcell.KeyEnd:
+		t.verticalScroll(len(t.rows))
+	case tcell.KeyRune:
+		switch keyRune := ev.Rune(); keyRune {
+		case 'j':
+			t.verticalScroll(+1)
+		case 'k':
+			t.verticalScroll(-1)
+		case 'h':
+			t.horizontalScroll(-1)
+		case 'l':
+			t.horizontalScroll(+1)
+		case 'c':
+			t.setTraversable(false, false)
+		case 'C', '-':
+			t.setTraversable(false, true)
+		case 'o':
+			t.setTraversable(true, false)
+		case 'O', '+':
+			t.setTraversable(true, true)
+		case '>':
+			t.sortByNextColumn(false)
+		case '<':
+			t.sortByNextColumn(true)
+		case '!':
+			t.reverseSortOrder()
+		}
+	}
 }

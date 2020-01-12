@@ -226,7 +226,10 @@ func (c AzurePipelinesClient) fetchPipeline(ctx context.Context, owner string, r
 	if err := c.getJSON(ctx, u, &builds); err != nil {
 		return Pipeline{}, err
 	}
-	if len(builds.Value) != 1 {
+
+	if len(builds.Value) == 0 {
+		return Pipeline{}, ErrUnknownPipelineURL
+	} else if len(builds.Value) > 1 {
 		return Pipeline{}, errors.New("expected a single build in response")
 	}
 

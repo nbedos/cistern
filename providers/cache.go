@@ -18,6 +18,7 @@ import (
 	"github.com/nbedos/cistern/utils"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
 )
 
 var ErrUnknownRepositoryURL = errors.New("unknown repository url")
@@ -165,6 +166,11 @@ type Provider struct {
 	Name string
 }
 
+type Ref struct {
+	Name string
+	Commit
+}
+
 type Commit struct {
 	Sha      string
 	Author   string
@@ -225,6 +231,67 @@ func (c Commit) StyledStrings(conf GitStyle) []tui.StyledString {
 	}
 
 	return texts
+}
+
+func References(path string, conf GitStyle) (tui.Suggestions, error) {
+	r, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{DetectDotGit: true})
+	if err != nil {
+		return nil, err
+	}
+
+	references := make([]tui.Suggestion, 0)
+
+	commIter, err := r.CommitObjects()
+	if err != nil {
+		return nil, err
+	}
+	if err := commIter.ForEach(func(c *object.Commit) error {
+		references = append(references, tui.Suggestion{
+			Value:        c.Hash.String(),
+			DisplayValue: tui.NewStyledString(c.Hash.String(), conf.SHA),
+			DisplayInfo:  tui.NewStyledString(strings.SplitN(c.Message, "\n", 2)[0]),
+		})
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	refIter, err := r.References()
+	if err != nil {
+		return nil, err
+	}
+	if err := refIter.ForEach(func(ref *plumbing.Reference) error {
+		suggestion := tui.Suggestion{
+			Value: ref.Name().Short(),
+		}
+
+		switch {
+		case ref.Name().IsTag():
+			suggestion.DisplayValue = tui.NewStyledString(suggestion.Value, conf.Tag)
+		case ref.Name().IsBranch(), ref.Name().IsRemote():
+			suggestion.DisplayValue = tui.NewStyledString(suggestion.Value, conf.Branch)
+		case suggestion.Value == "HEAD":
+			suggestion.DisplayValue = tui.NewStyledString(suggestion.Value, conf.Head)
+		default:
+			suggestion.DisplayValue = tui.NewStyledString(suggestion.Value)
+		}
+
+		c, err := r.CommitObject(ref.Hash())
+		if err == plumbing.ErrObjectNotFound {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		suggestion.DisplayInfo = tui.NewStyledString(strings.SplitN(c.Message, "\n", 2)[0])
+
+		references = append(references, suggestion)
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return references, nil
 }
 
 func RemotesAndCommit(path string, ref string) ([]string, Commit, error) {
@@ -1064,23 +1131,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 // Ask all providers to monitor the statuses of 'ref'. The url of each status is written on the
 // channel urlc once. If no Provider is able to handle the specified url, ErrUnknownRepositoryURL
 // is returned.
-func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref string, commitc chan<- Commit, b backoff.ExponentialBackOff) error {
-	repositoryURLs, commit, err := RemotesAndCommit(repo, ref)
-	switch err {
-	case nil:
-		select {
-		case commitc <- commit:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-		ref = commit.Sha
-	case ErrUnknownRepositoryURL:
-		// The path does not refer to a local repository so it probably is a url
-		repositoryURLs = []string{repo}
-	default:
-		return err
-	}
-
+func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repositoryURLs []string, ref string, commitc chan<- Commit, b backoff.ExponentialBackOff) error {
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
@@ -1110,6 +1161,7 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref 
 	}{}
 
 	var canceled = false
+	var err error
 	for e := range errc {
 		if !canceled {
 			// ErrUnknownRepositoryURL and ErrUnknownGitReference are returned if
@@ -1150,7 +1202,7 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repo string, ref 
 // updated with new data, a message is sent on the 'updates' channel.
 // This function may return ErrUnknownRepositoryURL if none of the source providers is
 // able to handle 'repositoryURL'.
-func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURL string, ref string, updates chan<- time.Time) error {
+func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURLs []string, ref Ref, updates chan<- time.Time) error {
 	commitc := make(chan Commit)
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
@@ -1169,9 +1221,21 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURL string, ref 
 	go func() {
 		defer wg.Done()
 		defer close(commitc)
+
+		refOrSha := ref.Name
+		if ref.Commit.Sha != "" {
+			select {
+			case commitc <- ref.Commit:
+				// Do nothing
+			case <-ctx.Done():
+				errc <- ctx.Err()
+				return
+			}
+			refOrSha = ref.Commit.Sha
+		}
 		// This gives us a stream of commits with a 'Statuses' attribute that may contain
 		// URLs refering to CI pipelines
-		errc <- c.broadcastMonitorRefStatus(ctx, repositoryURL, ref, commitc, b)
+		errc <- c.broadcastMonitorRefStatus(ctx, repositoryURLs, refOrSha, commitc, b)
 	}()
 
 	wg.Add(1)
@@ -1180,7 +1244,7 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURL string, ref 
 		urls := make(map[string]struct{})
 		// Ask for monitoring of each url
 		for commit := range commitc {
-			c.SaveCommit(ref, commit)
+			c.SaveCommit(ref.Name, commit)
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -1196,7 +1260,7 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURL string, ref 
 					wg.Add(1)
 					go func(u string) {
 						defer wg.Done()
-						err := c.broadcastMonitorPipeline(ctx, u, ref, updates)
+						err := c.broadcastMonitorPipeline(ctx, u, ref.Name, updates)
 						// Ignore ErrUnknownPipelineURL. This error means that we don't integrate
 						// with the application that created that particular url. No need to report
 						// this up the chain, though it's nice to know our request couldn't be handled.

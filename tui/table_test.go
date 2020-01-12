@@ -79,7 +79,7 @@ func TestHierarchicalTable_VerticalScroll(t *testing.T) {
 
 		for _, amount := range []int{0, -9, 100, -999, +9999} {
 			// Must not crash
-			table.VerticalScroll(amount)
+			table.verticalScroll(amount)
 
 			if table.pageIndex.Valid || table.cursorIndex.Valid {
 				t.Fatal("table.pageIndex and table.cursorIndex must both have .Valid=false")
@@ -186,7 +186,7 @@ func TestHierarchicalTable_VerticalScroll(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, amount := range testCase.scrollAmounts {
-				table.VerticalScroll(amount)
+				table.verticalScroll(amount)
 			}
 
 			if diff := testCase.pageIndex.Diff(table.pageIndex); diff != "" {
@@ -237,7 +237,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		}
 
 		// Open the first node, one child becomes visible
-		table.SetTraversable(true, false)
+		table.setTraversable(true, false)
 		expectedPaths = []nodePath{
 			nodePathFromIDs(1),
 			nodePathFromIDs(1, 2),
@@ -311,7 +311,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 			testNode{id: 2},
 		})
 
-		table.VerticalScroll(1)
+		table.verticalScroll(1)
 
 		table.Replace([]TableNode{
 			testNode{id: 0},
@@ -339,7 +339,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 			testNode{id: 5},
 		})
 
-		table.VerticalScroll(1)
+		table.verticalScroll(1)
 
 		table.Replace([]TableNode{
 			testNode{id: 1},
@@ -377,7 +377,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 			testNode{id: 5},
 		})
 
-		table.VerticalScroll(1)
+		table.verticalScroll(1)
 
 		table.Replace([]TableNode{
 			testNode{id: 2},
@@ -418,7 +418,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 			testNode{id: 5},
 		})
 
-		table.VerticalScroll(1)
+		table.verticalScroll(1)
 
 		table.Replace([]TableNode{
 			testNode{id: 1},
@@ -485,7 +485,7 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.SetTraversable(true, false)
+		table.setTraversable(true, false)
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
 			nodePathFromIDs(1, 2),
@@ -503,7 +503,7 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.SetTraversable(true, true)
+		table.setTraversable(true, true)
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
 			nodePathFromIDs(1, 2),
@@ -522,8 +522,8 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.SetTraversable(true, true)
-		table.SetTraversable(false, true)
+		table.setTraversable(true, true)
+		table.setTraversable(false, true)
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
 			nodePathFromIDs(4),
@@ -540,9 +540,9 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.SetTraversable(true, true)
-		table.VerticalScroll(1)
-		table.SetTraversable(false, true)
+		table.setTraversable(true, true)
+		table.verticalScroll(1)
+		table.setTraversable(false, true)
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
 			nodePathFromIDs(1, 2),
@@ -560,9 +560,9 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.SetTraversable(true, true)
-		table.VerticalScroll(2)
-		table.SetTraversable(false, true)
+		table.setTraversable(true, true)
+		table.verticalScroll(2)
+		table.setTraversable(false, true)
 
 		expectedCursorIndex := nullInt{
 			Valid: true,
@@ -631,7 +631,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		table.SetTraversable(true, true)
+		table.setTraversable(true, true)
 		if table.ScrollToNextMatch("2", true) != true {
 			t.Fatal("expected match to be found")
 		}
@@ -666,8 +666,8 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		table.SetTraversable(true, true)
-		table.VerticalScroll(1)
+		table.setTraversable(true, true)
+		table.verticalScroll(1)
 		if table.ScrollToNextMatch("1", true) != true {
 			t.Fatal("expected match to be found")
 		}
@@ -739,8 +739,8 @@ func TestHierarchicalTable_Resize(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.SetTraversable(true, true)
-		table.VerticalScroll(2)
+		table.setTraversable(true, true)
+		table.verticalScroll(2)
 		table.Resize(table.width, 0)
 		table.Resize(table.width, 4)
 
@@ -854,7 +854,7 @@ func TestHierarchicalTable_styledString(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		table.HorizontalScroll(1)
+		table.horizontalScroll(1)
 		s := table.styledString(values, "", false).String()
 		if diff := cmp.Diff("column2  column3  column4", s); diff != "" {
 			t.Fatal(diff)
@@ -867,7 +867,7 @@ func TestHierarchicalTable_styledString(t *testing.T) {
 			t.Fatal(err)
 		}
 		s := table.styledString(values, "", false).String()
-		if diff := cmp.Diff("", s); diff != "" {
+		if diff := cmp.Diff("                            ", s); diff != "" {
 			t.Fatal(diff)
 		}
 	})
@@ -965,7 +965,7 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.SortBy(column1, true)
+		table.sortBy(column1, true)
 
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
@@ -986,7 +986,7 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.SortBy(column1, false)
+		table.sortBy(column1, false)
 
 		header := table.headers()[column1].String()
 		expectedHeader := "column1-"
@@ -1022,7 +1022,7 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.SortBy(column1, true)
+		table.sortBy(column1, true)
 
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
@@ -1069,7 +1069,7 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.SortBy(column1, true)
+		table.sortBy(column1, true)
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
 			nodePathFromIDs(2),
@@ -1083,7 +1083,7 @@ func TestHierarchicalTable_SortBy(t *testing.T) {
 			t.Fatal(diff)
 		}
 
-		table.SortBy(column1, false)
+		table.sortBy(column1, false)
 		expectedPaths = []nodePath{
 			nodePathFromIDs(3),
 			nodePathFromIDs(2),

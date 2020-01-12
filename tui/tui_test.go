@@ -36,9 +36,8 @@ func TestTUI_Draw(t *testing.T) {
 	tui.screen.(tcell.SimulationScreen).SetSize(width, height)
 	s := NewStyledString("a")
 
-	tui.Draw(s, s, s)
-
 	for i := 0; i < 3; i++ {
+		tui.Window(0, i, width, height).Draw(0, 0, s)
 		r, _, _, _ := tui.screen.(tcell.SimulationScreen).GetContent(0, i)
 		if expectedRune := []rune(s.String())[0]; r != expectedRune {
 			t.Fatalf("invalid cell Content: expected %v but got '%v'", expectedRune, r)

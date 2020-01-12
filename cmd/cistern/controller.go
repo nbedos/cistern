@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,13 +26,16 @@ type focus int
 const (
 	table focus = iota
 	search
+	ref
 	help
 )
 
-var keyBindings = []struct {
+type keyBinding struct {
 	keys   []string
 	action string
-}{
+}
+
+var tableKeyBindings = []keyBinding{
 	{
 		keys:   []string{"Up", "k", "Ctrl-p"},
 		action: "Move cursor up by one line",
@@ -53,7 +57,7 @@ var keyBindings = []struct {
 		action: "Move cursor up by half a page",
 	},
 	{
-		keys:   []string{"Page Up"},
+		keys:   []string{"Page Up", "Ctrl-B"},
 		action: "Move cursor up by one page",
 	},
 	{
@@ -61,7 +65,7 @@ var keyBindings = []struct {
 		action: "Move cursor down by half a page",
 	},
 	{
-		keys:   []string{"Page Down"},
+		keys:   []string{"Page Down", "Ctrl-F"},
 		action: "Move cursor down by one page",
 	},
 	{
@@ -101,6 +105,14 @@ var keyBindings = []struct {
 		action: "Close the fold at the cursor and all sub-folds",
 	},
 	{
+		keys:   []string{"b"},
+		action: "Open associated web page in $BROWSER",
+	},
+	{
+		keys:   []string{"v"},
+		action: "View the log of the job at the cursor",
+	},
+	{
 		keys:   []string{"/"},
 		action: "Open search prompt",
 	},
@@ -117,43 +129,292 @@ var keyBindings = []struct {
 		action: "Move to the previous match",
 	},
 	{
-		keys:   []string{"v"},
-		action: "View the log of the job at the cursor",
+		keys:   []string{"g"},
+		action: "Open git reference selection prompt",
 	},
 	{
-		keys:   []string{"b"},
-		action: "Open associated web page in $BROWSER",
+		keys:   []string{"?"},
+		action: "Show help screen",
 	},
 	{
 		keys:   []string{"q"},
 		action: "Quit",
 	},
+}
+
+var shortTableKeyBindings = []keyBinding{
+	{
+		keys:   []string{"j"},
+		action: "Down",
+	},
+	{
+		keys:   []string{"k"},
+		action: "Up",
+	},
+	{
+		keys:   []string{"oO"},
+		action: "Open",
+	},
+	{
+		keys:   []string{"cC"},
+		action: "Close",
+	},
+	{
+		keys:   []string{"/"},
+		action: "Search",
+	},
+	{
+		keys:   []string{"v"},
+		action: "Logs",
+	},
+	{
+		keys:   []string{"b"},
+		action: "Browser",
+	},
 	{
 		keys:   []string{"?"},
-		action: "Show this window",
+		action: "Help",
+	},
+	{
+		keys:   []string{"q"},
+		action: "Quit",
+	},
+}
+
+var searchKeyBindings = []keyBinding{
+	{
+		keys:   []string{"Enter"},
+		action: "Search",
+	},
+	{
+		keys:   []string{"Backspace"},
+		action: "Delete last character",
+	},
+	{
+		keys:   []string{"Ctrl-U"},
+		action: "Delete whole line",
+	},
+	{
+		keys:   []string{"Escape"},
+		action: "Close prompt",
+	},
+}
+
+var shortSearchKeyBindings = []keyBinding{
+	{
+		keys:   []string{"Enter"},
+		action: "Search",
+	},
+	{
+		keys:   []string{"Backspace"},
+		action: "Delete character",
+	},
+	{
+		keys:   []string{"Ctrl-U"},
+		action: "Delete line",
+	},
+	{
+		keys:   []string{"Escape"},
+		action: "Abort",
+	},
+}
+
+var refKeyBindings = []keyBinding{
+	{
+		keys:   []string{"Enter"},
+		action: "Validate",
+	},
+	{
+		keys:   []string{"Backspace"},
+		action: "Delete last character",
+	},
+	{
+		keys:   []string{"Ctrl-U"},
+		action: "Delete whole line",
+	},
+	{
+		keys:   []string{"Tab", "Shift-Tab"},
+		action: "Complete",
+	},
+	{
+		keys:   []string{"Up", "Ctrl-P"},
+		action: "Move the cursor to the previous suggestion",
+	},
+	{
+		keys:   []string{"Down", "Ctrl-N"},
+		action: "Move the cursor to the next suggestion",
+	},
+	{
+		keys:   []string{"Page up", "Ctrl-B"},
+		action: "Move the cursor up by one page",
+	},
+	{
+		keys:   []string{"Page down", "Ctrl-F"},
+		action: "Move the cursor down by one page",
+	},
+	{
+		keys:   []string{"Escape"},
+		action: "Close prompt",
+	},
+}
+
+var shortRefKeyBindings = []keyBinding{
+	{
+		keys:   []string{"Enter"},
+		action: "Validate",
+	},
+	{
+		keys:   []string{"Tab", "Shift-Tab"},
+		action: "Complete",
+	},
+	{
+		keys:   []string{"Up"},
+		action: "Up",
+	},
+	{
+		keys:   []string{"Down"},
+		action: "Down",
+	},
+	{
+		keys:   []string{"Escape"},
+		action: "Abort",
+	},
+}
+
+var shortHelpKeyBindings = []keyBinding{
+	{
+		keys:   []string{"j"},
+		action: "Up",
+	},
+	{
+		keys:   []string{"k"},
+		action: "Down",
+	},
+	{
+		keys:   []string{"Ctrl-B"},
+		action: "Page up",
+	},
+	{
+		keys:   []string{"Ctrl-F"},
+		action: "Page down",
+	},
+	{
+		keys:   []string{"q"},
+		action: "Quit",
+	},
+}
+
+var helpKeyBindings = []keyBinding{
+	{
+		keys:   []string{"j", "Down", "Ctrl-N"},
+		action: "Scroll down by one line",
+	},
+	{
+		keys:   []string{"k", "Up", "Ctrl-P"},
+		action: "Scroll up by one line",
+	},
+	{
+		keys:   []string{"Page up", "Ctrl-B"},
+		action: "Scroll up by one page",
+	},
+	{
+		keys:   []string{"Page down", "Ctrl-F"},
+		action: "Scroll down by one page",
+	},
+	{
+		keys:   []string{"Ctrl-U"},
+		action: "Scroll up by half a page",
+	},
+	{
+		keys:   []string{"Ctrl-D"},
+		action: "Scroll down by half a page",
+	},
+	{
+		keys:   []string{"q"},
+		action: "Exit help screen",
 	},
 }
 
 func helpScreen(emphasis tui.StyleTransform) []tui.StyledString {
-	ss := make([]tui.StyledString, 0)
-
-	ss = append(ss, tui.NewStyledString("Help for interactive commands", emphasis))
-	ss = append(ss, tui.StyledString{})
-	for _, b := range keyBindings {
-		keys := make([]tui.StyledString, 0)
-		for _, k := range b.keys {
-			keys = append(keys, tui.NewStyledString(k, emphasis))
+	draw := func(bindings []keyBinding) []tui.StyledString {
+		lines := make([]tui.StyledString, 0)
+		for _, b := range bindings {
+			keys := make([]tui.StyledString, 0)
+			for _, k := range b.keys {
+				keys = append(keys, tui.NewStyledString(k, emphasis))
+			}
+			line := tui.NewStyledString("   ")
+			line.AppendString(tui.Join(keys, tui.NewStyledString(", ")))
+			line.Fit(tui.Left, 25)
+			line.Append(b.action)
+			lines = append(lines, line)
 		}
-		line := tui.NewStyledString("   ")
-		line.AppendString(tui.Join(keys, tui.NewStyledString(", ")))
-		line.Fit(tui.Left, 20)
-		line.Append(b.action)
-		ss = append(ss, line)
+		return lines
 	}
+
+	ss := []tui.StyledString{
+		tui.NewStyledString("HELP FOR INTERACTIVE COMMANDS", emphasis),
+		{},
+		{},
+	}
+
+	ss = append(ss, tui.NewStyledString("Tabular view:", emphasis))
 	ss = append(ss, tui.StyledString{})
-	ss = append(ss, tui.NewStyledString("Press 'q' to exit help screen"))
+	ss = append(ss, draw(tableKeyBindings)...)
+	ss = append(ss, tui.StyledString{}, tui.StyledString{})
+
+	ss = append(ss, tui.NewStyledString("Search prompt:", emphasis))
+	ss = append(ss, tui.StyledString{})
+	ss = append(ss, draw(searchKeyBindings)...)
+	ss = append(ss, tui.StyledString{}, tui.StyledString{})
+
+	ss = append(ss, tui.NewStyledString("Git reference selection prompt:", emphasis))
+	ss = append(ss, tui.StyledString{})
+	ss = append(ss, draw(refKeyBindings)...)
+	ss = append(ss, tui.StyledString{}, tui.StyledString{})
+
+	ss = append(ss, tui.NewStyledString("Help screen", emphasis))
+	ss = append(ss, tui.StyledString{})
+	ss = append(ss, draw(helpKeyBindings)...)
+	ss = append(ss, tui.StyledString{}, tui.StyledString{})
 
 	return ss
+}
+
+func (c *Controller) shortKeyBindings() tui.StyledString {
+	var bindings []keyBinding
+	switch c.focus {
+	case table:
+		bindings = shortTableKeyBindings
+	case search:
+		bindings = shortSearchKeyBindings
+	case ref:
+		bindings = shortRefKeyBindings
+	case help:
+		bindings = shortHelpKeyBindings
+	}
+
+	s := tui.StyledString{}
+	for i, b := range bindings {
+		if i > 0 {
+			s.Append("  ")
+		}
+		s.Append(strings.Join(b.keys, "/") + ":")
+		s.Append(b.action)
+	}
+	s.Fit(tui.Left, c.width)
+	s.Apply(func(s tcell.Style) tcell.Style {
+		return s.Reverse(true)
+	})
+
+	return s
+}
+
+type WindowDimensions struct {
+	x      int
+	y      int
+	width  int
+	height int
 }
 
 type ControllerConfiguration struct {
@@ -162,24 +423,27 @@ type ControllerConfiguration struct {
 }
 
 type Controller struct {
-	tui           *tui.TUI
-	cache         providers.Cache
-	ref           string
-	width         int
-	height        int
-	header        *tui.TextArea
-	table         *tui.HierarchicalTable
-	tableSearch   string
-	status        *tui.StatusBar
-	focus         focus
-	defaultStatus string
-	help          *tui.TextArea
-	style         providers.GitStyle
+	tui         *tui.TUI
+	cache       providers.Cache
+	ref         string
+	width       int
+	height      int
+	header      *tui.TextArea
+	table       *tui.HierarchicalTable
+	tableSearch string
+	status      *tui.TextArea
+	refcmd      *tui.Command
+	searchcmd   *tui.Command
+	keyhints    *tui.TextArea
+	focus       focus
+	help        *tui.TextArea
+	layout      map[tui.Widget]WindowDimensions
+	style       providers.GitStyle
 }
 
 var ErrExit = errors.New("exit")
 
-func NewController(ui *tui.TUI, conf ControllerConfiguration, ref string, c providers.Cache, defaultStatus string) (Controller, error) {
+func NewController(ui *tui.TUI, conf ControllerConfiguration, ref string, c providers.Cache) (Controller, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := ui.Size()
 	header, err := tui.NewTextArea(width, height)
@@ -192,31 +456,41 @@ func NewController(ui *tui.TUI, conf ControllerConfiguration, ref string, c prov
 		return Controller{}, err
 	}
 
-	status, err := tui.NewStatusBar(width, height)
+	status, err := tui.NewTextArea(width, height)
 	if err != nil {
 		return Controller{}, err
 	}
-	status.Write(defaultStatus)
+
+	keyhints, err := tui.NewTextArea(width, height)
+	if err != nil {
+		return Controller{}, err
+	}
+
+	search := tui.NewCommand(width, height, "Search: ")
+	command := tui.NewCommand(width, height, "Ref: ")
 
 	help, err := tui.NewTextArea(width, height)
 	if err != nil {
 		return Controller{}, err
 	}
 	bold := func(s tcell.Style) tcell.Style { return s.Bold(true) }
-	help.Write(helpScreen(bold)...)
+	help.WriteContent(helpScreen(bold)...)
 
 	return Controller{
-		tui:           ui,
-		ref:           ref,
-		cache:         c,
-		width:         width,
-		height:        height,
-		header:        &header,
-		table:         &table,
-		status:        &status,
-		defaultStatus: defaultStatus,
-		help:          &help,
-		style:         conf.GitStyle,
+		tui:       ui,
+		ref:       ref,
+		cache:     c,
+		width:     width,
+		height:    height,
+		header:    &header,
+		table:     &table,
+		status:    &status,
+		searchcmd: &search,
+		refcmd:    &command,
+		keyhints:  &keyhints,
+		help:      &help,
+		style:     conf.GitStyle,
+		layout:    make(map[tui.Widget]WindowDimensions),
 	}, nil
 }
 
@@ -229,6 +503,16 @@ func (c *Controller) setRef(ref string) {
 	c.ref = ref
 }
 
+func (c *Controller) focusWidget(f focus) {
+	c.focus = f
+	switch f {
+	case table:
+	case ref:
+	case search:
+	case help:
+	}
+}
+
 func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -236,6 +520,7 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 	refc := make(chan string)
 	updates := make(chan time.Time)
 
+	c.writeStatus("")
 	c.refresh()
 	c.draw()
 
@@ -262,8 +547,30 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 			mux.Unlock()
 			refCancel()
 			refCtx, refCancel = context.WithCancel(ctx)
-			go func(ctx context.Context, ref string) {
-				errc <- c.cache.MonitorPipelines(ctx, repositoryURL, ref, updates)
+			go func(ctx context.Context, refName string) {
+				var err error
+				var repositoryURLs []string
+				ref := providers.Ref{
+					Name: refName,
+				}
+				repositoryURLs, ref.Commit, err = providers.RemotesAndCommit(repositoryURL, ref.Name)
+				switch err {
+				case providers.ErrUnknownRepositoryURL:
+					// The path does not refer to a local repository so it probably is a url
+					repositoryURLs = []string{repositoryURL}
+				case nil:
+					suggestions, err := providers.References(repositoryURL, c.style)
+					if err != nil {
+						errc <- err
+						return
+					}
+					c.refcmd.SetCompletions(suggestions)
+				default:
+					errc <- err
+					return
+				}
+
+				errc <- c.cache.MonitorPipelines(ctx, repositoryURLs, ref, updates)
 			}(refCtx, ref)
 
 		case <-updates:
@@ -280,7 +587,7 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 			case context.Canceled:
 				// Do nothing
 			case providers.ErrUnknownGitReference:
-				c.status.Write(fmt.Sprintf("error: git reference was not found on remote server(s)"))
+				c.writeStatus("error: git reference was not found on remote server(s)")
 				c.draw()
 			default:
 				err = e
@@ -301,20 +608,21 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 }
 
 func (c *Controller) SetHeader(lines []tui.StyledString) {
-	c.header.Write(lines...)
+	c.header.WriteContent(lines...)
 }
 
 func (c *Controller) writeStatus(s string) {
-	c.status.Write(s)
-}
-
-func (c *Controller) writeDefaultStatus() {
-	c.writeStatus(c.defaultStatus)
+	msg := tui.NewStyledString(s)
+	msg.Fit(tui.Left, c.width)
+	//msg.Apply(func(s tcell.Style) tcell.Style {
+	//	return s.Reverse(true)
+	//})
+	c.status.WriteContent(msg)
 }
 
 func (c *Controller) refresh() {
 	commit, _ := c.cache.Commit(c.ref)
-	c.header.Write(commit.StyledStrings(c.style)...)
+	c.header.WriteContent(commit.StyledStrings(c.style)...)
 	pipelines := make([]tui.TableNode, 0)
 	for _, pipeline := range c.cache.Pipelines(c.ref) {
 		pipelines = append(pipelines, pipeline)
@@ -323,66 +631,70 @@ func (c *Controller) refresh() {
 	c.resize(c.width, c.height)
 }
 
-func (c Controller) text() []tui.StyledString {
-	ss := make([]tui.StyledString, 0)
-	if c.focus == help {
-		ss = c.help.StyledStrings()
-	} else {
-		for _, child := range []tui.Widget{c.header, c.table, c.status} {
-			for _, s := range child.StyledStrings() {
-				ss = append(ss, s)
-			}
-		}
-	}
-
-	return ss
-}
-
-func (c *Controller) nextMatch() {
+func (c *Controller) nextMatch(ascending bool) {
 	if c.tableSearch != "" {
-		found := c.table.ScrollToNextMatch(c.tableSearch, true)
+		found := c.table.ScrollToNextMatch(c.tableSearch, ascending)
 		if !found {
 			c.writeStatus(fmt.Sprintf("No match found for %#v", c.tableSearch))
 		}
 	}
 }
 
-func (c *Controller) ReverseSortOrder() {
-	if order := c.table.Order(); order.Valid {
-		c.table.SortBy(order.ID, !order.Ascending)
-	}
-}
-
-func (c *Controller) SortByNextColumn(reverse bool) {
-	if order := c.table.Order(); order.Valid {
-		ids := c.table.Configuration().Columns.IDs()
-		for i, id := range ids {
-			if id == order.ID {
-				j := i + 1
-				if reverse {
-					j = i - 1
-				}
-				nextID := ids[utils.Modulo(j, len(ids))]
-				c.table.SortBy(nextID, order.Ascending)
-				return
-			}
-		}
-	}
-}
-
 func (c *Controller) resize(width int, height int) {
-	width = utils.MaxInt(width, 0)
-	height = utils.MaxInt(height, 0)
-	c.help.Resize(width, height)
+	c.width = utils.MaxInt(width, 0)
+	c.height = utils.MaxInt(height, 0)
 
-	headerHeight := utils.MinInt(utils.MinInt(len(c.header.Content)+2, 9), height)
-	tableHeight := utils.MaxInt(0, height-headerHeight-1)
-	statusHeight := height - headerHeight - tableHeight
+	c.layout[c.help] = WindowDimensions{
+		width:  c.width,
+		height: utils.MaxInt(0, c.height-1),
+	}
 
-	c.header.Resize(width, headerHeight)
-	c.table.Resize(width, tableHeight)
-	c.status.Resize(width, statusHeight)
-	c.width, c.height = width, height
+	c.layout[c.header] = WindowDimensions{
+		width:  c.width,
+		height: utils.MinInt(utils.MinInt(len(c.header.Content)+2, 9), c.height),
+	}
+	y := c.layout[c.header].height
+
+	c.layout[c.table] = WindowDimensions{
+		y:      y,
+		width:  c.width,
+		height: utils.MaxInt(0, c.height-c.layout[c.header].height-2),
+	}
+	y += c.layout[c.table].height
+
+	c.layout[c.status] = WindowDimensions{
+		y:      y,
+		width:  c.width,
+		height: 1,
+	}
+
+	c.layout[c.searchcmd] = WindowDimensions{
+		y:      y,
+		width:  c.width,
+		height: 1,
+	}
+
+	c.layout[c.refcmd] = WindowDimensions{
+		y:      y - utils.MinInt(14, y) + 1,
+		width:  c.width,
+		height: utils.MinInt(14, y),
+	}
+	y += 1
+
+	c.layout[c.keyhints] = WindowDimensions{
+		y:      y,
+		width:  c.width,
+		height: 1,
+	}
+
+	for w, dim := range c.layout {
+		w.Resize(dim.width, dim.height)
+	}
+
+	if len(c.status.Content) > 0 {
+		// Call writeStatus since the result depends on the c.width
+		c.writeStatus(c.status.Content[0].String())
+	}
 }
 
 // Turn `aaa\rbbb\rccc\r\n` into `ccc\r\n`
@@ -396,7 +708,6 @@ func (c *Controller) viewLog(ctx context.Context) error {
 	c.writeStatus("Fetching logs...")
 	c.draw()
 	defer func() {
-		c.writeDefaultStatus()
 		c.draw()
 	}()
 	key, ids, exists := c.activeStepPath()
@@ -466,11 +777,37 @@ func (c Controller) openActiveRowInBrowser() error {
 }
 
 func (c *Controller) draw() {
-	c.tui.Draw(c.text()...)
+	c.tui.Clear()
+	widgets := make([]tui.Widget, 0)
+	if c.focus == help {
+		widgets = append(widgets, c.help)
+	} else {
+		widgets = append(widgets, c.header, c.table)
+		switch c.focus {
+		case ref:
+			widgets = append(widgets, c.refcmd)
+		case search:
+			widgets = append(widgets, c.searchcmd)
+		default:
+			widgets = append(widgets, c.status)
+		}
+	}
+	widgets = append(widgets, c.keyhints)
+
+	c.keyhints.WriteContent(c.shortKeyBindings())
+
+	for _, widget := range widgets {
+		dim := c.layout[widget]
+		window := c.tui.Window(dim.x, dim.y, dim.width, dim.height)
+		widget.Draw(window)
+	}
+
+	c.tui.Show()
 }
 
 func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<- string) error {
-	c.writeDefaultStatus()
+	c.writeStatus("")
+
 	switch ev := event.(type) {
 	case *tcell.EventResize:
 		sx, sy := ev.Size()
@@ -478,109 +815,61 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 	case *tcell.EventKey:
 		switch c.focus {
 		case help:
-			switch ev.Key() {
-			case tcell.KeyDown, tcell.KeyCtrlN:
-				c.help.VerticalScroll(+1)
-			case tcell.KeyUp, tcell.KeyCtrlP:
-				c.help.VerticalScroll(-1)
-			case tcell.KeyCtrlD:
-				c.help.VerticalScroll(c.height / 2)
-			case tcell.KeyPgDn:
-				c.help.VerticalScroll(c.height)
-			case tcell.KeyCtrlU:
-				c.help.VerticalScroll(-c.height / 2)
-			case tcell.KeyPgUp:
-				c.help.VerticalScroll(-c.height)
-			case tcell.KeyRune:
-				switch ev.Rune() {
-				case 'q':
+			if ev.Key() == tcell.KeyRune && ev.Rune() == 'q' {
+				c.focus = table
+			} else {
+				c.help.Process(ev)
+			}
+		case ref:
+			if ev.Key() == tcell.KeyEnter {
+				if ref := c.refcmd.Input(); ref != "" {
+					go func() {
+						select {
+						case refc <- ref:
+							// Do nothing
+						case <-ctx.Done():
+							return
+						}
+					}()
+				}
+				c.focus = table
+			} else {
+				c.refcmd.Process(ev)
+				if ev.Key() == tcell.KeyEsc {
 					c.focus = table
-				case 'k':
-					c.help.VerticalScroll(-1)
-				case 'j':
-					c.help.VerticalScroll(+1)
 				}
 			}
+
 		case search:
-			switch ev.Key() {
-			case tcell.KeyEnter:
-				c.tableSearch = c.status.InputBuffer
-				c.nextMatch()
+			if ev.Key() == tcell.KeyEnter {
+				c.tableSearch = c.searchcmd.Input()
+				c.nextMatch(true)
 				c.focus = table
-				c.status.ShowInput = false
-			case tcell.KeyEsc:
-				c.focus = table
-				c.status.ShowInput = false
-			case tcell.KeyCtrlU:
-				c.status.InputBuffer = ""
-			case tcell.KeyBackspace, tcell.KeyBackspace2:
-				runes := []rune(c.status.InputBuffer)
-				if len(runes) > 0 {
-					c.status.InputBuffer = string(runes[:len(runes)-1])
+			} else {
+				c.searchcmd.Process(ev)
+				if ev.Key() == tcell.KeyEsc {
+					c.focus = table
 				}
-			case tcell.KeyRune:
-				c.status.InputBuffer += string(ev.Rune())
 			}
 
 		case table:
-			switch ev.Key() {
-			case tcell.KeyDown, tcell.KeyCtrlN:
-				c.table.VerticalScroll(+1)
-			case tcell.KeyUp, tcell.KeyCtrlP:
-				c.table.VerticalScroll(-1)
-			case tcell.KeyLeft:
-				c.table.HorizontalScroll(-1)
-			case tcell.KeyRight:
-				c.table.HorizontalScroll(+1)
-			case tcell.KeyCtrlD:
-				c.table.VerticalScroll(c.table.PageSize() / 2)
-			case tcell.KeyPgDn:
-				c.table.VerticalScroll(c.table.PageSize())
-			case tcell.KeyCtrlU:
-				c.table.VerticalScroll(-c.table.PageSize() / 2)
-			case tcell.KeyPgUp:
-				c.table.VerticalScroll(-c.table.PageSize())
-			case tcell.KeyHome:
-				c.table.Top()
-			case tcell.KeyEnd:
-				c.table.Bottom()
-			case tcell.KeyEnter:
-				c.nextMatch()
-			case tcell.KeyRune:
+			if ev.Key() == tcell.KeyRune {
 				switch keyRune := ev.Rune(); keyRune {
 				case 'b':
 					if err := c.openActiveRowInBrowser(); err != nil {
 						return err
 					}
-				case 'j':
-					c.table.VerticalScroll(+1)
-				case 'k':
-					c.table.VerticalScroll(-1)
-				case 'h':
-					c.table.HorizontalScroll(-1)
-				case 'l':
-					c.table.HorizontalScroll(+1)
-				case 'c':
-					c.table.SetTraversable(false, false)
-				case 'C', '-':
-					c.table.SetTraversable(false, true)
-				case 'o':
-					c.table.SetTraversable(true, false)
-				case 'O', '+':
-					c.table.SetTraversable(true, true)
+				case 'g':
+					c.focus = ref
+					c.refcmd.Focus()
 				case 'n', 'N':
-					if c.status.InputBuffer != "" {
-						_ = c.table.ScrollToNextMatch(c.status.InputBuffer, ev.Rune() == 'n')
-					}
+					c.nextMatch(ev.Rune() == 'n')
 				case 'q':
 					return ErrExit
 				case '/':
 					c.focus = search
-					c.status.ShowInput = true
-					c.status.InputPrefix = "/"
-					c.status.InputBuffer = ""
+					c.searchcmd.Focus()
 				case 'u':
-					// TODO Fix controller.setRef to preserve traversable state
 					go func() {
 						select {
 						case refc <- c.ref:
@@ -594,13 +883,13 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 					if err := c.viewLog(ctx); err != nil {
 						return err
 					}
-				case '>':
-					c.SortByNextColumn(false)
-				case '<':
-					c.SortByNextColumn(true)
-				case '!':
-					c.ReverseSortOrder()
+				default:
+					c.table.Process(ev)
 				}
+			} else if ev.Key() == tcell.KeyEnter {
+				c.nextMatch(true)
+			} else {
+				c.table.Process(ev)
 			}
 		}
 	}
@@ -608,8 +897,6 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 	c.draw()
 	return nil
 }
-
-const defaultStatus = "j:Down  k:Up  oO:Open  cC:Close  /:Search  v:Logs  b:Browser  ?:Help  q:Quit"
 
 func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, ref string, conf Configuration) error {
 	// FIXME Discard log until the status bar is implemented in order to hide the "Unsolicited response received on
@@ -652,7 +939,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		GitStyle:           tableConfig.NodeStyle.(providers.StepStyle).GitStyle,
 	}
 
-	controller, err := NewController(&ui, controllerConf, ref, cacheDB, defaultStatus)
+	controller, err := NewController(&ui, controllerConf, ref, cacheDB)
 	if err != nil {
 		return err
 	}
