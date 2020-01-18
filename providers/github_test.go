@@ -12,22 +12,22 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v29/github"
 )
 
 func setupGitHubTestServer() (*http.Client, string, func()) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filename := ""
 		switch r.URL.Path {
-		case "/repos/nbedos/termtosvg/commits/d58600a58bf1738c6529ce3489a546bfa2178e07/check-runs":
+		case "/api/v3/repos/nbedos/termtosvg/commits/d58600a58bf1738c6529ce3489a546bfa2178e07/check-runs":
 			filename = "github_check_runs.json"
-		case "/repos/nbedos/termtosvg/commits/d58600a58bf1738c6529ce3489a546bfa2178e07/statuses":
+		case "/api/v3/repos/nbedos/termtosvg/commits/d58600a58bf1738c6529ce3489a546bfa2178e07/statuses":
 			filename = "github_statuses.json"
-		case "/repos/nbedos/termtosvg/commits/d58600a58bf1738c6529ce3489a546bfa2178e07":
+		case "/api/v3/repos/nbedos/termtosvg/commits/d58600a58bf1738c6529ce3489a546bfa2178e07":
 			filename = "github_commit.json"
-		case "/repos/nbedos/termtosvg/commits/d58600a58bf1738c6529ce3489a546bfa2178e07/branches-where-head":
+		case "/api/v3/repos/nbedos/termtosvg/commits/d58600a58bf1738c6529ce3489a546bfa2178e07/branches-where-head":
 			filename = "github_branches.json"
-		case "/repos/nbedos/termtosvg/tags":
+		case "/api/v3/repos/nbedos/termtosvg/tags":
 			filename = "github_tags.json"
 		default:
 			w.WriteHeader(404)
