@@ -132,16 +132,19 @@ func (d NullDuration) String() string {
 		return "-"
 	}
 
-	minutes := d.Duration / time.Minute
-	seconds := (d.Duration - minutes*time.Minute) / time.Second
+	hours := d.Duration / time.Hour
+	minutes := (d.Duration - hours*time.Hour) / time.Minute
+	seconds := (d.Duration - (hours*time.Hour + minutes*time.Minute)) / time.Second
 
-	if minutes == 0 {
-		if seconds == 0 {
-			return "<1s"
-		}
+	if hours != 0 {
+		return fmt.Sprintf("%dh%02dm%02ds", hours, minutes, seconds)
+	} else if minutes != 0 {
+		return fmt.Sprintf("%dm%02ds", minutes, seconds)
+	} else if seconds > 0 || d.Duration == 0 {
 		return fmt.Sprintf("%ds", seconds)
+	} else {
+		return "<1s"
 	}
-	return fmt.Sprintf("%dm%02ds", minutes, seconds)
 }
 
 func NullSub(after NullTime, before NullTime) NullDuration {

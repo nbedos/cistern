@@ -3,8 +3,10 @@ package utils
 import (
 	"fmt"
 	"testing"
-)
+	"time"
 
+	"github.com/google/go-cmp/cmp"
+)
 
 func TestRepositoryHostAndSlug(t *testing.T) {
 	testCases := map[string][]string{
@@ -59,6 +61,52 @@ func TestRepositoryHostAndSlug(t *testing.T) {
 		t.Run(fmt.Sprintf("URL: %v", u), func(t *testing.T) {
 			if _, _, err := RepositoryHostAndSlug(u); err == nil {
 				t.Fatalf("expected error but got nil for URL %q", u)
+			}
+		})
+	}
+}
+
+func TestNullDuration_String(t *testing.T) {
+	testCases := []struct {
+		name string
+		d    time.Duration
+		s    string
+	}{
+		{
+			name: "zero duration",
+			d:    0,
+			s:    "0s",
+		},
+		{
+			name: "less than a second",
+			d:    time.Nanosecond,
+			s:    "<1s",
+		},
+		{
+			name: "less than a minute",
+			d:    time.Second,
+			s:    "1s",
+		},
+		{
+			name: "less than an hour",
+			d:    time.Minute + 2*time.Second,
+			s:    "1m02s",
+		},
+		{
+			name: "more than an hour",
+			d:    time.Hour + 2*time.Minute + 3*time.Second,
+			s:    "1h02m03s",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			d := NullDuration{
+				Valid:    true,
+				Duration: testCase.d,
+			}
+			if diff := cmp.Diff(testCase.s, d.String()); diff != "" {
+				t.Fatal(diff)
 			}
 		})
 	}
