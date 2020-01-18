@@ -241,8 +241,19 @@ func (c AzurePipelinesClient) fetchPipeline(ctx context.Context, owner string, r
 	if len(azureBuild.ValidationResults) > 0 {
 		return pipeline, nil
 	}
+	if !pipeline.WebURL.Valid {
+		return pipeline, fmt.Errorf("missing web URL for pipeline #%s", pipeline.ID)
+	}
 
-	stages, err := c.fetchStages(ctx, azureBuild.Links.Timeline.Href, pipeline.WebURL)
+	webURL, err := url.Parse(pipeline.WebURL.String)
+	if err != nil {
+		return Pipeline{}, err
+	}
+	if webURL == nil {
+		return pipeline, fmt.Errorf("missing web URL for pipeline #%s", pipeline.ID)
+	}
+
+	stages, err := c.fetchStages(ctx, azureBuild.Links.Timeline.Href, *webURL)
 	if err != nil {
 		return Pipeline{}, err
 	}
@@ -276,7 +287,7 @@ func (c AzurePipelinesClient) fetchPipeline(ctx context.Context, owner string, r
 	return pipeline, err
 }
 
-func (c AzurePipelinesClient) fetchStages(ctx context.Context, u string, webURL utils.NullString) ([]Step, error) {
+func (c AzurePipelinesClient) fetchStages(ctx context.Context, u string, webURL url.URL) ([]Step, error) {
 	timelineURL, err := url.Parse(u)
 	if err != nil {
 		return nil, err
@@ -359,7 +370,7 @@ type azureRecord struct {
 	children []*azureRecord
 }
 
-func (r azureRecord) toSteps(webURL utils.NullString) ([]Step, error) {
+func (r azureRecord) toSteps(webURL url.URL) ([]Step, error) {
 	// A phase is a special case since it may or may not have children
 	// A phase without any children is treated as if it were a job
 	// A phase with children is ignored, but its children, which are jobs, are returned
@@ -393,19 +404,37 @@ func (r azureRecord) toSteps(webURL utils.NullString) ([]Step, error) {
 		Log: Log{
 			Key: r.Log.URL,
 		},
-		WebURL:       webURL,
 		AllowFailure: false,
 	}
 
 	switch strings.ToLower(r.Type) {
 	case "stage":
 		step.Type = StepStage
+		query := webURL.Query()
+		query.Add("s", r.ID)
+		query.Add("view", "logs")
+		webURL.RawQuery = query.Encode()
+
 	case "job":
 		step.Type = StepJob
+		query := webURL.Query()
+		query.Del("s")
+		query.Add("j", r.ID)
+		webURL.RawQuery = query.Encode()
+
 	case "task":
 		step.Type = StepTask
+		query := webURL.Query()
+		query.Add("t", r.ID)
+		webURL.RawQuery = query.Encode()
+
 	default:
 		return nil, fmt.Errorf("unknown record type: %q", r.Type)
+	}
+
+	step.WebURL = utils.NullString{
+		Valid:  true,
+		String: webURL.String(),
 	}
 
 	var err error

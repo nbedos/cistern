@@ -122,7 +122,7 @@ var expectedPipeline = Pipeline{
 					Duration: time.Minute + 37*time.Second + 406666700*time.Nanosecond,
 				},
 				WebURL: utils.NullString{
-					String: "http://HOST/owner/repo/_build/results?buildId=16",
+					String: "http://HOST/owner/repo/_build/results?buildId=16&s=8bfbeaae-4c8e-5f12-f154-edd305817000&view=logs",
 					Valid:  true,
 				},
 				Children: []Step{
@@ -145,7 +145,7 @@ var expectedPipeline = Pipeline{
 							Duration: time.Minute + 33*time.Second + 76666700*time.Nanosecond,
 						},
 						WebURL: utils.NullString{
-							String: "http://HOST/owner/repo/_build/results?buildId=16",
+							String: "http://HOST/owner/repo/_build/results?buildId=16&j=a1fe9f00-6aac-5c3d-c3c6-290a6d3ec2ef&view=logs",
 							Valid:  true,
 						},
 					},
@@ -168,7 +168,7 @@ var expectedPipeline = Pipeline{
 							Duration: time.Minute + 27*time.Second + 936666700*time.Nanosecond,
 						},
 						WebURL: utils.NullString{
-							String: "http://HOST/owner/repo/_build/results?buildId=16",
+							String: "http://HOST/owner/repo/_build/results?buildId=16&j=e305bc7f-849a-5981-f9f4-d079b0b7f451&view=logs",
 							Valid:  true,
 						},
 					},
@@ -191,7 +191,7 @@ var expectedPipeline = Pipeline{
 							Duration: 4*time.Second + 810*time.Millisecond,
 						},
 						WebURL: utils.NullString{
-							String: "http://HOST/owner/repo/_build/results?buildId=16",
+							String: "http://HOST/owner/repo/_build/results?buildId=16&j=aa83c9de-d200-5148-7d44-5e08a0dd6659&view=logs",
 							Valid:  true,
 						},
 						Children: []Step{
@@ -214,7 +214,7 @@ var expectedPipeline = Pipeline{
 									Duration: 716*time.Millisecond + 666*time.Microsecond + 700*time.Nanosecond,
 								},
 								WebURL: utils.NullString{
-									String: "http://HOST/owner/repo/_build/results?buildId=16",
+									String: "http://HOST/owner/repo/_build/results?buildId=16&j=aa83c9de-d200-5148-7d44-5e08a0dd6659&t=fd63e659-60cf-51c7-a63d-0111af4550dd&view=logs",
 									Valid:  true,
 								},
 							},
@@ -237,7 +237,7 @@ var expectedPipeline = Pipeline{
 									Duration: 360 * time.Millisecond,
 								},
 								WebURL: utils.NullString{
-									String: "http://HOST/owner/repo/_build/results?buildId=16",
+									String: "http://HOST/owner/repo/_build/results?buildId=16&j=aa83c9de-d200-5148-7d44-5e08a0dd6659&t=bebceb1b-138c-57de-594c-688f96e7a793&view=logs",
 									Valid:  true,
 								},
 							},
@@ -249,9 +249,16 @@ var expectedPipeline = Pipeline{
 	},
 }
 
-func setWebURLs(p Pipeline, webURL utils.NullString) Pipeline {
+func setURLHost(p Pipeline, host string) Pipeline {
 	p.Step = p.Step.Map(func(s Step) Step {
-		s.WebURL = webURL
+		if s.WebURL.Valid {
+			u, err := url.Parse(s.WebURL.String)
+			if err != nil {
+				panic(err.Error())
+			}
+			u.Host = host
+			s.WebURL.String = u.String()
+		}
 		return s
 	})
 
@@ -280,10 +287,7 @@ func TestAzurePipelinesClient_fetchBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedPipeline := setWebURLs(expectedPipeline, utils.NullString{
-		String: "http://" + client.baseURL.Host + "/owner/repo/_build/results?buildId=16",
-		Valid:  true,
-	})
+	expectedPipeline := setURLHost(expectedPipeline, client.baseURL.Host)
 	if diff := expectedPipeline.Diff(pipeline); len(diff) > 0 {
 		t.Fatal(diff)
 	}
@@ -303,10 +307,7 @@ func TestAzurePipelinesClient_BuildFromURL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedPipeline := setWebURLs(expectedPipeline, utils.NullString{
-		String: webURL,
-		Valid:  true,
-	})
+	expectedPipeline := setURLHost(expectedPipeline, client.baseURL.Host)
 	if diff := expectedPipeline.Diff(pipeline); len(diff) > 0 {
 		t.Fatal(diff)
 	}
