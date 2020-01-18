@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -175,22 +173,4 @@ func XDGConfigLocations(filename string) []string {
 	}
 
 	return locations
-}
-
-func StartAndRelease(executable string, args []string) error {
-	if filepath.Base(executable) == executable {
-		lp, err := exec.LookPath(executable)
-		if err != nil {
-			return err
-		}
-		executable = lp
-	}
-
-	argv := append([]string{path.Base(executable)}, args...)
-	process, err := os.StartProcess(executable, argv, &os.ProcAttr{})
-	if err != nil {
-		return err
-	}
-
-	return process.Release()
 }

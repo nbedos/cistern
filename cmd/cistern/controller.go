@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"regexp"
 	"sync"
 	"time"
@@ -457,7 +458,7 @@ func (c Controller) openActiveRowInBrowser() error {
 				return errors.New(fmt.Sprintf("BROWSER environment variable not set. You can instead open %s in your browser.", step.WebURL.String))
 			}
 
-			return utils.StartAndRelease(browser, []string{step.WebURL.String})
+			return exec.Command(browser, step.WebURL.String).Start()
 		}
 	}
 

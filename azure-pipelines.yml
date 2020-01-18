@@ -72,6 +72,16 @@ stages:
         go run ./cmd/make test
        displayName: 'Run unit tests'
 
+   - job: unit_tests_windows
+     displayName: 'Unit tests on Windows'
+     pool:
+       vmImage: 'windows-2019'
+     steps:
+     - script: |
+        go version
+        go run ./cmd/make test
+       displayName: 'Run unit tests'
+
    - job: Docker_image
      displayName: 'Test Docker image'
      pool:
