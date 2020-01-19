@@ -704,6 +704,7 @@ type Configuration struct {
 	GitLab []struct {
 		Name              string   `toml:"name" default:"gitlab"`
 		URL               string   `toml:"url"`
+		SSHHost           string   `toml:"ssh-host"`
 		Token             string   `toml:"token"`
 		TokenFromProcess  []string `toml:"token-from-process"`
 		RequestsPerSecond float64  `toml:"max-requests-per-second"`
@@ -765,7 +766,7 @@ func (c Configuration) ToCache(ctx context.Context) (Cache, error) {
 		if err != nil {
 			return Cache{}, err
 		}
-		client, err := NewGitLabClient(id, conf.Name, conf.URL, token, conf.RequestsPerSecond)
+		client, err := NewGitLabClient(id, conf.Name, conf.URL, token, conf.RequestsPerSecond, conf.SSHHost)
 		if err != nil {
 			return Cache{}, err
 		}

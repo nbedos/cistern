@@ -18,11 +18,12 @@ type GitLabClient struct {
 	provider    Provider
 	remote      *gitlab.Client
 	rateLimiter <-chan time.Time
+	sshHostname string
 }
 
 const gitLabCom = "https://gitlab.com"
 
-func NewGitLabClient(id string, name string, baseURL string, token string, requestsPerSecond float64) (GitLabClient, error) {
+func NewGitLabClient(id string, name string, baseURL string, token string, requestsPerSecond float64, SSHHostname string) (GitLabClient, error) {
 	remote := gitlab.NewClient(nil, token)
 	if baseURL == "" {
 		baseURL = gitLabCom
@@ -44,6 +45,7 @@ func NewGitLabClient(id string, name string, baseURL string, token string, reque
 		},
 		remote:      remote,
 		rateLimiter: time.Tick(rateLimit),
+		sshHostname: SSHHostname,
 	}, nil
 }
 
@@ -222,8 +224,8 @@ func (c GitLabClient) BuildFromURL(ctx context.Context, u string) (Pipeline, err
 }
 
 func (c GitLabClient) parseRepositoryURL(u string) (string, error) {
-	host, slug, err := utils.RepositoryHostAndSlug(u)
-	if err != nil || host != c.remote.BaseURL().Hostname() {
+	hostname, slug, err := utils.RepositoryHostAndSlug(u)
+	if err != nil || (hostname != c.remote.BaseURL().Hostname() && hostname != c.sshHostname) {
 		return "", ErrUnknownRepositoryURL
 	}
 

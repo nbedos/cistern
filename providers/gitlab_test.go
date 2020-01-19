@@ -44,7 +44,7 @@ func TestParsePipelineURL(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		c, err := NewGitLabClient("gitlab", "gitlab", "", "", 1000)
+		c, err := NewGitLabClient("gitlab", "gitlab", "", "", 1000, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,6 +111,7 @@ func setupGitLabTestServer() (GitLabClient, string, func(), error) {
 	client := GitLabClient{
 		remote:      gitlabClient,
 		rateLimiter: time.Tick(time.Millisecond),
+		sshHostname: "ssh.gitlab.com",
 	}
 
 	return client, ts.URL, func() { ts.Close() }, nil
@@ -159,10 +160,10 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 			},
 			Children: []Step{
 				{
-					ID:    "1",
-					Name:  "test",
-					Type:  1,
-					State: "passed",
+					ID:        "1",
+					Name:      "test",
+					Type:      1,
+					State:     "passed",
 					CreatedAt: time.Date(2019, 12, 15, 21, 46, 40, 706000000, time.UTC),
 					StartedAt: utils.NullTime{
 						Valid: true,
@@ -182,10 +183,10 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 					},
 					Children: []Step{
 						{
-							ID:    "379869167",
-							Name:  "golang 1.13",
-							Type:  2,
-							State: "passed",
+							ID:        "379869167",
+							Name:      "golang 1.13",
+							Type:      2,
+							State:     "passed",
 							CreatedAt: time.Date(2019, 12, 15, 21, 46, 40, 706000000, time.UTC),
 							StartedAt: utils.NullTime{
 								Valid: true,
@@ -237,16 +238,11 @@ func TestGitLabClient_Log(t *testing.T) {
 
 func TestGitLabClient_Commit(t *testing.T) {
 	t.Run("existing reference", func(t *testing.T) {
-		client, testURL, teardown, err:= setupGitLabTestServer()
+		client, testURL, teardown, err := setupGitLabTestServer()
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer teardown()
-
-		commit, err := client.Commit(context.Background(), testURL+"/long/namespace/owner/repo", "master")
-		if err != nil {
-			t.Fatal(err)
-		}
 
 		expectedCommit := Commit{
 			Sha:      "a24840cf94b395af69da4a1001d32e3694637e20",
@@ -259,8 +255,17 @@ func TestGitLabClient_Commit(t *testing.T) {
 			Statuses: nil,
 		}
 
-		if diff := cmp.Diff(expectedCommit, commit); len(diff) > 0 {
-			t.Fatal(diff)
+		for _, repoURL := range []string{testURL, client.sshHostname} {
+			t.Run(repoURL, func(t *testing.T) {
+				commit, err := client.Commit(context.Background(), repoURL+"/long/namespace/owner/repo", "master")
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if diff := cmp.Diff(expectedCommit, commit); len(diff) > 0 {
+					t.Fatal(diff)
+				}
+			})
 		}
 	})
 

@@ -2,6 +2,14 @@
 
 ## Next version
 
+### Bug Fix
+
+* GitLab: Add support for custom SSH host ([issue #20](https://github.com/nbedos/cistern/issues/20))
+
+
+
+## 0.2.0
+
 ### Features
 
 * User interface: Column visibility, column order, sort order and all style attributes can now be set

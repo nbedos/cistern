@@ -63,6 +63,11 @@ name = "gitlab"
 # (the GitLab instance must support GitLab REST API V4)
 url = "https://gitlab.com"
 
+# Custom SSH host (optional, string). If this GitLab instance uses a custom host for SSH
+# connections, uncomment the following line and specify the hostname so that cistern knows
+# to associate repositories on the host to this instance.
+# ssh-host = "ssh.gitlab.example.com"
+
 # GitLab API token (optional, string)
 #
 # Note: GitLab prevents access to pipeline jobs for unauthenticated users meaning if you wish
