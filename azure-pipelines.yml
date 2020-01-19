@@ -116,7 +116,7 @@ stages:
            isPreRelease: true
            releaseNotesFile: 'build/notes.md'
            assets: |
-               build/*.tar.gz
+               build/cistern-*.tar.gz
                build/cistern.man.html
                build/cistern.man.1
                build/cistern.toml
