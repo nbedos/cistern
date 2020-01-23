@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"sort"
@@ -12,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
 	"github.com/google/go-cmp/cmp"
 	"github.com/nbedos/cistern/tui"
 	"github.com/nbedos/cistern/utils"
@@ -46,9 +46,7 @@ type SourceProvider interface {
 }
 
 // Poll Provider at increasing interval for the url of statuses associated to "ref"
-func monitorRefStatuses(ctx context.Context, p SourceProvider, b backoff.ExponentialBackOff, remoteName string, url string, ref string, commitc chan<- Commit) error {
-	b.Reset()
-
+func monitorRefStatuses(ctx context.Context, p SourceProvider, s utils.PollingStrategy, remoteName string, url string, ref string, commitc chan<- Commit) error {
 	commit, err := p.Commit(ctx, url, ref)
 	if err != nil {
 		return err
@@ -63,7 +61,7 @@ func monitorRefStatuses(ctx context.Context, p SourceProvider, b backoff.Exponen
 		return ctx.Err()
 	}
 
-	for waitTime := time.Duration(0); waitTime != backoff.Stop; waitTime = b.NextBackOff() {
+	for waitTime := time.Duration(0); waitTime < s.MaxInterval; waitTime = s.NextInterval(waitTime) {
 		select {
 		case <-time.After(waitTime):
 			// Do nothing
@@ -88,7 +86,7 @@ func monitorRefStatuses(ctx context.Context, p SourceProvider, b backoff.Exponen
 			case <-ctx.Done():
 				return ctx.Err()
 			}
-			b.Reset()
+			waitTime = 0
 		}
 	}
 
@@ -964,7 +962,7 @@ func (c *Cache) SaveCommit(ref string, commit Commit) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if previousCommit, exists := c.commitsByRef[ref]; exists && previousCommit.Sha == commit.Sha{
+	if previousCommit, exists := c.commitsByRef[ref]; exists && previousCommit.Sha == commit.Sha {
 		previousBranches := make(map[string]struct{})
 		for _, b := range previousCommit.Branches {
 			previousBranches[b] = struct{}{}
@@ -1024,18 +1022,8 @@ func (c Cache) Pipelines(ref string) []Pipeline {
 // Poll Provider at increasing interval for information about the CI pipeline identified by the url
 // u. A message is sent on the channel 'updates' each time the cache is updated with new information
 // for this specific pipeline.
-func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref string, updates chan<- time.Time) error {
-	b := backoff.ExponentialBackOff{
-		InitialInterval:     10 * time.Second,
-		RandomizationFactor: backoff.DefaultRandomizationFactor,
-		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         2 * time.Minute,
-		MaxElapsedTime:      0,
-		Clock:               backoff.SystemClock,
-	}
-	b.Reset()
-
-	for waitTime := time.Duration(0); waitTime != backoff.Stop; waitTime = b.NextBackOff() {
+func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, updates chan<- time.Time, s utils.PollingStrategy) error {
+	for waitTime := time.Duration(0); waitTime < s.MaxInterval; waitTime = s.NextInterval(waitTime) {
 		select {
 		case <-time.After(waitTime):
 			// Do nothing
@@ -1062,7 +1050,7 @@ func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref
 			// If SavePipeline() does not return an error then the build object we just saved
 			// differs from the previous one. This most likely means the pipeline is
 			// currently running so reset the backoff object.
-			b.Reset()
+			waitTime = 0
 		case ErrObsoleteBuild:
 			// This error means that the build object we wanted to save was last updated by
 			// the CI Provider at the same time or before the one already saved in cache with the
@@ -1086,7 +1074,7 @@ func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref
 // Ask all providers to monitor the CI pipeline identified by the url u. A message is sent on the
 // channel 'updates' each time the cache is updated with new information for this specific pipeline.
 // If no Provider is able to handle the specified url, ErrUnknownPipelineURL is returned.
-func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref string, updates chan<- time.Time) error {
+func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, updates chan<- time.Time, s utils.PollingStrategy) error {
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
@@ -1098,7 +1086,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 			// meaning these providers can handle the url they've been given. These calls
 			// will run longer or possibly never return unless their context is canceled or
 			// they encounter an error.
-			err := c.monitorPipeline(ctx, p, u, ref, updates)
+			err := c.monitorPipeline(ctx, p, u, updates, s)
 			if err != nil {
 				if err != ErrUnknownPipelineURL && err != context.Canceled {
 					err = fmt.Errorf("Provider %s: monitorPipeline failed with %v (%s)", p.ID(), err, u)
@@ -1137,7 +1125,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 // Ask all providers to monitor the statuses of 'ref'. The url of each status is written on the
 // channel urlc once. If no Provider is able to handle the specified url, ErrUnknownRepositoryURL
 // is returned.
-func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repositoryURLs map[string][]string, ref string, commitc chan<- Commit, b backoff.ExponentialBackOff) error {
+func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repositoryURLs map[string][]string, ref string, commitc chan<- Commit, s utils.PollingStrategy) error {
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
@@ -1150,7 +1138,7 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repositoryURLs ma
 				wg.Add(1)
 				go func(p SourceProvider, u string) {
 					defer wg.Done()
-					errc <- monitorRefStatuses(ctx, p, b, remoteName, u, ref, commitc)
+					errc <- monitorRefStatuses(ctx, p, s, remoteName, u, ref, commitc)
 				}(p, u)
 			}
 		}
@@ -1216,13 +1204,13 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURLs map[string]
 	ctx, cancel := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
 
-	b := backoff.ExponentialBackOff{
-		InitialInterval:     10 * time.Second,
-		RandomizationFactor: backoff.DefaultRandomizationFactor,
-		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         2 * time.Minute,
-		MaxElapsedTime:      0,
-		Clock:               backoff.SystemClock,
+	rand.Seed(time.Now().UnixNano())
+
+	s := utils.PollingStrategy{
+		InitialInterval: 10 * time.Second,
+		Multiplier:      1.5,
+		Randomizer:      0.25,
+		MaxInterval:     2 * time.Minute,
 	}
 
 	wg.Add(1)
@@ -1243,7 +1231,7 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURLs map[string]
 		}
 		// This gives us a stream of commits with a 'Statuses' attribute that may contain
 		// URLs referring to CI pipelines
-		errc <- c.broadcastMonitorRefStatus(ctx, repositoryURLs, refOrSha, commitc, b)
+		errc <- c.broadcastMonitorRefStatus(ctx, repositoryURLs, refOrSha, commitc, s)
 	}()
 
 	wg.Add(1)
@@ -1268,7 +1256,7 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURLs map[string]
 					wg.Add(1)
 					go func(u string) {
 						defer wg.Done()
-						err := c.broadcastMonitorPipeline(ctx, u, ref.Name, updates)
+						err := c.broadcastMonitorPipeline(ctx, u, updates, s)
 						// Ignore ErrUnknownPipelineURL. This error means that we don't integrate
 						// with the application that created that particular url. No need to report
 						// this up the chain, though it's nice to know our request couldn't be handled.

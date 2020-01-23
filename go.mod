@@ -3,7 +3,6 @@ module github.com/nbedos/cistern
 go 1.12
 
 require (
-	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/gdamore/tcell v1.3.0
 	github.com/google/go-cmp v0.4.0
 	github.com/google/go-github/v29 v29.0.2

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path"
@@ -12,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
 	"github.com/google/go-cmp/cmp"
+	"github.com/nbedos/cistern/utils"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/config"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
@@ -444,17 +445,16 @@ func TestCache_monitorRefStatus(t *testing.T) {
 	commitc := make(chan Commit)
 	errc := make(chan error)
 
-	b := backoff.ExponentialBackOff{
-		InitialInterval:     time.Millisecond,
-		RandomizationFactor: backoff.DefaultRandomizationFactor,
-		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         10 * time.Millisecond,
-		MaxElapsedTime:      10 * time.Millisecond,
-		Clock:               backoff.SystemClock,
+	rand.Seed(0)
+	s := utils.PollingStrategy{
+		InitialInterval: time.Millisecond,
+		Multiplier:      1.5,
+		Randomizer:      0.25,
+		MaxInterval:     10 * time.Millisecond,
 	}
 
 	go func() {
-		err := monitorRefStatuses(ctx, &p, b, "remoteName", "url", "ref", commitc)
+		err := monitorRefStatuses(ctx, &p, s, "remoteName", "url", "ref", commitc)
 		close(commitc)
 		errc <- err
 		close(errc)
@@ -483,13 +483,13 @@ func TestCache_broadcastMonitorRefStatus(t *testing.T) {
 
 	commitc := make(chan Commit)
 	errc := make(chan error)
-	b := backoff.ExponentialBackOff{
-		InitialInterval:     time.Millisecond,
-		RandomizationFactor: backoff.DefaultRandomizationFactor,
-		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         10 * time.Millisecond,
-		MaxElapsedTime:      10 * time.Millisecond,
-		Clock:               backoff.SystemClock,
+
+	rand.Seed(0)
+	s := utils.PollingStrategy{
+		InitialInterval: time.Millisecond,
+		Multiplier:      1.5,
+		Randomizer:      0.25,
+		MaxInterval:     10 * time.Millisecond,
 	}
 	remotes := map[string][]string{
 		"origin1": {"origin1.example.com"},
@@ -498,7 +498,7 @@ func TestCache_broadcastMonitorRefStatus(t *testing.T) {
 	}
 
 	go func() {
-		err := c.broadcastMonitorRefStatus(ctx, remotes, "sha", commitc, b)
+		err := c.broadcastMonitorRefStatus(ctx, remotes, "sha", commitc, s)
 		close(commitc)
 		errc <- err
 		close(errc)
