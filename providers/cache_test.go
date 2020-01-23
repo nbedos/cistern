@@ -101,7 +101,7 @@ func TestCache_Save(t *testing.T) {
 				State: Failed,
 			},
 		}
-		if err := c.SavePipeline("", p); err != nil {
+		if err := c.SavePipeline(p); err != nil {
 			t.Fatal(err)
 		}
 		savedPipeline, exists := c.Pipeline(p.Key())
@@ -132,10 +132,10 @@ func TestCache_Save(t *testing.T) {
 	t.Run("existing build must be overwritten if it's older than the current build", func(t *testing.T) {
 		c := NewCache(nil, nil)
 
-		if err := c.SavePipeline("", oldPipeline); err != nil {
+		if err := c.SavePipeline(oldPipeline); err != nil {
 			t.Fatal(err)
 		}
-		if err := c.SavePipeline("", newPipeline); err != nil {
+		if err := c.SavePipeline(newPipeline); err != nil {
 			t.Fatal(err)
 		}
 		savedPipeline, exists := c.Pipeline(oldPipeline.Key())
@@ -151,10 +151,10 @@ func TestCache_Save(t *testing.T) {
 	t.Run("cache.SavePipeline must return ErrObsoleteBuild if the build to save is older than the one in cache", func(t *testing.T) {
 		c := NewCache(nil, nil)
 
-		if err := c.SavePipeline("", newPipeline); err != nil {
+		if err := c.SavePipeline(newPipeline); err != nil {
 			t.Fatal(err)
 		}
-		if err := c.SavePipeline("", oldPipeline); err != ErrObsoleteBuild {
+		if err := c.SavePipeline(oldPipeline); err != ErrObsoleteBuild {
 			t.Fatalf("expected %v but got %v", ErrObsoleteBuild, err)
 		}
 	})
@@ -170,7 +170,7 @@ func TestCache_Pipeline(t *testing.T) {
 				ID: id,
 			},
 		}
-		if err := c.SavePipeline("", p); err != nil {
+		if err := c.SavePipeline(p); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -193,6 +193,7 @@ func TestCache_Pipelines(t *testing.T) {
 	pipelines := []Pipeline{
 		{
 			GitReference: GitReference{
+				SHA:   "sha1",
 				Ref:   "ref1",
 				IsTag: false,
 			},
@@ -204,6 +205,7 @@ func TestCache_Pipelines(t *testing.T) {
 		},
 		{
 			GitReference: GitReference{
+				SHA:   "sha2",
 				Ref:   "ref2",
 				IsTag: false,
 			},
@@ -214,6 +216,7 @@ func TestCache_Pipelines(t *testing.T) {
 		},
 		{
 			GitReference: GitReference{
+				SHA:   "sha2",
 				Ref:   "ref2",
 				IsTag: false,
 			},
@@ -223,24 +226,29 @@ func TestCache_Pipelines(t *testing.T) {
 			},
 		},
 	}
+
+	c.SaveCommit("ref1", Commit{Sha: "sha1"})
+	c.SaveCommit("ref2", Commit{Sha: "sha2"})
 	for _, p := range pipelines {
-		if err := c.SavePipeline("ref2", p); err != nil {
+		if err := c.SavePipeline(p); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	expected := []Pipeline{pipelines[1], pipelines[2]}
-	buildRef2 := c.Pipelines("ref2")
-	sortPipelines(expected)
-	sortPipelines(buildRef2)
-
-	if diff := Pipelines(expected).Diff(buildRef2); len(diff) > 0 {
+	expected := []Pipeline{pipelines[0]}
+	buildRef1 := c.Pipelines("ref1")
+	if diff := Pipelines(expected).Diff(buildRef1); len(diff) > 0 {
 		t.Fatal(diff)
 	}
 
-	// Build with ID 1 must have moved from ref1 to ref2
-	if len(c.Pipelines("ref1")) != 0 {
-		t.Fatalf("expected empty list but got %+v", c.Pipelines("ref1"))
+	// Point "ref1" to "sha2"
+	c.SaveCommit("ref1", Commit{Sha: "sha2"})
+	expected = []Pipeline{pipelines[1], pipelines[2]}
+	buildRef1 = c.Pipelines("ref2")
+	sortPipelines(buildRef1)
+	sortPipelines(expected)
+	if diff := Pipelines(expected).Diff(buildRef1); len(diff) > 0 {
+		t.Fatal(diff)
 	}
 }
 
@@ -353,17 +361,12 @@ func TestRemotesAndCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		expectedURLs := []string{
-			"push1",
-			"push2",
-			"push5",
-			"push6",
-			"pushfetch1",
-			"pushfetch2",
-			"pushfetch3",
+		expectedURLs := map[string][]string{
+			"other1": {"pushfetch2", "push1"},
+			"origin": {"pushfetch1"},
+			"other2": {"pushfetch3", "push2", "push5"},
+			"other3": {"push6"},
 		}
-		sort.Strings(urls)
-		sort.Strings(expectedURLs)
 		if diff := cmp.Diff(expectedURLs, urls); len(diff) > 0 {
 			t.Fatal(diff)
 		}
@@ -451,7 +454,7 @@ func TestCache_monitorRefStatus(t *testing.T) {
 	}
 
 	go func() {
-		err := monitorRefStatuses(ctx, &p, b, "url", "ref", commitc)
+		err := monitorRefStatuses(ctx, &p, b, "remoteName", "url", "ref", commitc)
 		close(commitc)
 		errc <- err
 		close(errc)
@@ -488,9 +491,14 @@ func TestCache_broadcastMonitorRefStatus(t *testing.T) {
 		MaxElapsedTime:      10 * time.Millisecond,
 		Clock:               backoff.SystemClock,
 	}
+	remotes := map[string][]string{
+		"origin1": {"origin1.example.com"},
+		"origin2": {"origin2.example.com"},
+		"other1":  {"other1.example.com"},
+	}
 
 	go func() {
-		err := c.broadcastMonitorRefStatus(ctx, []string{"origin1", "origin2", "other1"}, "sha", commitc, b)
+		err := c.broadcastMonitorRefStatus(ctx, remotes, "sha", commitc, b)
 		close(commitc)
 		errc <- err
 		close(errc)
@@ -508,15 +516,15 @@ func TestCache_broadcastMonitorRefStatus(t *testing.T) {
 	}
 
 	expectedStatuses := map[string]struct{}{
-		"origin1_status0": {},
-		"origin1_status1": {},
-		"origin1_status2": {},
-		"origin2_status0": {},
-		"origin2_status1": {},
-		"origin2_status2": {},
-		"other1_status0":  {},
-		"other1_status1":  {},
-		"other1_status2":  {},
+		"origin1.example.com_status0": {},
+		"origin1.example.com_status1": {},
+		"origin1.example.com_status2": {},
+		"origin2.example.com_status0": {},
+		"origin2.example.com_status1": {},
+		"origin2.example.com_status2": {},
+		"other1.example.com_status0":  {},
+		"other1.example.com_status1":  {},
+		"other1.example.com_status2":  {},
 	}
 	if diff := cmp.Diff(statuses, expectedStatuses); len(diff) > 0 {
 		t.Fatal(diff)

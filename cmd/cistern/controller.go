@@ -425,7 +425,7 @@ type ControllerConfiguration struct {
 type Controller struct {
 	tui         *tui.TUI
 	cache       providers.Cache
-	ref         string
+	ref         providers.Ref
 	width       int
 	height      int
 	header      *tui.TextArea
@@ -443,7 +443,7 @@ type Controller struct {
 
 var ErrExit = errors.New("exit")
 
-func NewController(ui *tui.TUI, conf ControllerConfiguration, ref string, c providers.Cache) (Controller, error) {
+func NewController(ui *tui.TUI, conf ControllerConfiguration, c providers.Cache) (Controller, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := ui.Size()
 	header, err := tui.NewTextArea(width, height)
@@ -478,7 +478,6 @@ func NewController(ui *tui.TUI, conf ControllerConfiguration, ref string, c prov
 
 	return Controller{
 		tui:       ui,
-		ref:       ref,
 		cache:     c,
 		width:     width,
 		height:    height,
@@ -494,9 +493,9 @@ func NewController(ui *tui.TUI, conf ControllerConfiguration, ref string, c prov
 	}, nil
 }
 
-func (c *Controller) setRef(ref string) {
+func (c *Controller) setRef(ref providers.Ref) {
 	pipelines := make([]tui.TableNode, 0)
-	for _, pipeline := range c.cache.Pipelines(c.ref) {
+	for _, pipeline := range c.cache.Pipelines(c.ref.Name) {
 		pipelines = append(pipelines, pipeline)
 	}
 	c.table.Replace(pipelines)
@@ -513,11 +512,11 @@ func (c *Controller) focusWidget(f focus) {
 	}
 }
 
-func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
+func (c *Controller) Run(ctx context.Context, repositoryURL string, ref string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	errc := make(chan error)
-	refc := make(chan string)
+	refc := make(chan providers.Ref)
 	updates := make(chan time.Time)
 
 	c.writeStatus("")
@@ -527,12 +526,14 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 	// Start pipeline monitoring
 	go func() {
 		select {
-		case refc <- c.ref:
+		case refc <- providers.Ref{
+			Name: ref,
+		}:
 		case <-ctx.Done():
 		}
 	}()
 
-	var tmpRef string
+	var tmpRef providers.Ref
 	var mux = &sync.Mutex{}
 	var refCtx context.Context
 	var refCancel = func() {}
@@ -547,17 +548,20 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string) error {
 			mux.Unlock()
 			refCancel()
 			refCtx, refCancel = context.WithCancel(ctx)
-			go func(ctx context.Context, refName string) {
+			go func(ctx context.Context, ref providers.Ref) {
 				var err error
-				var repositoryURLs []string
-				ref := providers.Ref{
-					Name: refName,
+				repositoryURLs := make(map[string][]string)
+
+				name := ref.Name
+				if ref.Commit.Sha != "" {
+					name = ref.Commit.Sha
 				}
-				repositoryURLs, ref.Commit, err = providers.RemotesAndCommit(repositoryURL, ref.Name)
+
+				repositoryURLs, ref.Commit, err = providers.RemotesAndCommit(repositoryURL, name)
 				switch err {
 				case providers.ErrUnknownRepositoryURL:
 					// The path does not refer to a local repository so it probably is a url
-					repositoryURLs = []string{repositoryURL}
+					repositoryURLs["origin"] = append(repositoryURLs["origin"], repositoryURL)
 				case nil:
 					suggestions, err := providers.References(repositoryURL, c.style)
 					if err != nil {
@@ -621,10 +625,10 @@ func (c *Controller) writeStatus(s string) {
 }
 
 func (c *Controller) refresh() {
-	commit, _ := c.cache.Commit(c.ref)
+	commit, _ := c.cache.Commit(c.ref.Name)
 	c.header.WriteContent(commit.StyledStrings(c.style)...)
 	pipelines := make([]tui.TableNode, 0)
-	for _, pipeline := range c.cache.Pipelines(c.ref) {
+	for _, pipeline := range c.cache.Pipelines(c.ref.Name) {
 		pipelines = append(pipelines, pipeline)
 	}
 	c.table.Replace(pipelines)
@@ -805,7 +809,7 @@ func (c *Controller) draw() {
 	c.tui.Show()
 }
 
-func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<- string) error {
+func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<- providers.Ref) error {
 	c.writeStatus("")
 
 	switch ev := event.(type) {
@@ -825,7 +829,7 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 				if ref := c.refcmd.Input(); ref != "" {
 					go func() {
 						select {
-						case refc <- ref:
+						case refc <- providers.Ref{Name: ref}:
 							// Do nothing
 						case <-ctx.Done():
 							return
@@ -876,9 +880,15 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 						case <-ctx.Done():
 						}
 					}()
+				case 'f':
+					go func() {
+						select {
+						case refc <- providers.Ref{Name: c.ref.Name}:
+						case <-ctx.Done():
+						}
+					}()
 				case '?':
 					c.focus = help
-
 				case 'v':
 					if err := c.viewLog(ctx); err != nil {
 						return err
@@ -939,10 +949,10 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		GitStyle:           tableConfig.NodeStyle.(providers.StepStyle).GitStyle,
 	}
 
-	controller, err := NewController(&ui, controllerConf, ref, cacheDB)
+	controller, err := NewController(&ui, controllerConf, cacheDB)
 	if err != nil {
 		return err
 	}
 
-	return controller.Run(ctx, repo)
+	return controller.Run(ctx, repo, ref)
 }

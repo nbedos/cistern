@@ -34,6 +34,7 @@ type CIProvider interface {
 	Name() string
 	// FIXME Replace stepID by stepIDs
 	Log(ctx context.Context, step Step) (string, error)
+
 	BuildFromURL(ctx context.Context, u string) (Pipeline, error)
 }
 
@@ -45,12 +46,15 @@ type SourceProvider interface {
 }
 
 // Poll Provider at increasing interval for the url of statuses associated to "ref"
-func monitorRefStatuses(ctx context.Context, p SourceProvider, b backoff.ExponentialBackOff, url string, ref string, commitc chan<- Commit) error {
+func monitorRefStatuses(ctx context.Context, p SourceProvider, b backoff.ExponentialBackOff, remoteName string, url string, ref string, commitc chan<- Commit) error {
 	b.Reset()
 
 	commit, err := p.Commit(ctx, url, ref)
 	if err != nil {
 		return err
+	}
+	for i := range commit.Branches {
+		commit.Branches[i] = fmt.Sprintf("%s/%s", remoteName, commit.Branches[i])
 	}
 	select {
 	case commitc <- commit:
@@ -294,7 +298,7 @@ func References(path string, conf GitStyle) (tui.Suggestions, error) {
 	return references, nil
 }
 
-func RemotesAndCommit(path string, ref string) ([]string, Commit, error) {
+func RemotesAndCommit(path string, ref string) (map[string][]string, Commit, error) {
 	// If a path does not refer to an existing file or directory, go-git will continue
 	// running and will walk its way up the directory structure looking for a .git repository.
 	// This is not ideal for us since running 'cistern -r github.com/owner/repo' from
@@ -390,7 +394,7 @@ func RemotesAndCommit(path string, ref string) ([]string, Commit, error) {
 	if err != nil {
 		return nil, Commit{}, err
 	}
-	remoteURLs := make([]string, 0)
+	remoteURLs := make(map[string][]string, 0)
 	for _, remote := range remotes {
 		// Try calling the local git binary to get the list of push URLs for
 		// this remote.  For now this is better than what go-git offers since
@@ -404,11 +408,11 @@ func RemotesAndCommit(path string, ref string) ([]string, Commit, error) {
 		if bs, err := cmd.Output(); err == nil {
 			for _, u := range strings.Split(string(bs), "\n") {
 				if u = strings.TrimSuffix(u, "\r"); u != "" {
-					remoteURLs = append(remoteURLs, u)
+					remoteURLs[remote.Config().Name] = append(remoteURLs[remote.Config().Name], u)
 				}
 			}
 		} else {
-			remoteURLs = append(remoteURLs, remote.Config().URLs...)
+			remoteURLs[remote.Config().Name] = remote.Config().URLs
 		}
 	}
 
@@ -764,7 +768,7 @@ type Cache struct {
 	// All the following data structures must be accessed after acquiring mutex
 	commitsByRef  map[string]Commit
 	pipelineByKey map[PipelineKey]*Pipeline
-	pipelineByRef map[string]map[PipelineKey]*Pipeline
+	pipelineBySha map[string]map[PipelineKey]*Pipeline
 }
 
 type Configuration struct {
@@ -912,7 +916,7 @@ func NewCache(CIProviders []CIProvider, sourceProviders []SourceProvider) Cache 
 	return Cache{
 		commitsByRef:    make(map[string]Commit),
 		pipelineByKey:   make(map[PipelineKey]*Pipeline),
-		pipelineByRef:   make(map[string]map[PipelineKey]*Pipeline),
+		pipelineBySha:   make(map[string]map[PipelineKey]*Pipeline),
 		mutex:           &sync.Mutex{},
 		ciProvidersByID: providersByAccountID,
 		sourceProviders: sourceProviders,
@@ -925,7 +929,7 @@ var ErrObsoleteBuild = errors.New("build to save is older than current build in 
 // already stored in cache, it will be overwritten if the build to save is more recent
 // than the build in  If the build to save is older than the build in cache,
 // SavePipeline will return ErrObsoleteBuild.
-func (c *Cache) SavePipeline(ref string, p Pipeline) error {
+func (c *Cache) SavePipeline(p Pipeline) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -934,22 +938,22 @@ func (c *Cache) SavePipeline(ref string, p Pipeline) error {
 	// update of a job so default to always updating an active build
 	if exists && !p.State.IsActive() && !p.UpdatedAt.After(existingBuild.UpdatedAt) {
 		// Point ref to existingBuild
-		if _, exists := c.pipelineByRef[ref]; !exists {
-			c.pipelineByRef[ref] = make(map[PipelineKey]*Pipeline)
+		if _, exists := c.pipelineBySha[p.SHA]; !exists {
+			c.pipelineBySha[p.SHA] = make(map[PipelineKey]*Pipeline)
 		}
-		if c.pipelineByRef[ref][p.Key()] == existingBuild {
+		if c.pipelineBySha[p.SHA][p.Key()] == existingBuild {
 			return ErrObsoleteBuild
 		}
-		c.pipelineByRef[ref][p.Key()] = existingBuild
+		c.pipelineBySha[p.SHA][p.Key()] = existingBuild
 		return nil
 	}
 
 	c.pipelineByKey[p.Key()] = &p
 	// Point ref to new build
-	if _, exists := c.pipelineByRef[ref]; !exists {
-		c.pipelineByRef[ref] = make(map[PipelineKey]*Pipeline)
+	if _, exists := c.pipelineBySha[p.SHA]; !exists {
+		c.pipelineBySha[p.SHA] = make(map[PipelineKey]*Pipeline)
 	}
-	c.pipelineByRef[ref][p.Key()] = &p
+	c.pipelineBySha[p.SHA][p.Key()] = &p
 
 	return nil
 }
@@ -960,11 +964,7 @@ func (c *Cache) SaveCommit(ref string, commit Commit) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if previousCommit, exists := c.commitsByRef[ref]; exists {
-		if previousCommit.Sha != commit.Sha {
-			delete(c.pipelineByRef, ref)
-		}
-
+	if previousCommit, exists := c.commitsByRef[ref]; exists && previousCommit.Sha == commit.Sha{
 		previousBranches := make(map[string]struct{})
 		for _, b := range previousCommit.Branches {
 			previousBranches[b] = struct{}{}
@@ -1001,8 +1001,14 @@ func (c Cache) Commit(ref string) (Commit, bool) {
 func (c Cache) Pipelines(ref string) []Pipeline {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	pipelines := make([]Pipeline, 0, len(c.pipelineByRef[ref]))
-	for _, p := range c.pipelineByRef[ref] {
+
+	commit, exists := c.commitsByRef[ref]
+	if !exists {
+		return nil
+	}
+
+	pipelines := make([]Pipeline, 0, len(c.pipelineBySha[ref]))
+	for _, p := range c.pipelineBySha[commit.Sha] {
 		pipelines = append(pipelines, *p)
 	}
 
@@ -1045,7 +1051,7 @@ func (c *Cache) monitorPipeline(ctx context.Context, p CIProvider, u string, ref
 		pipeline.ProviderHost = p.Host()
 		pipeline.ProviderName = p.Name()
 
-		switch err := c.SavePipeline(ref, pipeline); err {
+		switch err := c.SavePipeline(pipeline); err {
 		case nil:
 			go func() {
 				select {
@@ -1131,20 +1137,22 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, ref stri
 // Ask all providers to monitor the statuses of 'ref'. The url of each status is written on the
 // channel urlc once. If no Provider is able to handle the specified url, ErrUnknownRepositoryURL
 // is returned.
-func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repositoryURLs []string, ref string, commitc chan<- Commit, b backoff.ExponentialBackOff) error {
+func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repositoryURLs map[string][]string, ref string, commitc chan<- Commit, b backoff.ExponentialBackOff) error {
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
 	requestCount := 0
 	// FIXME Deduplicate repositoryURLs
-	for _, u := range repositoryURLs {
-		for _, p := range c.sourceProviders {
-			requestCount++
-			wg.Add(1)
-			go func(p SourceProvider, u string) {
-				defer wg.Done()
-				errc <- monitorRefStatuses(ctx, p, b, u, ref, commitc)
-			}(p, u)
+	for remoteName, remoteURLs := range repositoryURLs {
+		for _, u := range remoteURLs {
+			for _, p := range c.sourceProviders {
+				requestCount++
+				wg.Add(1)
+				go func(p SourceProvider, u string) {
+					defer wg.Done()
+					errc <- monitorRefStatuses(ctx, p, b, remoteName, u, ref, commitc)
+				}(p, u)
+			}
 		}
 	}
 
@@ -1202,7 +1210,7 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repositoryURLs []
 // updated with new data, a message is sent on the 'updates' channel.
 // This function may return ErrUnknownRepositoryURL if none of the source providers is
 // able to handle 'repositoryURL'.
-func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURLs []string, ref Ref, updates chan<- time.Time) error {
+func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURLs map[string][]string, ref Ref, updates chan<- time.Time) error {
 	commitc := make(chan Commit)
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
@@ -1234,7 +1242,7 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURLs []string, r
 			refOrSha = ref.Commit.Sha
 		}
 		// This gives us a stream of commits with a 'Statuses' attribute that may contain
-		// URLs refering to CI pipelines
+		// URLs referring to CI pipelines
 		errc <- c.broadcastMonitorRefStatus(ctx, repositoryURLs, refOrSha, commitc, b)
 	}()
 

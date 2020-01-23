@@ -28,7 +28,7 @@ func setup() (Controller, func(), error) {
 			Location: time.UTC,
 		},
 	}
-	controller, err := NewController(&ui, conf, "", c)
+	controller, err := NewController(&ui, conf, c)
 	if err != nil {
 		ui.Finish()
 		return Controller{}, nil, err
