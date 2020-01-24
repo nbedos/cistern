@@ -190,5 +190,10 @@ func (s PollingStrategy) NextInterval(i time.Duration) time.Duration {
 	if i == 0 {
 		i = s.InitialInterval
 	}
-	return time.Duration(float64(i) * (s.Multiplier + s.Randomizer*(2*rand.Float64()-1)))
+	d := time.Duration(float64(i) * (s.Multiplier + s.Randomizer*(2*rand.Float64()-1)))
+	if d > s.MaxInterval {
+		return s.MaxInterval
+	}
+
+	return d
 }

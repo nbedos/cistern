@@ -9,6 +9,7 @@ import (
 	"github.com/gdamore/tcell"
 	"github.com/nbedos/cistern/providers"
 	"github.com/nbedos/cistern/tui"
+	"github.com/nbedos/cistern/utils"
 )
 
 func setup() (Controller, func(), error) {
@@ -19,10 +20,7 @@ func setup() (Controller, func(), error) {
 	if err != nil {
 		return Controller{}, nil, err
 	}
-	defer func() {
-
-	}()
-	c := providers.NewCache(nil, nil)
+	c := providers.NewCache(nil, nil, utils.PollingStrategy{})
 	conf := ControllerConfiguration{
 		GitStyle: providers.GitStyle{
 			Location: time.UTC,

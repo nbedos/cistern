@@ -20,82 +20,9 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 )
 
-func TestAggregateStatuses(t *testing.T) {
-	testCases := []struct {
-		name   string
-		steps  []Step
-		result State
-	}{
-		{
-			name:   "Empty list",
-			steps:  []Step{},
-			result: Unknown,
-		},
-		{
-			name: "Jobs: No allowed failure",
-			steps: []Step{
-				{
-					AllowFailure: false,
-					State:        Passed,
-				},
-				{
-					AllowFailure: false,
-					State:        Failed,
-				},
-				{
-					AllowFailure: false,
-					State:        Passed,
-				},
-			},
-			result: Failed,
-		},
-		{
-			name: "Jobs: Allowed failure",
-			steps: []Step{
-				{
-					AllowFailure: false,
-					State:        Passed,
-				},
-				{
-					AllowFailure: true,
-					State:        Failed,
-				},
-				{
-					AllowFailure: false,
-					State:        Passed,
-				},
-			},
-			result: Passed,
-		},
-		{
-			name: "Builds",
-			steps: []Step{
-				{
-					State: Passed,
-				},
-				{
-					State: Failed,
-				},
-				{
-					State: Passed,
-				},
-			},
-			result: Failed,
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			if agg := Aggregate(testCase.steps); agg.State != testCase.result {
-				t.Fatalf("expected %q but got %q", testCase.result, agg.State)
-			}
-		})
-	}
-}
-
 func TestCache_Save(t *testing.T) {
 	t.Run("Saved build must be returned by pipeline()", func(t *testing.T) {
-		c := NewCache(nil, nil)
+		c := NewCache(nil, nil, utils.PollingStrategy{})
 		p := Pipeline{
 			Step: Step{
 				ID:    "42",
@@ -131,7 +58,7 @@ func TestCache_Save(t *testing.T) {
 	}
 
 	t.Run("existing build must be overwritten if it's older than the current build", func(t *testing.T) {
-		c := NewCache(nil, nil)
+		c := NewCache(nil, nil, utils.PollingStrategy{})
 
 		if err := c.SavePipeline(oldPipeline); err != nil {
 			t.Fatal(err)
@@ -150,7 +77,7 @@ func TestCache_Save(t *testing.T) {
 	})
 
 	t.Run("cache.SavePipeline must return ErrObsoleteBuild if the build to save is older than the one in cache", func(t *testing.T) {
-		c := NewCache(nil, nil)
+		c := NewCache(nil, nil, utils.PollingStrategy{})
 
 		if err := c.SavePipeline(newPipeline); err != nil {
 			t.Fatal(err)
@@ -163,7 +90,7 @@ func TestCache_Save(t *testing.T) {
 
 func TestCache_Pipeline(t *testing.T) {
 	ids := []string{"1", "2", "3", "4"}
-	c := NewCache(nil, nil)
+	c := NewCache(nil, nil, utils.PollingStrategy{})
 	for _, id := range ids {
 		p := Pipeline{
 			ProviderHost: "host",
@@ -189,7 +116,7 @@ func TestCache_Pipeline(t *testing.T) {
 }
 
 func TestCache_Pipelines(t *testing.T) {
-	c := NewCache(nil, nil)
+	c := NewCache(nil, nil, utils.PollingStrategy{})
 
 	pipelines := []Pipeline{
 		{
@@ -422,13 +349,16 @@ func (p *testProvider) RefStatuses(ctx context.Context, url, ref, sha string) ([
 	if !strings.Contains(url, p.url) {
 		return nil, ErrUnknownRepositoryURL
 	}
+	statusURL := func(status string) string {
+		return fmt.Sprintf("%s/%s/%s", url, ref, status)
+	}
 	switch p.callNumber++; p.callNumber {
 	case 1:
-		return []string{url + "_status0"}, nil
+		return []string{statusURL("status0")}, nil
 	case 2:
-		return []string{url + "_status0", url + "_status1"}, nil
+		return []string{statusURL("status0"), statusURL("status1")}, nil
 	default:
-		return []string{url + "_status0", url + "_status1", url + "_status2"}, nil
+		return []string{statusURL("status0"), statusURL("status1"), statusURL("status2")}, nil
 	}
 }
 
@@ -437,6 +367,37 @@ func (p testProvider) Commit(ctx context.Context, repo, sha string) (Commit, err
 		return Commit{}, ErrUnknownRepositoryURL
 	}
 	return Commit{}, nil
+}
+
+func (p testProvider) Host() string {
+	return ""
+}
+
+func (p testProvider) Name() string {
+	return ""
+}
+
+func (p testProvider) Log(ctx context.Context, step Step) (string, error) {
+	return "", nil
+}
+
+func (p *testProvider) BuildFromURL(ctx context.Context, u string) (Pipeline, error) {
+	p.callNumber++
+	if !strings.Contains(u, p.url) {
+		return Pipeline{}, ErrUnknownPipelineURL
+	}
+	if strings.Contains(u, "inactive") {
+		switch p.callNumber {
+		case 1:
+			return Pipeline{Step: Step{State: Pending}}, nil
+		case 2:
+			return Pipeline{Step: Step{State: Running}}, nil
+		default:
+			return Pipeline{Step: Step{State: Passed}}, nil
+		}
+	}
+
+	return Pipeline{Step: Step{State: Running}}, nil
 }
 
 func TestCache_monitorRefStatus(t *testing.T) {
@@ -468,29 +429,28 @@ func TestCache_monitorRefStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	statuses := []string{"url_status0", "url_status1", "url_status2"}
+	statuses := []string{"url/ref/status0", "url/ref/status1", "url/ref/status2"}
 	if diff := cmp.Diff(c.Statuses, statuses); len(diff) > 0 {
 		t.Fatal(diff)
 	}
 }
 
 func TestCache_broadcastMonitorRefStatus(t *testing.T) {
+	rand.Seed(0)
 	ctx := context.Background()
 	c := NewCache(nil, []SourceProvider{
 		&testProvider{"origin", "origin", 0},
 		&testProvider{"other", "other", 0},
+	}, utils.PollingStrategy{
+		InitialInterval: time.Millisecond,
+		Multiplier:      1.5,
+		Randomizer:      0.25,
+		MaxInterval:     10 * time.Millisecond,
 	})
 
 	commitc := make(chan Commit)
 	errc := make(chan error)
 
-	rand.Seed(0)
-	s := utils.PollingStrategy{
-		InitialInterval: time.Millisecond,
-		Multiplier:      1.5,
-		Randomizer:      0.25,
-		MaxInterval:     10 * time.Millisecond,
-	}
 	remotes := map[string][]string{
 		"origin1": {"origin1.example.com"},
 		"origin2": {"origin2.example.com"},
@@ -498,7 +458,7 @@ func TestCache_broadcastMonitorRefStatus(t *testing.T) {
 	}
 
 	go func() {
-		err := c.broadcastMonitorRefStatus(ctx, remotes, "sha", commitc, s)
+		err := c.broadcastMonitorRefStatus(ctx, remotes, "sha", commitc)
 		close(commitc)
 		errc <- err
 		close(errc)
@@ -516,17 +476,234 @@ func TestCache_broadcastMonitorRefStatus(t *testing.T) {
 	}
 
 	expectedStatuses := map[string]struct{}{
-		"origin1.example.com_status0": {},
-		"origin1.example.com_status1": {},
-		"origin1.example.com_status2": {},
-		"origin2.example.com_status0": {},
-		"origin2.example.com_status1": {},
-		"origin2.example.com_status2": {},
-		"other1.example.com_status0":  {},
-		"other1.example.com_status1":  {},
-		"other1.example.com_status2":  {},
+		"origin1.example.com/sha/status0": {},
+		"origin1.example.com/sha/status1": {},
+		"origin1.example.com/sha/status2": {},
+		"origin2.example.com/sha/status0": {},
+		"origin2.example.com/sha/status1": {},
+		"origin2.example.com/sha/status2": {},
+		"other1.example.com/sha/status0":  {},
+		"other1.example.com/sha/status1":  {},
+		"other1.example.com/sha/status2":  {},
 	}
 	if diff := cmp.Diff(statuses, expectedStatuses); len(diff) > 0 {
 		t.Fatal(diff)
 	}
+}
+
+func TestCache_monitorPipeline(t *testing.T) {
+	t.Run("monitorPipeline must save pipeline in cache and return once the pipeline becomes inactive", func(t *testing.T) {
+		rand.Seed(0)
+		ctx := context.Background()
+		c := NewCache([]CIProvider{
+			&testProvider{"ci", "ci.example.com", 0},
+		}, nil, utils.PollingStrategy{
+			InitialInterval: time.Millisecond,
+			Multiplier:      1.5,
+			Randomizer:      0.25,
+			MaxInterval:     10 * time.Millisecond,
+		})
+
+		err := c.monitorPipeline(ctx, "ci", "ci.example.com/pipelines/inactive", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, exists := c.Pipeline(PipelineKey{}); !exists {
+			t.Fatal("pipeline was not saved in cache")
+		}
+	})
+
+	t.Run("monitorPipeline must return ErrUnknownPipelineURL if the provider cannot handle the URL", func(t *testing.T) {
+		rand.Seed(0)
+		ctx := context.Background()
+		c := NewCache([]CIProvider{
+			&testProvider{"ci", "ci.example.com", 0},
+		}, nil, utils.PollingStrategy{
+			InitialInterval: time.Millisecond,
+			Multiplier:      1.5,
+			Randomizer:      0.25,
+			MaxInterval:     10 * time.Millisecond,
+		})
+
+		err := c.monitorPipeline(ctx, "ci", "bad.url.example.com", nil)
+		if err != ErrUnknownPipelineURL {
+			t.Fatalf("expected %v but got %v", ErrUnknownPipelineURL, err)
+		}
+	})
+
+	t.Run("monitorPipeline must be cancellable", func(t *testing.T) {
+		rand.Seed(0)
+		ctx, cancel := context.WithCancel(context.Background())
+		c := NewCache([]CIProvider{
+			&testProvider{"ci", "ci.example.com", 0},
+		}, nil, utils.PollingStrategy{
+			InitialInterval: time.Minute,
+			Multiplier:      1.5,
+			Randomizer:      0.25,
+			MaxInterval:     time.Hour,
+		})
+
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			cancel()
+		}()
+
+		started := time.Now()
+		err := c.monitorPipeline(ctx, "ci", "ci.example.com/pipelines/active", nil)
+		if err != context.Canceled {
+			t.Fatalf("expected %v but got %v", context.Canceled, err)
+		}
+
+		if elapsed := time.Now().Sub(started); elapsed > c.pollStrat.InitialInterval {
+			t.Fatalf("call lasted %v but was expected to last less than %v", elapsed, c.pollStrat.InitialInterval)
+		}
+	})
+}
+
+func TestCache_broadcastMonitorPipeline(t *testing.T) {
+	t.Run("broadcastMonitorPipeline must save the pipeline in cache and return once the pipeline becomes inactive", func(t *testing.T) {
+		rand.Seed(0)
+		ctx := context.Background()
+		c := NewCache([]CIProvider{
+			&testProvider{"ci1", "ci1.example.com", 0},
+			&testProvider{"ci2", "ci2.example.com", 0},
+			&testProvider{"ci3", "ci3.example.com", 0},
+		}, nil, utils.PollingStrategy{
+			InitialInterval: time.Millisecond,
+			Multiplier:      1.5,
+			Randomizer:      0.25,
+			MaxInterval:     10 * time.Millisecond,
+		})
+
+		err := c.broadcastMonitorPipeline(ctx, "ci1.example.com/pipelines/inactive", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, exists := c.Pipeline(PipelineKey{}); !exists {
+			t.Fatal("pipeline was not saved in cache")
+		}
+	})
+
+	t.Run("broadcastMonitorPipeline must return ErrUnknownPipelineURL if no provider can handle the URL", func(t *testing.T) {
+		rand.Seed(0)
+		ctx := context.Background()
+		c := NewCache([]CIProvider{
+			&testProvider{"ci1", "ci1.example.com", 0},
+			&testProvider{"ci2", "ci2.example.com", 0},
+			&testProvider{"ci3", "ci3.example.com", 0},
+		}, nil, utils.PollingStrategy{
+			InitialInterval: time.Millisecond,
+			Multiplier:      1.5,
+			Randomizer:      0.25,
+			MaxInterval:     10 * time.Millisecond,
+		})
+
+		err := c.broadcastMonitorPipeline(ctx, "bad.url.example.com", nil)
+		if err != ErrUnknownPipelineURL {
+			t.Fatalf("expected %v but got %v", ErrUnknownPipelineURL, err)
+		}
+	})
+
+	t.Run("broadcastMonitorPipeline must be cancellable", func(t *testing.T) {
+		rand.Seed(0)
+		ctx, cancel := context.WithCancel(context.Background())
+		c := NewCache([]CIProvider{
+			&testProvider{"ci1", "ci1.example.com", 0},
+			&testProvider{"ci2", "ci2.example.com", 0},
+			&testProvider{"ci3", "ci3.example.com", 0},
+		}, nil, utils.PollingStrategy{
+			InitialInterval: time.Minute,
+			Multiplier:      1.5,
+			Randomizer:      0.25,
+			MaxInterval:     time.Hour,
+		})
+
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			cancel()
+		}()
+
+		started := time.Now()
+		err := c.broadcastMonitorPipeline(ctx, "ci1.example.com/pipelines/active", nil)
+		if err != context.Canceled {
+			t.Fatalf("expected %v but got %v", context.Canceled, err)
+		}
+
+		if elapsed := time.Now().Sub(started); elapsed > c.pollStrat.InitialInterval {
+			t.Fatalf("call lasted %v but was expected to last less than %v", elapsed, c.pollStrat.InitialInterval)
+		}
+	})
+}
+
+func TestCache_MonitorPipelines(t *testing.T) {
+	t.Run("MonitorPipelines must save the pipeline in cache and return once the pipeline becomes inactive and MaxInterval is exceeded", func(t *testing.T) {
+		rand.Seed(0)
+		ctx := context.Background()
+		ciProviders := []CIProvider{
+			&testProvider{"provider", "provider.example.com", 0},
+		}
+		sourceProviders := []SourceProvider{
+			&testProvider{"provider", "provider.example.com", 0},
+		}
+		c := NewCache(ciProviders, sourceProviders, utils.PollingStrategy{
+			InitialInterval: time.Millisecond,
+			Multiplier:      1.5,
+			Randomizer:      0.25,
+			MaxInterval:     2 * time.Millisecond,
+		})
+
+		remotes := map[string][]string{
+			"provider": {"provider.example.com"},
+		}
+		ref := Ref{
+			Name:   "inactive",
+			Commit: Commit{},
+		}
+		err := c.MonitorPipelines(ctx, remotes, ref, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, exists := c.Pipeline(PipelineKey{}); !exists {
+			t.Fatal("pipeline was not saved in cache")
+		}
+	})
+
+	t.Run("MonitorPipelines must be cancellable", func(t *testing.T) {
+		rand.Seed(0)
+		ctx, cancel := context.WithCancel(context.Background())
+		ciProviders := []CIProvider{
+			&testProvider{"provider", "provider.example.com", 0},
+		}
+		sourceProviders := []SourceProvider{
+			&testProvider{"provider", "provider.example.com", 0},
+		}
+		c := NewCache(ciProviders, sourceProviders, utils.PollingStrategy{
+			InitialInterval: time.Minute,
+			Multiplier:      1.5,
+			Randomizer:      0.25,
+			MaxInterval:     time.Hour,
+		})
+
+		remotes := map[string][]string{
+			"provider": {"provider.example.com"},
+		}
+		ref := Ref{
+			Name:   "active",
+			Commit: Commit{},
+		}
+
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			cancel()
+		}()
+
+		started := time.Now()
+		err := c.MonitorPipelines(ctx, remotes, ref, nil)
+		if err != context.Canceled {
+			t.Fatalf("expected %v but got %v", context.Canceled, err)
+		}
+		if elapsed := time.Now().Sub(started); elapsed > c.pollStrat.InitialInterval {
+			t.Fatalf("call lasted %v but was expected to last less than %v", elapsed, c.pollStrat.InitialInterval)
+		}
+	})
 }

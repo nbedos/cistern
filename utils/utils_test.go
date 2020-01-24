@@ -118,7 +118,7 @@ func TestPollingStrategy_NextInterval(t *testing.T) {
 		InitialInterval: time.Millisecond,
 		Multiplier:      2,
 		Randomizer:      0.25,
-		MaxInterval:     100 * time.Millisecond,
+		MaxInterval:     time.Minute,
 	}
 
 	rand.Seed(0)
