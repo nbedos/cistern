@@ -164,13 +164,17 @@ v                   View the log of the job at the cursor
 
 Escape              Close search prompt
 
-Enter, n            Move to the next match
+Enter, n            Move to the next search match
 
-N                   Move to the previous match
+N                   Move to the previous search match
+
+f                   Follow the current git reference to the commit it points to
 
 g                   Open git reference selection prompt
 
-?                   Show help screen
+r, F5               Refresh pipeline data
+
+?, F1               Show help screen
 
 q                   Quit
 

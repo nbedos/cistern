@@ -128,11 +128,19 @@ var tableKeyBindings = []keyBinding{
 		action: "Move to the previous match",
 	},
 	{
+		keys:   []string{"f"},
+		action: "Follow the current git reference",
+	},
+	{
 		keys:   []string{"g"},
 		action: "Open git reference selection prompt",
 	},
 	{
-		keys:   []string{"?"},
+		keys:   []string{"r", "F5"},
+		action: "Refresh pipeline data",
+	},
+	{
+		keys:   []string{"?", "F1"},
 		action: "Show help screen",
 	},
 	{
@@ -403,7 +411,7 @@ func (c *Controller) shortKeyBindings() tui.StyledString {
 	}
 	s.Fit(tui.Left, c.width)
 	s.Apply(func(s tcell.Style) tcell.Style {
-		return s.Reverse(true)
+		return s.Reverse(true).Bold(true)
 	})
 
 	return s
@@ -829,7 +837,8 @@ func (c *Controller) process(ctx context.Context, event tcell.Event) (providers.
 			}
 
 		case focusTable:
-			if ev.Key() == tcell.KeyRune {
+			switch ev.Key() {
+			case tcell.KeyRune:
 				switch keyRune := ev.Rune(); keyRune {
 				case 'b':
 					if err := c.openActiveRowInBrowser(); err != nil {
@@ -845,7 +854,7 @@ func (c *Controller) process(ctx context.Context, event tcell.Event) (providers.
 				case '/':
 					c.focus = focusSearch
 					c.searchcmd.Focus()
-				case 'u':
+				case 'r':
 					restartPolling = true
 				case 'f':
 					gitRef = providers.Ref{Name: c.ref.Name}
@@ -858,9 +867,13 @@ func (c *Controller) process(ctx context.Context, event tcell.Event) (providers.
 				default:
 					c.table.Process(ev)
 				}
-			} else if ev.Key() == tcell.KeyEnter {
+			case tcell.KeyEnter:
 				c.nextMatch(true)
-			} else {
+			case tcell.KeyF1:
+				c.focus = focusHelp
+			case tcell.KeyF5:
+				restartPolling = true
+			default:
 				c.table.Process(ev)
 			}
 		}
