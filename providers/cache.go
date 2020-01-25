@@ -98,6 +98,13 @@ func monitorRefStatuses(ctx context.Context, p SourceProvider, s utils.PollingSt
 }
 
 func References(path string, conf GitStyle) (tui.Suggestions, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			err = ErrUnknownRepositoryURL
+		}
+		return nil, err
+	}
+
 	r, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
 		return nil, err
@@ -158,30 +165,22 @@ func References(path string, conf GitStyle) (tui.Suggestions, error) {
 	return references, nil
 }
 
-func RemotesAndCommit(path string, ref string) (map[string][]string, Commit, error) {
-	// If a path does not refer to an existing file or directory, go-git will continue
-	// running and will walk its way up the directory structure looking for a .git repository.
-	// This is not ideal for us since running 'cistern -r github.com/owner/repo' from
-	// /home/user/localrepo will make go-git look for a .git repository in
-	// /home/user/localrepo/github.com/owner/repo which will inevitably lead to
-	// /home/user/localrepo which is not what the user expected since the user was
-	// referring to the online repository https://github.com/owner/repo. So instead
-	// we bail out early if the path is invalid, meaning it's not a local path but a url.
+func ResolveCommit(path string, ref string) (Commit, error) {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			err = ErrUnknownRepositoryURL
 		}
-		return nil, Commit{}, err
+		return Commit{}, err
 	}
 
 	r, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
-		return nil, Commit{}, err
+		return Commit{}, err
 	}
 
 	head, err := r.Head()
 	if err != nil {
-		return nil, Commit{}, err
+		return Commit{}, err
 	}
 
 	var hash plumbing.Hash
@@ -191,26 +190,21 @@ func RemotesAndCommit(path string, ref string) (map[string][]string, Commit, err
 		if p, err := r.ResolveRevision(plumbing.Revision(ref)); err == nil {
 			hash = *p
 		} else {
-			// Ideally we'd take this path only for certain error cases but some errors
-			// from go-git that should not be fatal to us are internal making it impossible
-			// to test against them.
-
 			// The failure of ResolveRevision may be due to go-git failure to resolve an
 			// abbreviated SHA. Abbreviated SHAs are quite useful so, for now, circumvent the
 			// problem by using the local git binary.
 			cmd := exec.Command("git", "-C", path, "show", ref, "--pretty=format:%H")
 			bs, err := cmd.Output()
 			if err != nil {
-				return nil, Commit{}, ErrUnknownGitReference
+				return Commit{}, ErrUnknownGitReference
 			}
 
 			hash = plumbing.NewHash(strings.SplitN(string(bs), "\n", 2)[0])
 		}
-
 	}
 	commit, err := r.CommitObject(hash)
 	if err != nil {
-		return nil, Commit{}, err
+		return Commit{}, err
 	}
 
 	c := Commit{
@@ -225,7 +219,7 @@ func RemotesAndCommit(path string, ref string) (map[string][]string, Commit, err
 
 	refs, err := r.References()
 	if err != nil {
-		return nil, Commit{}, err
+		return Commit{}, err
 	}
 
 	err = refs.ForEach(func(ref *plumbing.Reference) error {
@@ -247,12 +241,28 @@ func RemotesAndCommit(path string, ref string) (map[string][]string, Commit, err
 		return nil
 	})
 	if err != nil {
-		return nil, Commit{}, err
+		return Commit{}, err
+	}
+
+	return c, nil
+}
+
+func Remotes(path string) (map[string][]string, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			err = ErrUnknownRepositoryURL
+		}
+		return nil, err
+	}
+
+	r, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{DetectDotGit: true})
+	if err != nil {
+		return nil, err
 	}
 
 	remotes, err := r.Remotes()
 	if err != nil {
-		return nil, Commit{}, err
+		return nil, err
 	}
 	remoteURLs := make(map[string][]string, 0)
 	for _, remote := range remotes {
@@ -276,7 +286,7 @@ func RemotesAndCommit(path string, ref string) (map[string][]string, Commit, err
 		}
 	}
 
-	return remoteURLs, c, nil
+	return remoteURLs, nil
 }
 
 type Cache struct {

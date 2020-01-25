@@ -228,9 +228,10 @@ func createRepository(t *testing.T, remotes []config.RemoteConfig) (string, stri
 	return tmpDir, sha.String()
 }
 
-func TestRemotesAndCommit(t *testing.T) {
+
+func TestRemotes(t *testing.T) {
 	t.Run("invalid path", func(t *testing.T) {
-		_, _, err := RemotesAndCommit("invalid path", "HEAD")
+		_, err := Remotes("invalid path")
 		if err != ErrUnknownRepositoryURL {
 			t.Fatalf("expected %v but got %v", ErrUnknownRepositoryURL, err)
 		}
@@ -240,7 +241,7 @@ func TestRemotesAndCommit(t *testing.T) {
 		repositoryPath, _ := createRepository(t, nil)
 		defer os.RemoveAll(repositoryPath)
 
-		_, _, err := RemotesAndCommit(path.Join(repositoryPath, "invalidpath"), "HEAD")
+		_, err := Remotes(path.Join(repositoryPath, "invalidpath"))
 		if err != ErrUnknownRepositoryURL {
 			t.Fatalf("expected %v but got %v", ErrUnknownRepositoryURL, err)
 		}
@@ -270,7 +271,7 @@ func TestRemotesAndCommit(t *testing.T) {
 			},
 		}
 		repositoryPath, _ := createRepository(t, remotes)
-		//defer os.RemoveAll(repositoryPath)
+		defer os.RemoveAll(repositoryPath)
 
 		// Setup insteadOf configuration
 		cmd := exec.Command("git", "config", "url.push5.insteadOf", "push3")
@@ -284,7 +285,7 @@ func TestRemotesAndCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		urls, _, err := RemotesAndCommit(repositoryPath, "HEAD")
+		urls, err := Remotes(repositoryPath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -297,6 +298,25 @@ func TestRemotesAndCommit(t *testing.T) {
 		}
 		if diff := cmp.Diff(expectedURLs, urls); len(diff) > 0 {
 			t.Fatal(diff)
+		}
+	})
+}
+
+func TestResolveCommit(t *testing.T) {
+	t.Run("invalid path", func(t *testing.T) {
+		_, err := ResolveCommit("invalid path", "HEAD")
+		if err != ErrUnknownRepositoryURL {
+			t.Fatalf("expected %v but got %v", ErrUnknownRepositoryURL, err)
+		}
+	})
+
+	t.Run("invalid path in git repository", func(t *testing.T) {
+		repositoryPath, _ := createRepository(t, nil)
+		defer os.RemoveAll(repositoryPath)
+
+		_, err := ResolveCommit(path.Join(repositoryPath, "invalidpath"), "HEAD")
+		if err != ErrUnknownRepositoryURL {
+			t.Fatalf("expected %v but got %v", ErrUnknownRepositoryURL, err)
 		}
 	})
 
@@ -324,7 +344,7 @@ func TestRemotesAndCommit(t *testing.T) {
 
 		for _, ref := range references {
 			t.Run(fmt.Sprintf("reference %q", ref), func(t *testing.T) {
-				_, commit, err := RemotesAndCommit(repositoryPath, ref)
+				commit, err := ResolveCommit(repositoryPath, ref)
 				if err != nil {
 					t.Fatal(err)
 				}

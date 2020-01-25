@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -24,10 +23,10 @@ import (
 type focus int
 
 const (
-	table focus = iota
-	search
-	ref
-	help
+	focusTable focus = iota
+	focusSearch
+	focusRef
+	focusHelp
 )
 
 type keyBinding struct {
@@ -384,13 +383,13 @@ func helpScreen(emphasis tui.StyleTransform) []tui.StyledString {
 func (c *Controller) shortKeyBindings() tui.StyledString {
 	var bindings []keyBinding
 	switch c.focus {
-	case table:
+	case focusTable:
 		bindings = shortTableKeyBindings
-	case search:
+	case focusSearch:
 		bindings = shortSearchKeyBindings
-	case ref:
+	case focusRef:
 		bindings = shortRefKeyBindings
-	case help:
+	case focusHelp:
 		bindings = shortHelpKeyBindings
 	}
 
@@ -410,7 +409,7 @@ func (c *Controller) shortKeyBindings() tui.StyledString {
 	return s
 }
 
-type WindowDimensions struct {
+type windowDimensions struct {
 	x      int
 	y      int
 	width  int
@@ -437,7 +436,7 @@ type Controller struct {
 	keyhints    *tui.TextArea
 	focus       focus
 	help        *tui.TextArea
-	layout      map[tui.Widget]WindowDimensions
+	layout      map[tui.Widget]windowDimensions
 	style       providers.GitStyle
 }
 
@@ -489,100 +488,83 @@ func NewController(ui *tui.TUI, conf ControllerConfiguration, c providers.Cache)
 		keyhints:  &keyhints,
 		help:      &help,
 		style:     conf.GitStyle,
-		layout:    make(map[tui.Widget]WindowDimensions),
+		layout:    make(map[tui.Widget]windowDimensions),
 	}, nil
 }
 
 func (c *Controller) setRef(ref providers.Ref) {
-	pipelines := make([]tui.TableNode, 0)
-	for _, pipeline := range c.cache.Pipelines(c.ref.Name) {
-		pipelines = append(pipelines, pipeline)
-	}
-	c.table.Replace(pipelines)
 	c.ref = ref
 }
 
-func (c *Controller) focusWidget(f focus) {
-	c.focus = f
-	switch f {
-	case table:
-	case ref:
-	case search:
-	case help:
+func (c *Controller) Run(ctx context.Context, repositoryPath string, ref string) error {
+	isLocalRepository := false
+	remotes, err := providers.Remotes(repositoryPath)
+	switch err {
+	case providers.ErrUnknownRepositoryURL:
+		remotes = map[string][]string{"origin": {repositoryPath}}
+		err = nil
+	case nil:
+		isLocalRepository = true
+	default:
+		return err
 	}
-}
 
-func (c *Controller) Run(ctx context.Context, repositoryURL string, ref string) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	errc := make(chan error)
-	refc := make(chan providers.Ref)
-	updates := make(chan time.Time)
-
+	c.setRef(providers.Ref{Name: ref})
 	c.writeStatus("")
 	c.refresh()
 	c.draw()
 
-	// Start pipeline monitoring
-	go func() {
-		select {
-		case refc <- providers.Ref{
-			Name: ref,
-		}:
-		case <-ctx.Done():
-		}
-	}()
+	errc := make(chan error)
+	if isLocalRepository {
+		go func() {
+			suggestions, err := providers.References(repositoryPath, c.style)
+			if err != nil {
+				errc <- err
+				return
+			}
+			c.refcmd.SetCompletions(suggestions)
+		}()
+	}
 
-	var tmpRef providers.Ref
-	var mux = &sync.Mutex{}
-	var refCtx context.Context
-	var refCancel = func() {}
-	var err error
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	pollCtx, pollCancel := context.WithCancel(ctx)
+	updates := make(chan time.Time)
 	for err == nil {
 		select {
-		case ref := <-refc:
-			// Each time a new git reference is received, cancel the last function call
-			// and start a new one.
-			mux.Lock()
-			tmpRef = ref
-			mux.Unlock()
-			refCancel()
-			refCtx, refCancel = context.WithCancel(ctx)
-			go func(ctx context.Context, ref providers.Ref) {
+		case event := <-c.tui.Eventc:
+			var gitRef providers.Ref
+			var restartPolling bool
+			gitRef, restartPolling, err = c.process(ctx, event)
+			if err != nil {
+				break
+			}
+
+			if isLocalRepository {
 				var err error
-				repositoryURLs := make(map[string][]string)
 
-				name := ref.Name
-				if ref.Commit.Sha != "" {
-					name = ref.Commit.Sha
+				name := gitRef.Name
+				if gitRef.Commit.Sha != "" {
+					name = gitRef.Commit.Sha
 				}
-
-				repositoryURLs, ref.Commit, err = providers.RemotesAndCommit(repositoryURL, name)
-				switch err {
-				case providers.ErrUnknownRepositoryURL:
-					// The path does not refer to a local repository so it probably is a url
-					repositoryURLs["origin"] = append(repositoryURLs["origin"], repositoryURL)
-				case nil:
-					suggestions, err := providers.References(repositoryURL, c.style)
-					if err != nil {
-						errc <- err
-						return
-					}
-					c.refcmd.SetCompletions(suggestions)
-				default:
-					errc <- err
-					return
+				gitRef.Commit, err = providers.ResolveCommit(repositoryPath, name)
+				if err != nil {
+					break
 				}
+			}
 
-				errc <- c.cache.MonitorPipelines(ctx, repositoryURLs, ref, updates)
-			}(refCtx, ref)
+			if refChanged := gitRef.Name != c.ref.Name || gitRef.Sha != c.ref.Sha; restartPolling || refChanged {
+				if refChanged {
+					c.setRef(gitRef)
+				}
+				pollCancel()
+				pollCtx, pollCancel = context.WithCancel(ctx)
+				go func(ctx context.Context, ref providers.Ref) {
+					errc <- c.cache.MonitorPipelines(ctx, remotes, ref, updates)
+				}(pollCtx, gitRef)
+			}
 
 		case <-updates:
-			// Update the controller once we receive an update, meaning the reference exists at
-			// least locally or remotely
-			mux.Lock()
-			c.setRef(tmpRef)
-			mux.Unlock()
 			c.refresh()
 			c.draw()
 
@@ -596,9 +578,6 @@ func (c *Controller) Run(ctx context.Context, repositoryURL string, ref string) 
 			default:
 				err = e
 			}
-
-		case event := <-c.tui.Eventc:
-			err = c.process(ctx, event, refc)
 
 		case <-ctx.Done():
 			err = ctx.Err()
@@ -618,9 +597,6 @@ func (c *Controller) SetHeader(lines []tui.StyledString) {
 func (c *Controller) writeStatus(s string) {
 	msg := tui.NewStyledString(s)
 	msg.Fit(tui.Left, c.width)
-	//msg.Apply(func(s tcell.Style) tcell.Style {
-	//	return s.Reverse(true)
-	//})
 	c.status.WriteContent(msg)
 }
 
@@ -648,44 +624,44 @@ func (c *Controller) resize(width int, height int) {
 	c.width = utils.MaxInt(width, 0)
 	c.height = utils.MaxInt(height, 0)
 
-	c.layout[c.help] = WindowDimensions{
+	c.layout[c.help] = windowDimensions{
 		width:  c.width,
 		height: utils.MaxInt(0, c.height-1),
 	}
 
-	c.layout[c.header] = WindowDimensions{
+	c.layout[c.header] = windowDimensions{
 		width:  c.width,
 		height: utils.MinInt(utils.MinInt(len(c.header.Content)+2, 9), c.height),
 	}
 	y := c.layout[c.header].height
 
-	c.layout[c.table] = WindowDimensions{
+	c.layout[c.table] = windowDimensions{
 		y:      y,
 		width:  c.width,
 		height: utils.MaxInt(0, c.height-c.layout[c.header].height-2),
 	}
 	y += c.layout[c.table].height
 
-	c.layout[c.status] = WindowDimensions{
+	c.layout[c.status] = windowDimensions{
 		y:      y,
 		width:  c.width,
 		height: 1,
 	}
 
-	c.layout[c.searchcmd] = WindowDimensions{
+	c.layout[c.searchcmd] = windowDimensions{
 		y:      y,
 		width:  c.width,
 		height: 1,
 	}
 
-	c.layout[c.refcmd] = WindowDimensions{
+	c.layout[c.refcmd] = windowDimensions{
 		y:      y - utils.MinInt(14, y) + 1,
 		width:  c.width,
 		height: utils.MinInt(14, y),
 	}
 	y += 1
 
-	c.layout[c.keyhints] = WindowDimensions{
+	c.layout[c.keyhints] = windowDimensions{
 		y:      y,
 		width:  c.width,
 		height: 1,
@@ -783,14 +759,14 @@ func (c Controller) openActiveRowInBrowser() error {
 func (c *Controller) draw() {
 	c.tui.Clear()
 	widgets := make([]tui.Widget, 0)
-	if c.focus == help {
+	if c.focus == focusHelp {
 		widgets = append(widgets, c.help)
 	} else {
 		widgets = append(widgets, c.header, c.table)
 		switch c.focus {
-		case ref:
+		case focusRef:
 			widgets = append(widgets, c.refcmd)
-		case search:
+		case focusSearch:
 			widgets = append(widgets, c.searchcmd)
 		default:
 			widgets = append(widgets, c.status)
@@ -809,7 +785,10 @@ func (c *Controller) draw() {
 	c.tui.Show()
 }
 
-func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<- providers.Ref) error {
+func (c *Controller) process(ctx context.Context, event tcell.Event) (providers.Ref, bool, error) {
+	gitRef := c.ref
+	restartPolling := false
+
 	c.writeStatus("")
 
 	switch ev := event.(type) {
@@ -818,80 +797,63 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 		c.resize(sx, sy)
 	case *tcell.EventKey:
 		switch c.focus {
-		case help:
+		case focusHelp:
 			if ev.Key() == tcell.KeyRune && ev.Rune() == 'q' {
-				c.focus = table
+				c.focus = focusTable
 			} else {
 				c.help.Process(ev)
 			}
-		case ref:
+		case focusRef:
 			if ev.Key() == tcell.KeyEnter {
 				if ref := c.refcmd.Input(); ref != "" {
-					go func() {
-						select {
-						case refc <- providers.Ref{Name: ref}:
-							// Do nothing
-						case <-ctx.Done():
-							return
-						}
-					}()
+					gitRef = providers.Ref{Name: ref}
 				}
-				c.focus = table
+				c.focus = focusTable
 			} else {
 				c.refcmd.Process(ev)
 				if ev.Key() == tcell.KeyEsc {
-					c.focus = table
+					c.focus = focusTable
 				}
 			}
 
-		case search:
+		case focusSearch:
 			if ev.Key() == tcell.KeyEnter {
 				c.tableSearch = c.searchcmd.Input()
 				c.nextMatch(true)
-				c.focus = table
+				c.focus = focusTable
 			} else {
 				c.searchcmd.Process(ev)
 				if ev.Key() == tcell.KeyEsc {
-					c.focus = table
+					c.focus = focusTable
 				}
 			}
 
-		case table:
+		case focusTable:
 			if ev.Key() == tcell.KeyRune {
 				switch keyRune := ev.Rune(); keyRune {
 				case 'b':
 					if err := c.openActiveRowInBrowser(); err != nil {
-						return err
+						return gitRef, restartPolling, err
 					}
 				case 'g':
-					c.focus = ref
+					c.focus = focusRef
 					c.refcmd.Focus()
 				case 'n', 'N':
 					c.nextMatch(ev.Rune() == 'n')
 				case 'q':
-					return ErrExit
+					return gitRef, restartPolling, ErrExit
 				case '/':
-					c.focus = search
+					c.focus = focusSearch
 					c.searchcmd.Focus()
 				case 'u':
-					go func() {
-						select {
-						case refc <- c.ref:
-						case <-ctx.Done():
-						}
-					}()
+					restartPolling = true
 				case 'f':
-					go func() {
-						select {
-						case refc <- providers.Ref{Name: c.ref.Name}:
-						case <-ctx.Done():
-						}
-					}()
+					gitRef = providers.Ref{Name: c.ref.Name}
 				case '?':
-					c.focus = help
+					c.focus = focusHelp
 				case 'v':
 					if err := c.viewLog(ctx); err != nil {
-						return err
+						return gitRef, restartPolling, err
 					}
 				default:
 					c.table.Process(ev)
@@ -905,7 +867,7 @@ func (c *Controller) process(ctx context.Context, event tcell.Event, refc chan<-
 	}
 
 	c.draw()
-	return nil
+	return gitRef, restartPolling, nil
 }
 
 func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error), repo string, ref string, conf Configuration) error {
