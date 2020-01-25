@@ -440,6 +440,7 @@ type Controller struct {
 	tableSearch string
 	status      *tui.TextArea
 	refcmd      *tui.Command
+	completec   chan time.Time
 	searchcmd   *tui.Command
 	keyhints    *tui.TextArea
 	focus       focus
@@ -505,19 +506,19 @@ func (c *Controller) setRef(ref providers.Ref) {
 }
 
 func (c *Controller) Run(ctx context.Context, repositoryPath string, ref string) error {
-	isLocalRepository := false
 	remotes, err := providers.Remotes(repositoryPath)
 	switch err {
 	case providers.ErrUnknownRepositoryURL:
-		remotes = map[string][]string{"origin": {repositoryPath}}
+		remotes = map[string][]string{"": {repositoryPath}}
 		err = nil
 	case nil:
-		isLocalRepository = true
+		c.completec = make(chan time.Time)
 	default:
 		return err
 	}
 
-	c.setRef(providers.Ref{Name: ref})
+	isLocalRepository := c.completec != nil
+
 	c.writeStatus("")
 	c.refresh()
 	c.draw()
@@ -525,12 +526,29 @@ func (c *Controller) Run(ctx context.Context, repositoryPath string, ref string)
 	errc := make(chan error)
 	if isLocalRepository {
 		go func() {
-			suggestions, err := providers.References(repositoryPath, c.style)
-			if err != nil {
-				errc <- err
-				return
+			for lastUpdate := time.Now(); ; {
+				select {
+				case <-ctx.Done():
+					return
+				case t := <-c.completec:
+					if t.After(lastUpdate) {
+						lastUpdate = t
+						suggestions, err := providers.References(repositoryPath, c.style)
+						if err != nil {
+							errc <- err
+							return
+						}
+						c.refcmd.SetCompletions(suggestions)
+					}
+				}
 			}
-			c.refcmd.SetCompletions(suggestions)
+		}()
+
+		go func() {
+			select {
+			case <-ctx.Done():
+			case c.completec <- time.Now():
+			}
 		}()
 	}
 
@@ -547,6 +565,9 @@ func (c *Controller) Run(ctx context.Context, repositoryPath string, ref string)
 			if err != nil {
 				break
 			}
+			if gitRef.Name == "" {
+				gitRef.Name = ref
+			}
 
 			if isLocalRepository {
 				var err error
@@ -561,7 +582,8 @@ func (c *Controller) Run(ctx context.Context, repositoryPath string, ref string)
 				}
 			}
 
-			if refChanged := gitRef.Name != c.ref.Name || gitRef.Sha != c.ref.Sha; restartPolling || refChanged {
+			refChanged := gitRef.Name != c.ref.Name || gitRef.Sha != c.ref.Sha
+			if restartPolling || refChanged {
 				if refChanged {
 					c.setRef(gitRef)
 				}
@@ -847,6 +869,15 @@ func (c *Controller) process(ctx context.Context, event tcell.Event) (providers.
 				case 'g':
 					c.focus = focusRef
 					c.refcmd.Focus()
+					if c.completec != nil {
+						// Trigger update of completion suggestions
+						go func() {
+							select {
+							case <-ctx.Done():
+							case c.completec <- time.Now():
+							}
+						}()
+					}
 				case 'n', 'N':
 					c.nextMatch(ev.Rune() == 'n')
 				case 'q':

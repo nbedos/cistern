@@ -161,7 +161,7 @@ func (c *completion) setSuggestions(suggestions Suggestions) {
 
 	c.suggestions = suggestions
 	sort.Sort(c.suggestions)
-	c.pageIndex = nullInt{}
+	c.pageIndex = nullInt{Valid: len(c.suggestions) > 0}
 	c.cursorIndex = c.pageIndex
 }
 
@@ -224,7 +224,7 @@ func (c *completion) Draw(w Window) {
 		valueWidth, infoWidth := 0, 0
 		for i := c.pageIndex.Int; i < len(c.suggestions) && i-c.pageIndex.Int+1 < c.pageSize(); i++ {
 			valueWidth = utils.MaxInt(valueWidth, c.suggestions[i].DisplayValue.Length())
-			infoWidth = utils.MaxInt(infoWidth, c.suggestions[i].DisplayInfo.Length())
+			infoWidth = utils.MaxInt(infoWidth, c.suggestions[i].DisplayInfo.Length()+1)
 		}
 
 		sep := "  "
@@ -238,6 +238,7 @@ func (c *completion) Draw(w Window) {
 			suggestion.Fit(Left, valueWidth)
 			suggestion.Append(sep)
 			suggestion.AppendString(c.suggestions[i].DisplayInfo)
+			suggestion.Append(" ")
 			suggestion.Fit(Left, width)
 			if i == c.cursorIndex.Int {
 				suggestion.Apply(func(s tcell.Style) tcell.Style {

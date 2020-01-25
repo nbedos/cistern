@@ -56,7 +56,11 @@ func monitorRefStatuses(ctx context.Context, p SourceProvider, s utils.PollingSt
 		return err
 	}
 	for i := range commit.Branches {
-		commit.Branches[i] = fmt.Sprintf("%s/%s", remoteName, commit.Branches[i])
+		if remoteName != "" {
+			commit.Branches[i] = fmt.Sprintf("%s/%s", remoteName, commit.Branches[i])
+		} else {
+			commit.Branches[i] = commit.Branches[i]
+		}
 	}
 	select {
 	case commitc <- commit:
