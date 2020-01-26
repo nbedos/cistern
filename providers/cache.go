@@ -27,7 +27,8 @@ var defaultPollingStrategy = utils.PollingStrategy{
 	InitialInterval: 10 * time.Second,
 	Multiplier:      1.5,
 	Randomizer:      0.25,
-	MaxInterval:     2 * time.Minute,
+	MaxInterval:     120 * time.Second,
+	Forever:         false,
 }
 
 type CIProvider interface {
@@ -69,7 +70,7 @@ func monitorRefStatuses(ctx context.Context, p SourceProvider, s utils.PollingSt
 		return ctx.Err()
 	}
 
-	for waitTime := time.Duration(0); waitTime < s.MaxInterval; waitTime = s.NextInterval(waitTime) {
+	for waitTime := time.Duration(0); s.Forever || waitTime < s.MaxInterval; waitTime = s.NextInterval(waitTime) {
 		select {
 		case <-time.After(waitTime):
 			// Do nothing
@@ -305,6 +306,11 @@ type Cache struct {
 }
 
 type Configuration struct {
+	Polling struct {
+		InitialInterval int  `toml:"initial-interval"`
+		MaxInterval     int  `toml:"max-interval"`
+		Forever         bool `toml:"forever"`
+	}
 	GitLab []struct {
 		Name              string   `toml:"name" default:"gitlab"`
 		URL               string   `toml:"url"`
@@ -435,7 +441,12 @@ func (c Configuration) ToCache(ctx context.Context) (Cache, error) {
 		return Cache{}, ErrNoProvider
 	}
 
-	return NewCache(ci, source, defaultPollingStrategy), nil
+	s, err := utils.NewPollingStrategy(c.Polling.InitialInterval, c.Polling.MaxInterval, c.Polling.Forever, defaultPollingStrategy)
+	if err != nil {
+		return Cache{}, err
+	}
+
+	return NewCache(ci, source, s), nil
 }
 
 var ErrNoProvider = errors.New("list of providers must not be empty")
@@ -564,7 +575,7 @@ func (c *Cache) monitorPipeline(ctx context.Context, pid string, u string, updat
 		return fmt.Errorf("cache does not contain any CI provider with ID %q", pid)
 	}
 
-	for waitTime, active := time.Duration(0), true; active; waitTime = c.pollStrat.NextInterval(waitTime) {
+	for waitTime, active := time.Duration(0), true; c.pollStrat.Forever || active; waitTime = c.pollStrat.NextInterval(waitTime) {
 		select {
 		case <-time.After(waitTime):
 			// Do nothing
