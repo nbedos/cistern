@@ -2,9 +2,22 @@
 
 ## Next version
 
+### Features
+
+* User interface: Implement navigation between git reference
+* User interface: Allow refreshing data, following the current git reference and endless polling ([issue #10](https://github.com/nbedos/cistern/issues/10))
+* User interface: Display durations greater or equal to 60 minutes in hours
+* Azure: The URL of a stage, job or task now link to corresponding stage, job or task instead of the pipeline  
+
 ### Bug Fix
 
 * GitLab: Add support for custom SSH host ([issue #20](https://github.com/nbedos/cistern/issues/20))
+
+### Chores
+
+* Remove dependency on github.com/cenkalti/backoff
+* Update all dependencies
+* Enable CI build on Windows
 
 
 

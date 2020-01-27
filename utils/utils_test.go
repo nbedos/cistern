@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -110,4 +111,45 @@ func TestNullDuration_String(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPollingStrategy_NextInterval(t *testing.T) {
+	s := PollingStrategy{
+		InitialInterval: time.Millisecond,
+		Multiplier:      2,
+		Randomizer:      0.25,
+		MaxInterval:     time.Minute,
+	}
+
+	rand.Seed(0)
+	for i := 0; i < 100; i++ {
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			interval := s.InitialInterval
+			for j := 0; j < 10; j++ {
+				nextInterval := s.NextInterval(interval)
+				if float64(nextInterval) < float64(interval)*(2-0.25) || float64(nextInterval) > float64(interval)*(2+0.25) {
+					t.Fail()
+				}
+				interval = nextInterval
+			}
+		})
+	}
+}
+
+func TestNewPollingStrategy(t *testing.T) {
+	t.Run("any zero interval duration must be replaced by the corresponding duration of the default strategy", func(t *testing.T) {
+		d := PollingStrategy{
+			InitialInterval: 1,
+			Multiplier:      2,
+			Randomizer:      3,
+			MaxInterval:     4,
+		}
+		s, err := NewPollingStrategy(0, 0, false, d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(s, d); diff != "" {
+			t.Fatal(diff)
+		}
+	})
 }

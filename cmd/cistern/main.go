@@ -6,8 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"path"
+	"time"
 
 	"github.com/gdamore/tcell"
 	"github.com/nbedos/cistern/utils"
@@ -52,6 +54,7 @@ To lift these restrictions, create a configuration file containing your credenti
 
 func Main(w io.Writer) error {
 	SetupSignalHandlers()
+	rand.Seed(time.Now().UnixNano())
 
 	f := flag.NewFlagSet("cistern", flag.ContinueOnError)
 	null := bytes.NewBuffer(nil)

@@ -33,7 +33,7 @@ CircleCI       no       yes     [https://circleci.com/](https://circleci.com/)
 
 Travis CI      no       yes     [https://travis-ci.org/](https://travis-ci.org/)
                                 [https://travis-ci.com/](https://travis-ci.com/)
-                             
+
 Azure Devops   no       yes     [https://dev.azure.com](https://dev.azure.com)
 
 --------------------------------------------------------
@@ -58,7 +58,7 @@ cistern feature/doc
 ## `-r=REPOSITORY, --repository=REPOSITORY`
 Specify the git repository to monitor. If REPOSITORY is the path of a local repository, cistern
 will monitor all the associated remotes. If REPOSITORY is a URL, cistern will monitor the
-corresponding online repository. 
+corresponding online repository.
 
 If this option is not set, cistern will behave as if it had been set to the path of the current
 directory.
@@ -117,62 +117,134 @@ URL of the step on the website of the provider
 # INTERACTIVE COMMANDS
 Below are the default commands for interacting with cistern.
 
+
+
+## Tabular view
+
 -----------------------------------------------------------------
-Key               Action
-----------------  -----------------------------------------------
-Up, k, Ctrl-p     Move cursor up by one line
+Key                 Action
+------------------  -----------------------------------------------
+Up, k, Ctrl-p       Move cursor up by one line
 
-Down, j, Ctrl-n   Move cursor down by one line
+Down, j, Ctrl-n     Move cursor down by one line
 
-Right, l          Scroll right
+Right, l            Scroll right
 
-Left, h           Scroll left
+Left, h             Scroll left
 
-Ctrl-u            Move cursor up by half a page
+Ctrl-u              Move cursor up by half a page
 
-Page Up           Move cursor up by one page
+Page Up, Ctrl-B     Move cursor up by one page
 
-Ctrl-d            Move cursor down by half a page
+Ctrl-d              Move cursor down by half a page
 
-Page Down         Move cursor down by one page
+Page Down, Ctrl-F   Move cursor down by one page
 
-Home              Move cursor to the first line
+Home                Move cursor to the first line
 
-End               Move cursor to the last line
+End                 Move cursor to the last line
 
-<                 Move sort column left
+<                   Move sort column left
 
-\>                Move sort column right
+!                   Reverse sort order
 
-!                 Reverse sort order
+o, +                Open the fold at the cursor
 
-o, +              Open the fold at the cursor
+O                   Open the fold at the cursor and all sub-folds
 
-O                 Open the fold at the cursor and all sub-folds
+c, -                Close the fold at the cursor
 
-c, -              Close the fold at the cursor
+C                   Close the fold at the cursor and all sub-folds
 
-C                 Close the fold at the cursor and all sub-folds
+b                   Open associated web page in $BROWSER
 
-/                 Open search prompt
+v                   View the log of the job at the cursor
 
-Escape            Close search prompt
+/                   Open search prompt
 
-Enter, n          Move to the next match
+Escape              Close search prompt
 
-N                 Move to the previous match
+Enter, n            Move to the next search match
 
-v                 View the log of the job at the cursor<sup>\[a\]</sup>
+N                   Move to the previous search match
 
-b                 Open associated web page in $BROWSER
+f                   Follow the current git reference to the commit it points to
 
-q                 Quit
+g                   Open git reference selection prompt
 
-?                 Show help for interactive commands
+r, F5               Refresh pipeline data
+
+?, F1               Show help screen
+
+q                   Quit
+
+-----------------------------------------------------------------
+
+
+
+## Search prompt
+
+--------------------------------------
+Key          Action
+-----------  -------------------------
+Enter        Search
+
+Backspace    Delete last character
+
+Ctrl-U       Delete whole line
+
+Escape       Close prompt
+
+--------------------------------------
+
+
+
+## Git reference selection prompt
+
+-----------------------------------------------------------------
+Key                 Action
+------------------  -----------------------------------------------
+Enter               Validate
+
+Backspace           Delete last character
+
+Ctrl-U              Delete whole line
+
+Tab, Shift-Tab      Complete
+
+Up, Ctrl-P          Move the cursor to the previous suggestion
+
+Down, Ctrl-N        Move the cursor to the next suggestion
+
+Page up, Ctrl-B     Move the cursor up by one page
+
+Page down, Ctrl-F   Move the cursor down by one page
+
+Escape              Close prompt
 
 ----------------------------------------------------------
 
-* <sup>\[a\]</sup>  Note that if the job is still running, the log may be incomplete.
+
+## Help screen
+
+----------------------------------------------------------
+Key                    Action
+---------------------  -------------------------------------
+j, Down, Ctrl-N        Scroll down by one line
+
+k, Up, Ctrl-P          Scroll up by one line
+
+Page up, Ctrl-B        Scroll up by one page
+
+Page down, Ctrl-F      Scroll down by one page
+
+Ctrl-U                 Scroll up by half a page
+
+Ctrl-D                 Scroll down by half a page
+
+q                      Exit help screen
+
+----------------------------------------------------------
 
 
 # CONFIGURATION FILE
@@ -190,7 +262,7 @@ If `XDG_CONFIG_HOME` (resp. `XDG_CONFIG_DIRS`) is not set, cistern uses the defa
 
 ## Format
 cistern uses a configuration file in [TOML version v0.5.0](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md)
-format. 
+format.
 
 The complete format of the configuration file is described in the example included in the
 release archives which is also available [on GitHub](https://github.com/nbedos/cistern/blob/master/cmd/cistern/cistern.toml)
@@ -205,7 +277,7 @@ It should be enough to get you started running cistern.
 # $XDG_CONFIG_HOME/cistern/cistern.toml
 
 ## GENERIC OPTIONS ##
-# List of columns displayed on screen. Available columns are 
+# List of columns displayed on screen. Available columns are
 # "ref", "pipeline", "type", "state", "created", "started",
 # "finished", "duration", "xfail", "name", "url"
 columns = ["ref", "pipeline", "type", "state", "started", "duration", "name", "url"]
@@ -217,13 +289,13 @@ sort = "-started"
 
 ## PROVIDERS ##
 [providers]
-# The sections below define credentials for accessing source 
+# The sections below define credentials for accessing source
 # providers (GitHub, GitLab) and CI providers (GitLab, Travis,
 # AppVeyor, Azure Devops, CircleCI).
 #
 # Feel free to remove any section as long as you leave one
 # section for a source provider and one for a CI provider.
-# 
+#
 # When an API token is not set or set to the empty string,
 # cistern will still run but with some limitations:
 #     - GitHub: cistern will hit the rate-limit for
@@ -317,7 +389,7 @@ Monitor pipelines of the current git repository
 ```shell
 # Move to a directory containing a git repository of your choosing
 git clone git@github.com:nbedos/cistern.git && cd cistern
-# Run cistern to list the pipelines associated to the last commit of the repository 
+# Run cistern to list the pipelines associated to the last commit of the repository
 cistern
 
 # Show pipelines associated to a specific commit, tag or branch

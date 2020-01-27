@@ -16,10 +16,29 @@ sort = "-started"
 depth = 2
 
 
-
 ## PROVIDERS ##
 [providers]
-# The 'providers' table is used to define credentials for accessing online services. cistern
+
+[providers.polling]
+# cistern gets information from providers by sending requests to their API at increasing intervals.
+# The duration between two consecutive requests for a given API resource starts at
+# the value defined by the key "initial-interval" and exponentially increases until it reaches
+# the duration "max-interval". Each time a requests returns new data (e.g. a new pipeline, or a
+# pipeline that changed since the last request), the duration between requests is reset to the value
+# of "initial-interval" and starts increasing again.
+
+# Duration of the initial interval in seconds (integer, default: 10)
+initial-interval = 10
+
+# Duration of the maximal interval in seconds (integer, default: 120)
+max-interval = 120
+
+# Continue polling once the duration "max-interval" is reached. The duration between two requests
+# is capped at "max-interval". (boolean, default: false)
+forever = false
+
+
+# The sections below are used to define credentials for accessing online services. cistern
 # relies on two types of providers:
 #
 #    - 'source providers' are used for listing the CI pipelines associated to a given commit

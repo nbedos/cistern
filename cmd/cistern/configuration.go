@@ -22,10 +22,10 @@ const ConfFilename = "cistern.toml"
 // See https://github.com/pelletier/go-toml/issues/274
 type Configuration struct {
 	Providers providers.Configuration `toml:"providers"`
-	Location  string                  `toml:"location" default:"Local"`
-	Columns   []string                `toml:"columns"`
-	Sort      string                  `toml:"sort"`
-	Depth     int                     `toml:"depth" default:"2"`
+	Location  string                           `toml:"location" default:"Local"`
+	Columns   []string                         `toml:"columns"`
+	Sort      string                           `toml:"sort"`
+	Depth     int                              `toml:"depth" default:"2"`
 	Style     struct {
 		Theme   string                        `toml:"theme"`
 		Default *tui.StyleTransformDefinition `toml:"default"`

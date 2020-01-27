@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"math/rand"
 	"net/url"
 	"os"
 	"path"
@@ -176,4 +177,42 @@ func XDGConfigLocations(filename string) []string {
 	}
 
 	return locations
+}
+
+type PollingStrategy struct {
+	InitialInterval time.Duration
+	Multiplier      float64
+	Randomizer      float64
+	MaxInterval     time.Duration
+	Forever         bool
+}
+
+func NewPollingStrategy(initial int, max int, forever bool, d PollingStrategy) (PollingStrategy, error) {
+	d.Forever = forever
+
+	if initial < 0 {
+		return PollingStrategy{}, fmt.Errorf("duration of initial interval of polling strategy must be greater than 0s")
+	} else if initial > 0 {
+		d.InitialInterval = time.Duration(initial) * time.Second
+	}
+
+	if max < 0 {
+		return PollingStrategy{}, fmt.Errorf("duration of maximal interval of polling strategy must be greater than 0s")
+	} else if max > 0 {
+		d.MaxInterval = time.Duration(max) * time.Second
+	}
+
+	return d, nil
+}
+
+func (s PollingStrategy) NextInterval(i time.Duration) time.Duration {
+	if i == 0 {
+		i = s.InitialInterval
+	}
+	d := time.Duration(float64(i) * (s.Multiplier + s.Randomizer*(2*rand.Float64()-1)))
+	if d > s.MaxInterval {
+		return s.MaxInterval
+	}
+
+	return d
 }
