@@ -29,7 +29,7 @@ func TestCache_Save(t *testing.T) {
 				State: Failed,
 			},
 		}
-		if err := c.SavePipeline(p); err != nil {
+		if _, err := c.SavePipeline(p); err != nil {
 			t.Fatal(err)
 		}
 		savedPipeline, exists := c.Pipeline(p.Key())
@@ -60,10 +60,10 @@ func TestCache_Save(t *testing.T) {
 	t.Run("existing build must be overwritten if it's older than the current build", func(t *testing.T) {
 		c := NewCache(nil, nil, utils.PollingStrategy{})
 
-		if err := c.SavePipeline(oldPipeline); err != nil {
+		if _, err := c.SavePipeline(oldPipeline); err != nil {
 			t.Fatal(err)
 		}
-		if err := c.SavePipeline(newPipeline); err != nil {
+		if _, err := c.SavePipeline(newPipeline); err != nil {
 			t.Fatal(err)
 		}
 		savedPipeline, exists := c.Pipeline(oldPipeline.Key())
@@ -79,10 +79,10 @@ func TestCache_Save(t *testing.T) {
 	t.Run("cache.SavePipeline must return ErrObsoleteBuild if the build to save is older than the one in cache", func(t *testing.T) {
 		c := NewCache(nil, nil, utils.PollingStrategy{})
 
-		if err := c.SavePipeline(newPipeline); err != nil {
+		if _, err := c.SavePipeline(newPipeline); err != nil {
 			t.Fatal(err)
 		}
-		if err := c.SavePipeline(oldPipeline); err != ErrObsoleteBuild {
+		if _, err := c.SavePipeline(oldPipeline); err != ErrObsoleteBuild {
 			t.Fatalf("expected %v but got %v", ErrObsoleteBuild, err)
 		}
 	})
@@ -98,7 +98,7 @@ func TestCache_Pipeline(t *testing.T) {
 				ID: id,
 			},
 		}
-		if err := c.SavePipeline(p); err != nil {
+		if _, err := c.SavePipeline(p); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -158,7 +158,7 @@ func TestCache_Pipelines(t *testing.T) {
 	c.SaveCommit("ref1", Commit{Sha: "sha1"})
 	c.SaveCommit("ref2", Commit{Sha: "sha2"})
 	for _, p := range pipelines {
-		if err := c.SavePipeline(p); err != nil {
+		if _, err := c.SavePipeline(p); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -212,7 +212,7 @@ func createRepository(t *testing.T, remotes []config.RemoteConfig) (string, stri
 	}
 	sha, err := w.Commit("message", &git.CommitOptions{
 		Author: &object.Signature{
-			Name:  "nName",
+			Name:  "Name",
 			Email: "email",
 			When:  time.Date(2019, 19, 12, 21, 49, 0, 0, time.UTC),
 		},
@@ -326,7 +326,7 @@ func TestResolveCommit(t *testing.T) {
 
 		expectedCommit := Commit{
 			Sha:      sha,
-			Author:   "nName <email>",
+			Author:   "Name <email>",
 			Date:     time.Date(2019, 19, 12, 21, 49, 0, 0, time.UTC),
 			Message:  "message",
 			Branches: []string{"master"},

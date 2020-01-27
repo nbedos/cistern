@@ -100,6 +100,15 @@ type nodePath struct {
 	len int
 }
 
+func (p nodePath) isParentOf(other nodePath) bool {
+	for i := 0; i < p.len; i++ {
+		if p.ids[i] != other.ids[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func nodePathFromIDs(ids ...nodeID) nodePath {
 	return nodePath{}.append(ids...)
 }
@@ -176,6 +185,16 @@ func (n *innerTableNode) Map(f func(n *innerTableNode)) {
 	for _, child := range n.children {
 		child.Map(f)
 	}
+}
+
+func (t *HierarchicalTable) Collapse(path ...interface{}) {
+	nodeIDs := make([]nodeID, 0, len(path))
+	for _, id := range path {
+		nodeIDs = append(nodeIDs, id)
+	}
+
+	node := t.lookup(nodePathFromIDs(nodeIDs...))
+	t.setTraversable(node, false, false)
 }
 
 func (t *HierarchicalTable) lookup(path nodePath) *innerTableNode {
@@ -298,7 +317,7 @@ func (t *HierarchicalTable) computeTraversal() {
 
 	// Adjust value of pageIndex and cursorIndex
 	for i, row := range t.rows {
-		if row.path == pageNodePath {
+		if  row.path.isParentOf(pageNodePath) || row.path == pageNodePath {
 			t.pageIndex = nullInt{
 				Valid: true,
 				Int:   i,
@@ -308,10 +327,12 @@ func (t *HierarchicalTable) computeTraversal() {
 		// Track the row the cursor was on, unless it was on the first row and the user never
 		// scrolled. This prevents the cursor from moving around when increasingly more rows are
 		// loaded into the table but the user has not interacted with the table yet.
-		if row.path == cursorNodePath && (t.scrolled || (cursorIndex.Valid && cursorIndex.Int > 0)) {
-			t.cursorIndex = nullInt{
-				Valid: true,
-				Int:   i,
+		if t.scrolled || (cursorIndex.Valid && cursorIndex.Int > 0) {
+			if row.path.isParentOf(cursorNodePath) || row.path == cursorNodePath {
+				t.cursorIndex = nullInt{
+					Valid: true,
+					Int:   i,
+				}
 			}
 		}
 	}
@@ -332,8 +353,8 @@ func (t *HierarchicalTable) computeTraversal() {
 		}
 
 		// Show as many rows as possible on screen
-		if t.cursorIndex.Int-t.pageIndex.Int+1 < t.pageSize() {
-			t.pageIndex.Int = utils.MaxInt(0, t.cursorIndex.Int-t.pageSize()+1)
+		if len(t.rows) - t.pageIndex.Int < t.pageSize() {
+			t.pageIndex.Int = utils.MaxInt(0, len(t.rows) - t.pageSize())
 		}
 
 		// Adjust pageIndex so that the cursor is always on screen
@@ -400,18 +421,26 @@ func (t *HierarchicalTable) Replace(nodes []TableNode) {
 	t.computeTraversal()
 }
 
-func (t *HierarchicalTable) setTraversable(traversable bool, recursive bool) {
+func (t *HierarchicalTable) setTraversable(n *innerTableNode, traversable bool, recursive bool) {
+	if n == nil {
+		return
+	}
+
+	if recursive {
+		n.Map(func(node *innerTableNode) {
+			node.traversable = traversable
+		})
+	} else {
+		n.traversable = traversable
+	}
+
+	t.computeTraversal()
+}
+
+func (t *HierarchicalTable) setTraversableAtCursor(traversable bool, recursive bool) {
 	if t.cursorIndex.Valid {
-		if n := t.lookup(t.rows[t.cursorIndex.Int].path); n != nil {
-			if recursive {
-				n.Map(func(node *innerTableNode) {
-					node.traversable = traversable
-				})
-			} else {
-				n.traversable = traversable
-			}
-		}
-		t.computeTraversal()
+		n := t.lookup(t.rows[t.cursorIndex.Int].path)
+		t.setTraversable(n, traversable, recursive)
 	}
 }
 
@@ -629,13 +658,13 @@ func (t *HierarchicalTable) Process(ev *tcell.EventKey) {
 		case 'l':
 			t.horizontalScroll(+1)
 		case 'c':
-			t.setTraversable(false, false)
+			t.setTraversableAtCursor(false, false)
 		case 'C', '-':
-			t.setTraversable(false, true)
+			t.setTraversableAtCursor(false, true)
 		case 'o':
-			t.setTraversable(true, false)
+			t.setTraversableAtCursor(true, false)
 		case 'O', '+':
-			t.setTraversable(true, true)
+			t.setTraversableAtCursor(true, true)
 		case '>':
 			t.sortByNextColumn(false)
 		case '<':

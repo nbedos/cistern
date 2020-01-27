@@ -197,6 +197,70 @@ func (s Step) Map(f func(Step) Step) Step {
 	return s
 }
 
+// Return step identified by stepIDs
+func (s Step) getStep(stepIDs []string) (Step, bool) {
+	step := s
+	for _, id := range stepIDs {
+		exists := false
+		for _, childStep := range step.Children {
+			if childStep.ID == id {
+				exists = true
+				step = childStep
+				break
+			}
+		}
+		if !exists {
+			return Step{}, false
+		}
+	}
+
+	return step, true
+}
+
+type StepStatusChanges struct {
+	Started [][]string
+	Passed  [][]string
+	Failed  [][]string
+}
+
+func (s Step) statusDiff(before Step, prefix []string) map[StepType]*StepStatusChanges {
+	c := map[StepType]*StepStatusChanges{
+		StepPipeline: {},
+		StepStage:    {},
+		StepJob:      {},
+		StepTask:     {},
+	}
+	prefix = append(prefix, s.ID)
+	if s.State != before.State {
+		switch s.State {
+		case Running:
+			c[s.Type].Started = append(c[s.Type].Started, prefix)
+		case Passed:
+			c[s.Type].Passed = append(c[s.Type].Passed, prefix)
+		case Failed, Canceled:
+			if s.AllowFailure {
+				c[s.Type].Passed = append(c[s.Type].Passed, prefix)
+			} else {
+				c[s.Type].Failed = append(c[s.Type].Failed, prefix)
+			}
+		}
+	}
+
+	for _, child := range s.Children {
+		beforeChild, exists := before.getStep([]string{child.ID})
+		if !exists {
+			beforeChild = Step{}
+		}
+		for stepType, childChanges := range child.statusDiff(beforeChild, prefix) {
+			c[stepType].Started = append(c[stepType].Started, childChanges.Started...)
+			c[stepType].Passed = append(c[stepType].Passed, childChanges.Passed...)
+			c[stepType].Failed = append(c[stepType].Failed, childChanges.Failed...)
+		}
+	}
+
+	return c
+}
+
 const (
 	ColumnRef tui.ColumnID = iota
 	ColumnPipeline
@@ -410,26 +474,6 @@ func (ps Pipelines) Diff(others Pipelines) string {
 	return cmp.Diff(ps, others, cmp.AllowUnexported(Pipeline{}, Step{}))
 }
 
-// Return step identified by stepIDs
-func (p Pipeline) getStep(stepIDs []string) (Step, bool) {
-	step := p.Step
-	for _, id := range stepIDs {
-		exists := false
-		for _, childStep := range step.Children {
-			if childStep.ID == id {
-				exists = true
-				step = childStep
-				break
-			}
-		}
-		if !exists {
-			return Step{}, false
-		}
-	}
-
-	return step, true
-}
-
 type PipelineKey struct {
 	ProviderHost string
 	ID           string
@@ -492,5 +536,19 @@ func (p Pipeline) Compare(other tui.TableNode, id tui.ColumnID, i interface{}) i
 		}
 	default:
 		return p.Step.Compare(q.Step, id, i)
+	}
+}
+
+type PipelineChanges struct {
+	Valid bool
+	PipelineKey
+	Changes map[StepType]*StepStatusChanges
+}
+
+func (p Pipeline) StatusDiff(before Pipeline) PipelineChanges {
+	return PipelineChanges{
+		Valid:       true,
+		PipelineKey: p.Key(),
+		Changes:     p.Step.statusDiff(before.Step, nil),
 	}
 }

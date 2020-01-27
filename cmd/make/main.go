@@ -47,7 +47,7 @@ Note: This script relies on the following local executables: go, git, tar and pa
 // Location of the directory where build artifacts are stored
 const buildDirectory = "build"
 
-// nName or path for the go executable
+// Name or path for the go executable
 var goBin = "go"
 
 // List of OS + architecture targets for releases

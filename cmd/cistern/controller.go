@@ -415,9 +415,18 @@ type windowDimensions struct {
 	height int
 }
 
-type ControllerConfiguration struct {
-	tui.TableConfiguration
+type controllerConfiguration struct {
+	AutoCollapse struct {
+		Job      bool `toml:"job"`
+		Stage    bool `toml:"stage"`
+		Pipeline bool `toml:"pipeline"`
+	} `toml:"autocollapse"`
 	providers.GitStyle
+}
+
+type ApplicationConfiguration struct {
+	controllerConfiguration
+	tui.TableConfiguration
 }
 
 type Controller struct {
@@ -437,12 +446,12 @@ type Controller struct {
 	focus       focus
 	help        *tui.TextArea
 	layout      map[tui.Widget]windowDimensions
-	style       providers.GitStyle
+	conf        controllerConfiguration
 }
 
 var ErrExit = errors.New("exit")
 
-func NewController(ui *tui.TUI, conf ControllerConfiguration, c providers.Cache) (Controller, error) {
+func NewController(ui *tui.TUI, conf ApplicationConfiguration, c providers.Cache) (Controller, error) {
 	// Arbitrary values, the correct size will be set when the first RESIZE event is received
 	width, height := ui.Size()
 	header, err := tui.NewTextArea(width, height)
@@ -487,7 +496,7 @@ func NewController(ui *tui.TUI, conf ControllerConfiguration, c providers.Cache)
 		refcmd:    &command,
 		keyhints:  &keyhints,
 		help:      &help,
-		style:     conf.GitStyle,
+		conf:      conf.controllerConfiguration,
 		layout:    make(map[tui.Widget]windowDimensions),
 	}, nil
 }
@@ -524,7 +533,7 @@ func (c *Controller) Run(ctx context.Context, repositoryPath string, ref string)
 				case t := <-c.completec:
 					if t.After(lastUpdate) {
 						lastUpdate = t
-						suggestions, err := providers.References(repositoryPath, c.style)
+						suggestions, err := providers.References(repositoryPath, c.conf.GitStyle)
 						if err != nil {
 							errc <- err
 							return
@@ -546,7 +555,7 @@ func (c *Controller) Run(ctx context.Context, repositoryPath string, ref string)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	pollCtx, pollCancel := context.WithCancel(ctx)
-	updates := make(chan time.Time)
+	updates := make(chan providers.PipelineChanges)
 	for err == nil {
 		select {
 		case event := <-c.tui.Eventc:
@@ -585,7 +594,8 @@ func (c *Controller) Run(ctx context.Context, repositoryPath string, ref string)
 				}(pollCtx, gitRef)
 			}
 
-		case <-updates:
+		case u := <-updates:
+			c.autoCollapse(u)
 			c.refresh()
 			c.draw()
 
@@ -611,6 +621,28 @@ func (c *Controller) Run(ctx context.Context, repositoryPath string, ref string)
 	return err
 }
 
+func (c *Controller) autoCollapse(u providers.PipelineChanges) {
+	if !u.Valid {
+		return
+	}
+
+	for stepType, changes := range u.Changes {
+		if (stepType == providers.StepPipeline && c.conf.AutoCollapse.Pipeline) ||
+			(stepType == providers.StepStage && c.conf.AutoCollapse.Stage) ||
+			(stepType == providers.StepJob && c.conf.AutoCollapse.Job) {
+			for _, path := range changes.Passed {
+				ipath := []interface{}{u.PipelineKey}
+				for i, v := range path {
+					if i >= 1 {
+						ipath = append(ipath, v)
+					}
+				}
+				c.table.Collapse(ipath...)
+			}
+		}
+	}
+}
+
 func (c *Controller) SetHeader(lines []tui.StyledString) {
 	c.header.WriteContent(lines...)
 }
@@ -623,7 +655,7 @@ func (c *Controller) writeStatus(s string) {
 
 func (c *Controller) refresh() {
 	commit, _ := c.cache.Commit(c.ref.Name)
-	c.header.WriteContent(commit.StyledStrings(c.style)...)
+	c.header.WriteContent(commit.StyledStrings(c.conf.GitStyle)...)
 	pipelines := make([]tui.TableNode, 0)
 	for _, pipeline := range c.cache.Pipelines(c.ref.Name) {
 		pipelines = append(pipelines, pipeline)
@@ -911,7 +943,7 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 	//  idle HTTP channel" from GitLab's HTTP client
 	log.SetOutput(ioutil.Discard)
 
-	tableConfig, err := conf.TableConfig(defaultTableColumns)
+	controllerConf, err := conf.ControllerConfig(defaultTableColumns)
 	if err != nil {
 		return err
 	}
@@ -941,11 +973,6 @@ func RunApplication(ctx context.Context, newScreen func() (tcell.Screen, error),
 		// in order to have them return an error in case of a panic.
 		ui.Finish()
 	}()
-
-	controllerConf := ControllerConfiguration{
-		TableConfiguration: tableConfig,
-		GitStyle:           tableConfig.NodeStyle.(providers.StepStyle).GitStyle,
-	}
 
 	controller, err := NewController(&ui, controllerConf, cacheDB)
 	if err != nil {
