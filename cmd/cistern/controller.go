@@ -214,11 +214,7 @@ var shortSearchKeyBindings = []keyBinding{
 	},
 	{
 		keys:   []string{"Backspace"},
-		action: "Delete character",
-	},
-	{
-		keys:   []string{"Ctrl-U"},
-		action: "Delete line",
+		action: "Erase",
 	},
 	{
 		keys:   []string{"Escape"},
@@ -275,12 +271,8 @@ var shortRefKeyBindings = []keyBinding{
 		action: "Complete",
 	},
 	{
-		keys:   []string{"Up"},
-		action: "Up",
-	},
-	{
-		keys:   []string{"Down"},
-		action: "Down",
+		keys:   []string{"Backspace"},
+		action: "Erase",
 	},
 	{
 		keys:   []string{"Escape"},
@@ -406,12 +398,11 @@ func (c *Controller) shortKeyBindings() tui.StyledString {
 		if i > 0 {
 			s.Append("  ")
 		}
-		s.Append(strings.Join(b.keys, "/") + ":")
-		s.Append(b.action)
+		s.Append(strings.Join(b.keys, "/") + ":" + b.action)
 	}
 	s.Fit(tui.Left, c.width)
 	s.Apply(func(s tcell.Style) tcell.Style {
-		return s.Reverse(true).Bold(true)
+		return s.Reverse(true)
 	})
 
 	return s
