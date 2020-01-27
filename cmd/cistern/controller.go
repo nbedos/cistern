@@ -879,6 +879,7 @@ func (c *Controller) process(ctx context.Context, event tcell.Event) (providers.
 				case 'r':
 					restartPolling = true
 				case 'f':
+					restartPolling = true
 					gitRef = providers.Ref{Name: c.ref.Name}
 				case '?':
 					c.focus = focusHelp
