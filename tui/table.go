@@ -151,15 +151,14 @@ func (n innerTableNode) depthFirstTraversal(traverseAll bool) []*innerTableNode 
 	return explored
 }
 
-func (t HierarchicalTable) toInnerTableNode(n TableNode, parent innerTableNode, traversable map[nodePath]bool, depth int) innerTableNode {
+func (t HierarchicalTable) toInnerTableNode(n TableNode, parent innerTableNode, depth int) innerTableNode {
 	path := parent.path.append(n.NodeID())
 	s := innerTableNode{
 		path:        path,
 		values:      n.Values(t.conf.NodeStyle),
-		traversable: traversable[path],
 	}
 
-	if isTraversable, exists := traversable[path]; exists {
+	if isTraversable, exists := t.traversable[path]; exists {
 		s.traversable = isTraversable
 	} else if depth > 0 {
 		s.traversable = true
@@ -172,7 +171,7 @@ func (t HierarchicalTable) toInnerTableNode(n TableNode, parent innerTableNode, 
 	children := n.NodeChildren()
 	t.sortSlice(children)
 	for _, child := range children {
-		innerNode := t.toInnerTableNode(child, s, traversable, depth-1)
+		innerNode := t.toInnerTableNode(child, s, depth-1)
 		s.children = append(s.children, &innerNode)
 	}
 
@@ -241,7 +240,8 @@ type TableConfiguration struct {
 type HierarchicalTable struct {
 	outerNodes []TableNode
 	// List of the top-level innerNodes
-	innerNodes []innerTableNode
+	innerNodes  []innerTableNode
+	traversable map[nodePath]bool
 	// Depth first traversal of all the top-level innerNodes. Needs updating if `innerNodes` or `traversable` changes
 	rows []*innerTableNode
 	// Index in `rows` of the first node of the current page
@@ -267,6 +267,7 @@ func NewHierarchicalTable(conf TableConfiguration, nodes []TableNode, width int,
 		width:       width,
 		conf:        conf,
 		columnWidth: make(map[ColumnID]int),
+		traversable: make(map[nodePath]bool),
 	}
 
 	table.Replace(nodes)
@@ -317,7 +318,7 @@ func (t *HierarchicalTable) computeTraversal() {
 
 	// Adjust value of pageIndex and cursorIndex
 	for i, row := range t.rows {
-		if  row.path.isParentOf(pageNodePath) || row.path == pageNodePath {
+		if row.path.isParentOf(pageNodePath) || row.path == pageNodePath {
 			t.pageIndex = nullInt{
 				Valid: true,
 				Int:   i,
@@ -353,8 +354,8 @@ func (t *HierarchicalTable) computeTraversal() {
 		}
 
 		// Show as many rows as possible on screen
-		if len(t.rows) - t.pageIndex.Int < t.pageSize() {
-			t.pageIndex.Int = utils.MaxInt(0, len(t.rows) - t.pageSize())
+		if len(t.rows)-t.pageIndex.Int < t.pageSize() {
+			t.pageIndex.Int = utils.MaxInt(0, len(t.rows)-t.pageSize())
 		}
 
 		// Adjust pageIndex so that the cursor is always on screen
@@ -404,9 +405,8 @@ func (t *HierarchicalTable) Replace(nodes []TableNode) {
 	copy(t.outerNodes, nodes)
 
 	// Save traversable state
-	traversable := make(map[nodePath]bool, 0)
 	for _, node := range t.depthFirstTraversal(true) {
-		traversable[node.path] = node.traversable
+		t.traversable[node.path] = node.traversable
 	}
 
 	t.sortSlice(nodes)
@@ -414,7 +414,7 @@ func (t *HierarchicalTable) Replace(nodes []TableNode) {
 	// Copy node hierarchy and compute the path of each node along the way
 	t.innerNodes = make([]innerTableNode, 0, len(nodes))
 	for _, n := range nodes {
-		innerNode := t.toInnerTableNode(n, innerTableNode{}, traversable, t.conf.DefaultDepth)
+		innerNode := t.toInnerTableNode(n, innerTableNode{}, t.conf.DefaultDepth)
 		t.innerNodes = append(t.innerNodes, innerNode)
 	}
 
