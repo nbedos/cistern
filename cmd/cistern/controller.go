@@ -595,8 +595,8 @@ func (c *Controller) Run(ctx context.Context, repositoryPath string, ref string)
 			}
 
 		case u := <-updates:
-			c.autoCollapse(u)
 			c.refresh()
+			c.autoCollapse(u)
 			c.draw()
 
 		case e := <-errc:
