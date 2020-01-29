@@ -100,6 +100,10 @@ var tableKeyBindings = []keyBinding{
 		action: "Close the fold at the cursor",
 	},
 	{
+		keys:   []string{"Tab"},
+		action: "Toggle fold open/closed",
+	},
+	{
 		keys:   []string{"C"},
 		action: "Close the fold at the cursor and all sub-folds",
 	},

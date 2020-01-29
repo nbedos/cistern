@@ -156,6 +156,8 @@ c, -                Close the fold at the cursor
 
 C                   Close the fold at the cursor and all sub-folds
 
+Tab                 Toggle fold open/closed
+
 b                   Open associated web page in $BROWSER
 
 v                   View the log of the job at the cursor
