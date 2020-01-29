@@ -92,7 +92,7 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 		Step: Step{
 			ID:        "36",
 			Name:      "build",
-			Type:      StepPipeline,
+			Type:      StepJob,
 			State:     Passed,
 			CreatedAt: time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
 			StartedAt: utils.NullTime{
