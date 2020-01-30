@@ -484,7 +484,8 @@ func (c *Cache) SavePipeline(p Pipeline) (PipelineChanges, error) {
 
 		// updatedAt refers to the last update of the build and does not reflect an eventual
 		// update of a job so default to always updating an active build
-		if !p.State.IsActive() && !p.UpdatedAt.After(existingBuild.UpdatedAt) {
+		isNotAfter := p.UpdatedAt.Valid && existingBuild.UpdatedAt.Valid && !p.UpdatedAt.Time.After(existingBuild.UpdatedAt.Time)
+		if !p.State.IsActive() && isNotAfter {
 			// Point ref to existingBuild
 			if _, exists := c.pipelineBySha[p.SHA]; !exists {
 				c.pipelineBySha[p.SHA] = make(map[PipelineKey]*Pipeline)

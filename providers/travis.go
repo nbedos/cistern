@@ -83,7 +83,7 @@ func (b travisBuild) toPipeline(webURL string) (pipeline Pipeline, err error) {
 	if pipeline.FinishedAt, err = utils.NullTimeFromString(b.FinishedAt); err != nil {
 		return pipeline, err
 	}
-	if pipeline.UpdatedAt, err = time.Parse(time.RFC3339, b.UpdatedAt); err != nil {
+	if pipeline.UpdatedAt, err = utils.NullTimeFromString(b.UpdatedAt); err != nil {
 		return pipeline, err
 	}
 
@@ -101,19 +101,13 @@ func (b travisBuild) toPipeline(webURL string) (pipeline Pipeline, err error) {
 	sort.Slice(b.Jobs, func(i, j int) bool {
 		return b.Jobs[i].Stage.ID < b.Jobs[j].Stage.ID || (b.Jobs[i].Stage.ID == b.Jobs[j].Stage.ID && b.Jobs[i].ID < b.Jobs[j].ID)
 	})
-	for i, travisJob := range b.Jobs {
+	for _, travisJob := range b.Jobs {
 		job, err := travisJob.toStep(webURL)
 		if err != nil {
 			return pipeline, err
 		}
 
-		if i == 0 {
-			pipeline.CreatedAt = job.CreatedAt
-		} else {
-			if job.CreatedAt.Before(pipeline.CreatedAt) {
-				pipeline.CreatedAt = job.CreatedAt
-			}
-		}
+		pipeline.CreatedAt = utils.MinNullTime(job.CreatedAt, pipeline.CreatedAt)
 
 		if travisJob.Stage.ID != 0 {
 			s, err := travisJob.Stage.toStep(pipeline.WebURL.String)
@@ -121,21 +115,13 @@ func (b travisBuild) toPipeline(webURL string) (pipeline Pipeline, err error) {
 				return pipeline, err
 			}
 
-			isNewStage := false
 			if len(pipeline.Children) == 0 || pipeline.Children[len(pipeline.Children)-1].ID != s.ID {
 				pipeline.Children = append(pipeline.Children, s)
-				isNewStage = true
 			}
 
 			stage := &pipeline.Children[len(pipeline.Children)-1]
 			stage.Children = append(stage.Children, job)
-			if isNewStage {
-				stage.CreatedAt = job.CreatedAt
-			} else {
-				if job.CreatedAt.Before(stage.CreatedAt) {
-					stage.CreatedAt = job.CreatedAt
-				}
-			}
+			stage.CreatedAt = utils.MinNullTime(job.CreatedAt, stage.CreatedAt)
 		} else {
 			pipeline.Children = append(pipeline.Children, job)
 		}
@@ -216,12 +202,8 @@ func (j travisJob) toStep(webURL string) (Step, error) {
 		AllowFailure: j.AllowFailure,
 	}
 
-	job.CreatedAt, err = time.Parse(time.RFC3339, j.CreatedAt)
-	if err != nil {
-		return job, err
-	}
-
 	ats := map[string]*utils.NullTime{
+		j.CreatedAt:  &job.CreatedAt,
 		j.StartedAt:  &job.StartedAt,
 		j.FinishedAt: &job.FinishedAt,
 	}

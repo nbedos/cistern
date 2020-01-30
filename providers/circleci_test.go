@@ -94,7 +94,10 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 			Name:      "build",
 			Type:      StepJob,
 			State:     Passed,
-			CreatedAt: time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
+			},
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 21, 14, 40, 32, 555000000, time.UTC),
@@ -103,7 +106,10 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 				Valid: true,
 				Time:  time.Date(2019, 11, 21, 14, 41, 6, 461000000, time.UTC),
 			},
-			UpdatedAt: time.Date(2019, 11, 21, 14, 41, 6, 461000000, time.UTC),
+			UpdatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 21, 14, 41, 6, 461000000, time.UTC),
+			},
 			Duration: utils.NullDuration{
 				Valid:    true,
 				Duration: 33*time.Second + 906*time.Millisecond,
@@ -119,7 +125,10 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 					Name:  "Spin up Environment",
 					Type:  3,
 					State: "passed",
-					CreatedAt: time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
+					CreatedAt: utils.NullTime{
+						Valid: true,
+						Time:  time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
+					},
 					StartedAt: utils.NullTime{
 						Valid: true,
 						Time:  time.Date(2019, 11, 21, 14, 40, 32, 620000000, time.UTC),
@@ -172,5 +181,16 @@ func TestCircleCIClient_Log(t *testing.T) {
 
 	if diff := cmp.Diff(log, "log"); len(diff) > 0 {
 		t.Fatal(diff)
+	}
+}
+
+func TestCircleCIBuild_NullCreationDate(t *testing.T){
+	// Regression test for https://github.com/nbedos/cistern/issues/24
+	p, err := circleCIBuild{}.toPipeline()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.CreatedAt.Valid {
+		t.Fatal("expected p.CreatedAt.Valid to be false but got true")
 	}
 }

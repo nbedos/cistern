@@ -52,10 +52,13 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			IsTag: false,
 		},
 		Step: Step{
-			ID:        "609256446",
-			Type:      StepPipeline,
-			State:     Failed,
-			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
+			ID:    "609256446",
+			Type:  StepPipeline,
+			State: Failed,
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
+			},
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 53, 52, 0, time.UTC),
@@ -64,7 +67,10 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 54, 18, 0, time.UTC),
 			},
-			UpdatedAt: time.Date(2019, 11, 8, 20, 54, 19, 108000000, time.UTC),
+			UpdatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 20, 54, 19, 108000000, time.UTC),
+			},
 			Duration: utils.NullDuration{
 				Valid:    true,
 				Duration: 114 * time.Second,
@@ -78,11 +84,14 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 
 	expectedPipeline.Children = []Step{
 		{
-			ID:        "11290169",
-			Type:      StepStage,
-			Name:      "Tests",
-			State:     Failed,
-			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
+			ID:    "11290169",
+			Type:  StepStage,
+			Name:  "Tests",
+			State: Failed,
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
+			},
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 53, 52, 0, time.UTC),
@@ -103,11 +112,14 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 	}
 	expectedPipeline.Children[0].Children = []Step{
 		{
-			ID:        "609256447",
-			Type:      StepJob,
-			State:     Failed,
-			Name:      "GoLang 1.13 on Ubuntu Bionic",
-			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
+			ID:    "609256447",
+			Type:  StepJob,
+			State: Failed,
+			Name:  "GoLang 1.13 on Ubuntu Bionic",
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 14, 26, 21, 506000000, time.UTC),
+			},
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 53, 52, 0, time.UTC),
@@ -128,11 +140,14 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			AllowFailure: false,
 		},
 		{
-			ID:        "609256448",
-			Type:      StepJob,
-			State:     Failed,
-			Name:      "GoLang 1.12 on Ubuntu Trusty",
-			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 509000000, time.UTC),
+			ID:    "609256448",
+			Type:  StepJob,
+			State: Failed,
+			Name:  "GoLang 1.12 on Ubuntu Trusty",
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 14, 26, 21, 509000000, time.UTC),
+			},
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 32, 48, 0, time.UTC),
@@ -153,11 +168,14 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			AllowFailure: false,
 		},
 		{
-			ID:        "609256449",
-			Type:      StepJob,
-			State:     Failed,
-			Name:      "GoLang 1.13 on macOS 10.14",
-			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 512000000, time.UTC),
+			ID:    "609256449",
+			Type:  StepJob,
+			State: Failed,
+			Name:  "GoLang 1.13 on macOS 10.14",
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 14, 26, 21, 512000000, time.UTC),
+			},
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 33, 44, 0, time.UTC),
@@ -178,11 +196,14 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 			AllowFailure: false,
 		},
 		{
-			ID:        "609256450",
-			Type:      StepJob,
-			State:     Failed,
-			Name:      "GoLang 1.12 on macOS 10.13",
-			CreatedAt: time.Date(2019, 11, 8, 14, 26, 21, 514000000, time.UTC),
+			ID:    "609256450",
+			Type:  StepJob,
+			State: Failed,
+			Name:  "GoLang 1.12 on macOS 10.13",
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 8, 14, 26, 21, 514000000, time.UTC),
+			},
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 8, 20, 33, 39, 0, time.UTC),

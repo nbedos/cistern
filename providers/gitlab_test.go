@@ -140,7 +140,10 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 			Type:         StepPipeline,
 			State:        Passed,
 			AllowFailure: false,
-			CreatedAt:    time.Date(2019, 12, 15, 21, 46, 40, 694000000, time.UTC),
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 12, 15, 21, 46, 40, 694000000, time.UTC),
+			},
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 12, 15, 21, 46, 41, 214000000, time.UTC),
@@ -149,7 +152,10 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 				Valid: true,
 				Time:  time.Date(2019, 12, 15, 21, 48, 13, 72000000, time.UTC),
 			},
-			UpdatedAt: time.Date(2019, 12, 15, 21, 48, 13, 77000000, time.UTC),
+			UpdatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 12, 15, 21, 48, 13, 77000000, time.UTC),
+			},
 			Duration: utils.NullDuration{
 				Valid:    true,
 				Duration: time.Minute + 31*time.Second,
@@ -160,11 +166,14 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 			},
 			Children: []Step{
 				{
-					ID:        "1",
-					Name:      "test",
-					Type:      1,
-					State:     "passed",
-					CreatedAt: time.Date(2019, 12, 15, 21, 46, 40, 706000000, time.UTC),
+					ID:    "1",
+					Name:  "test",
+					Type:  1,
+					State: "passed",
+					CreatedAt: utils.NullTime{
+						Valid: true,
+						Time:  time.Date(2019, 12, 15, 21, 46, 40, 706000000, time.UTC),
+					},
 					StartedAt: utils.NullTime{
 						Valid: true,
 						Time:  time.Date(2019, 12, 15, 21, 46, 41, 151000000, time.UTC),
@@ -183,11 +192,14 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 					},
 					Children: []Step{
 						{
-							ID:        "379869167",
-							Name:      "golang 1.13",
-							Type:      2,
-							State:     "passed",
-							CreatedAt: time.Date(2019, 12, 15, 21, 46, 40, 706000000, time.UTC),
+							ID:    "379869167",
+							Name:  "golang 1.13",
+							Type:  2,
+							State: "passed",
+							CreatedAt: utils.NullTime{
+								Valid: true,
+								Time:  time.Date(2019, 12, 15, 21, 46, 40, 706000000, time.UTC),
+							},
 							StartedAt: utils.NullTime{
 								Valid: true,
 								Time:  time.Date(2019, 12, 15, 21, 46, 41, 151000000, time.UTC),

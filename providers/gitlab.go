@@ -385,10 +385,6 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 		return pipeline, err
 	}
 
-	if gitlabPipeline.UpdatedAt == nil {
-		return pipeline, fmt.Errorf("missing UpdatedAt date for pipeline #%d", gitlabPipeline.ID)
-	}
-
 	pipeline = Pipeline{
 		GitReference: GitReference{
 			SHA:   gitlabPipeline.SHA,
@@ -399,9 +395,10 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 			ID:         strconv.Itoa(gitlabPipeline.ID),
 			Type:       StepPipeline,
 			State:      fromGitLabState(gitlabPipeline.Status),
+			CreatedAt:  utils.NullTimeFromTime(gitlabPipeline.CreatedAt),
 			StartedAt:  utils.NullTimeFromTime(gitlabPipeline.StartedAt),
 			FinishedAt: utils.NullTimeFromTime(gitlabPipeline.FinishedAt),
-			UpdatedAt:  *gitlabPipeline.UpdatedAt,
+			UpdatedAt:  utils.NullTimeFromTime(gitlabPipeline.UpdatedAt),
 			Duration: utils.NullDuration{
 				Duration: time.Duration(gitlabPipeline.Duration) * time.Second,
 				Valid:    gitlabPipeline.Duration > 0,
@@ -412,12 +409,6 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 			},
 		},
 	}
-
-	if gitlabPipeline.CreatedAt == nil {
-		return pipeline, fmt.Errorf("missing CreatedAt date for pipeline #%d", gitlabPipeline.ID)
-	}
-
-	pipeline.Step.CreatedAt = *gitlabPipeline.CreatedAt
 
 	jobs, err := c.fetchJobs(ctx, slug, gitlabPipeline.ID)
 	if err != nil {
@@ -446,6 +437,7 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 			Log: Log{
 				Key: slug,
 			},
+			CreatedAt:  utils.NullTimeFromTime(gitlabJob.CreatedAt),
 			StartedAt:  utils.NullTimeFromTime(gitlabJob.StartedAt),
 			FinishedAt: utils.NullTimeFromTime(gitlabJob.FinishedAt),
 			Duration: utils.NullDuration{
@@ -458,10 +450,6 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 			},
 			AllowFailure: gitlabJob.AllowFailure,
 		}
-		if gitlabJob.CreatedAt == nil {
-			return pipeline, fmt.Errorf("missing CreatedAt date for job #%d", gitlabJob.ID)
-		}
-		job.CreatedAt = *gitlabJob.CreatedAt
 
 		index := stagesIndexByName[gitlabJob.Stage]
 		pipeline.Children[index].Children = append(pipeline.Children[index].Children, job)

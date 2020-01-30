@@ -68,15 +68,9 @@ func Aggregate(steps []Step) Step {
 		Children:   steps,
 	}
 
-	s.CreatedAt = first.CreatedAt
-	if last.CreatedAt.Before(s.CreatedAt) {
-		s.CreatedAt = last.CreatedAt
-	}
+	s.CreatedAt = utils.MinNullTime(first.CreatedAt, last.CreatedAt)
 	s.Duration = utils.NullSub(s.FinishedAt, s.StartedAt)
-	s.UpdatedAt = first.UpdatedAt
-	if last.UpdatedAt.After(s.UpdatedAt) {
-		s.UpdatedAt = last.UpdatedAt
-	}
+	s.UpdatedAt = utils.MaxNullTime(first.UpdatedAt, last.UpdatedAt)
 
 	return s
 }
@@ -173,10 +167,10 @@ type Step struct {
 	Type         StepType
 	State        State
 	AllowFailure bool
-	CreatedAt    time.Time
+	CreatedAt    utils.NullTime
 	StartedAt    utils.NullTime
 	FinishedAt   utils.NullTime
-	UpdatedAt    time.Time
+	UpdatedAt    utils.NullTime
 	Duration     utils.NullDuration
 	WebURL       utils.NullString
 	Log          Log
@@ -269,7 +263,6 @@ const (
 	ColumnCreated
 	ColumnStarted
 	ColumnFinished
-	ColumnUpdated
 	ColumnDuration
 	ColumnName
 	ColumnWebURL
@@ -310,14 +303,10 @@ type StepStyle struct {
 func (s Step) Values(v interface{}) map[tui.ColumnID]tui.StyledString {
 	conf := v.(StepStyle)
 
-	timeToString := func(t time.Time) string {
-		return t.In(conf.Location).Truncate(time.Second).Format("Jan 2 15:04")
-	}
-
 	nullTimeToString := func(t utils.NullTime) tui.StyledString {
 		s := "-"
 		if t.Valid {
-			s = timeToString(t.Time)
+			s = t.Time.In(conf.Location).Truncate(time.Second).Format("Jan 2 15:04")
 		}
 		return tui.NewStyledString(s)
 	}
@@ -365,10 +354,9 @@ func (s Step) Values(v interface{}) map[tui.ColumnID]tui.StyledString {
 		ColumnType:           tui.NewStyledString(typeChar),
 		ColumnState:          state,
 		ColumnAllowedFailure: tui.NewStyledString(allowedFailure),
-		ColumnCreated:        tui.NewStyledString(timeToString(s.CreatedAt)),
+		ColumnCreated:        nullTimeToString(s.CreatedAt),
 		ColumnStarted:        nullTimeToString(s.StartedAt),
 		ColumnFinished:       nullTimeToString(s.FinishedAt),
-		ColumnUpdated:        tui.NewStyledString(timeToString(s.UpdatedAt)),
 		ColumnDuration:       tui.NewStyledString(s.Duration.String()),
 		ColumnName:           tui.NewStyledString(s.Name),
 		ColumnWebURL:         tui.NewStyledString(webURL),
@@ -388,21 +376,16 @@ func (s Step) Compare(t tui.TableNode, id tui.ColumnID, i interface{}) int {
 			return 1
 		}
 
-	case ColumnCreated:
-		if s.CreatedAt.Before(other.CreatedAt) {
-			return -1
-		} else if s.CreatedAt.Equal(other.CreatedAt) {
-			return 0
-		} else {
-			return 1
-		}
-
-	case ColumnStarted, ColumnFinished:
+	case ColumnCreated, ColumnStarted, ColumnFinished:
 		var v, vOther utils.NullTime
-		if id == ColumnStarted {
+		switch id {
+		case ColumnCreated:
+			v = s.CreatedAt
+			vOther = other.CreatedAt
+		case ColumnStarted:
 			v = s.StartedAt
 			vOther = other.StartedAt
-		} else {
+		case ColumnFinished:
 			v = s.FinishedAt
 			vOther = other.FinishedAt
 		}
