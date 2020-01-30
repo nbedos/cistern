@@ -60,8 +60,6 @@ stages:
      displayName: 'Unit tests on '
      strategy:
        matrix:
-         macOS_10_13:
-           imageName: 'macos-10.13'
          macOS_10_14:
            imageName: 'macos-10.14'
      pool:

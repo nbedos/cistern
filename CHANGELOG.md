@@ -19,6 +19,7 @@
 * Remove dependency on github.com/cenkalti/backoff
 * Update all dependencies
 * Enable CI build on Windows
+* Disable CI build on macOS 10.13 for Azure due to upcoming removal of image
 
 
 
