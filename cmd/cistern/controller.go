@@ -163,12 +163,8 @@ var shortTableKeyBindings = []keyBinding{
 		action: "Up",
 	},
 	{
-		keys:   []string{"oO"},
-		action: "Open",
-	},
-	{
-		keys:   []string{"cC"},
-		action: "Close",
+		keys:   []string{"Tab"},
+		action: "Open/Close",
 	},
 	{
 		keys:   []string{"/"},
