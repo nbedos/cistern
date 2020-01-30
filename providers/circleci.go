@@ -306,7 +306,7 @@ func (b circleCIBuild) toPipeline() (Pipeline, error) {
 		Step: Step{
 			ID:    strconv.Itoa(b.ID),
 			Name:  b.Workflows.JobName,
-			Type:  StepPipeline,
+			Type:  StepJob,
 			State: fromCircleCIStatus(b.Status),
 			WebURL: utils.NullString{
 				String: b.WebURL,

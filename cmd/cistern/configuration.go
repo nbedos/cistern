@@ -21,12 +21,17 @@ const ConfFilename = "cistern.toml"
 // Warning: go-toml ignores default values on fields of nested structs
 // See https://github.com/pelletier/go-toml/issues/274
 type Configuration struct {
-	Providers providers.Configuration `toml:"providers"`
-	Location  string                           `toml:"location" default:"Local"`
-	Columns   []string                         `toml:"columns"`
-	Sort      string                           `toml:"sort"`
-	Depth     int                              `toml:"depth" default:"2"`
-	Style     struct {
+	Providers    providers.Configuration `toml:"providers"`
+	Location     string                  `toml:"location" default:"Local"`
+	Columns      []string                `toml:"columns"`
+	Sort         string                  `toml:"sort"`
+	Depth        int                     `toml:"depth" default:"2"`
+	AutoCollapse struct {
+		Job      bool `toml:"job"`
+		Stage    bool `toml:"stage"`
+		Pipeline bool `toml:"pipeline"`
+	} `toml:"autocollapse"`
+	Style struct {
 		Theme   string                        `toml:"theme"`
 		Default *tui.StyleTransformDefinition `toml:"default"`
 		Table   struct {
@@ -180,6 +185,21 @@ var defaultTableColumns = map[tui.ColumnID]tui.Column{
 		MaxWidth:  maxWidth,
 		Alignment: tui.Left,
 	},
+}
+
+func (c Configuration) ControllerConfig(allColumns map[tui.ColumnID]tui.Column) (ApplicationConfiguration, error) {
+	tableConfig, err := c.TableConfig(allColumns)
+	if err != nil {
+		return ApplicationConfiguration{}, err
+	}
+
+	return ApplicationConfiguration{
+		TableConfiguration: tableConfig,
+		controllerConfiguration: controllerConfiguration{
+			GitStyle:     tableConfig.NodeStyle.(providers.StepStyle).GitStyle,
+			AutoCollapse: c.AutoCollapse,
+		},
+	}, nil
 }
 
 func (c Configuration) TableConfig(allColumns map[tui.ColumnID]tui.Column) (tui.TableConfiguration, error) {

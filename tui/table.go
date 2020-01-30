@@ -100,6 +100,15 @@ type nodePath struct {
 	len int
 }
 
+func (p nodePath) isParentOf(other nodePath) bool {
+	for i := 0; i < p.len; i++ {
+		if p.ids[i] != other.ids[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func nodePathFromIDs(ids ...nodeID) nodePath {
 	return nodePath{}.append(ids...)
 }
@@ -142,15 +151,14 @@ func (n innerTableNode) depthFirstTraversal(traverseAll bool) []*innerTableNode 
 	return explored
 }
 
-func (t HierarchicalTable) toInnerTableNode(n TableNode, parent innerTableNode, traversable map[nodePath]bool, depth int) innerTableNode {
+func (t HierarchicalTable) toInnerTableNode(n TableNode, parent innerTableNode, depth int) innerTableNode {
 	path := parent.path.append(n.NodeID())
 	s := innerTableNode{
-		path:        path,
-		values:      n.Values(t.conf.NodeStyle),
-		traversable: traversable[path],
+		path:   path,
+		values: n.Values(t.conf.NodeStyle),
 	}
 
-	if isTraversable, exists := traversable[path]; exists {
+	if isTraversable, exists := t.traversable[path]; exists {
 		s.traversable = isTraversable
 	} else if depth > 0 {
 		s.traversable = true
@@ -163,7 +171,7 @@ func (t HierarchicalTable) toInnerTableNode(n TableNode, parent innerTableNode, 
 	children := n.NodeChildren()
 	t.sortSlice(children)
 	for _, child := range children {
-		innerNode := t.toInnerTableNode(child, s, traversable, depth-1)
+		innerNode := t.toInnerTableNode(child, s, depth-1)
 		s.children = append(s.children, &innerNode)
 	}
 
@@ -176,6 +184,16 @@ func (n *innerTableNode) Map(f func(n *innerTableNode)) {
 	for _, child := range n.children {
 		child.Map(f)
 	}
+}
+
+func (t *HierarchicalTable) Collapse(path ...interface{}) {
+	nodeIDs := make([]nodeID, 0, len(path))
+	for _, id := range path {
+		nodeIDs = append(nodeIDs, id)
+	}
+
+	node := t.lookup(nodePathFromIDs(nodeIDs...))
+	t.setTraversable(node, false, false)
 }
 
 func (t *HierarchicalTable) lookup(path nodePath) *innerTableNode {
@@ -222,7 +240,8 @@ type TableConfiguration struct {
 type HierarchicalTable struct {
 	outerNodes []TableNode
 	// List of the top-level innerNodes
-	innerNodes []innerTableNode
+	innerNodes  []innerTableNode
+	traversable map[nodePath]bool
 	// Depth first traversal of all the top-level innerNodes. Needs updating if `innerNodes` or `traversable` changes
 	rows []*innerTableNode
 	// Index in `rows` of the first node of the current page
@@ -248,6 +267,7 @@ func NewHierarchicalTable(conf TableConfiguration, nodes []TableNode, width int,
 		width:       width,
 		conf:        conf,
 		columnWidth: make(map[ColumnID]int),
+		traversable: make(map[nodePath]bool),
 	}
 
 	table.Replace(nodes)
@@ -298,7 +318,7 @@ func (t *HierarchicalTable) computeTraversal() {
 
 	// Adjust value of pageIndex and cursorIndex
 	for i, row := range t.rows {
-		if row.path == pageNodePath {
+		if row.path.isParentOf(pageNodePath) || row.path == pageNodePath {
 			t.pageIndex = nullInt{
 				Valid: true,
 				Int:   i,
@@ -308,10 +328,12 @@ func (t *HierarchicalTable) computeTraversal() {
 		// Track the row the cursor was on, unless it was on the first row and the user never
 		// scrolled. This prevents the cursor from moving around when increasingly more rows are
 		// loaded into the table but the user has not interacted with the table yet.
-		if row.path == cursorNodePath && (t.scrolled || (cursorIndex.Valid && cursorIndex.Int > 0)) {
-			t.cursorIndex = nullInt{
-				Valid: true,
-				Int:   i,
+		if t.scrolled || (cursorIndex.Valid && cursorIndex.Int > 0) {
+			if row.path.isParentOf(cursorNodePath) || row.path == cursorNodePath {
+				t.cursorIndex = nullInt{
+					Valid: true,
+					Int:   i,
+				}
 			}
 		}
 	}
@@ -332,8 +354,8 @@ func (t *HierarchicalTable) computeTraversal() {
 		}
 
 		// Show as many rows as possible on screen
-		if t.cursorIndex.Int-t.pageIndex.Int+1 < t.pageSize() {
-			t.pageIndex.Int = utils.MaxInt(0, t.cursorIndex.Int-t.pageSize()+1)
+		if len(t.rows)-t.pageIndex.Int < t.pageSize() {
+			t.pageIndex.Int = utils.MaxInt(0, len(t.rows)-t.pageSize())
 		}
 
 		// Adjust pageIndex so that the cursor is always on screen
@@ -383,9 +405,8 @@ func (t *HierarchicalTable) Replace(nodes []TableNode) {
 	copy(t.outerNodes, nodes)
 
 	// Save traversable state
-	traversable := make(map[nodePath]bool, 0)
 	for _, node := range t.depthFirstTraversal(true) {
-		traversable[node.path] = node.traversable
+		t.traversable[node.path] = node.traversable
 	}
 
 	t.sortSlice(nodes)
@@ -393,25 +414,40 @@ func (t *HierarchicalTable) Replace(nodes []TableNode) {
 	// Copy node hierarchy and compute the path of each node along the way
 	t.innerNodes = make([]innerTableNode, 0, len(nodes))
 	for _, n := range nodes {
-		innerNode := t.toInnerTableNode(n, innerTableNode{}, traversable, t.conf.DefaultDepth)
+		innerNode := t.toInnerTableNode(n, innerTableNode{}, t.conf.DefaultDepth)
 		t.innerNodes = append(t.innerNodes, innerNode)
 	}
 
 	t.computeTraversal()
 }
 
-func (t *HierarchicalTable) setTraversable(traversable bool, recursive bool) {
+func (t *HierarchicalTable) setTraversable(n *innerTableNode, traversable bool, recursive bool) {
+	if n == nil {
+		return
+	}
+
+	if recursive {
+		n.Map(func(node *innerTableNode) {
+			node.traversable = traversable
+		})
+	} else {
+		n.traversable = traversable
+	}
+
+	t.computeTraversal()
+}
+
+func (t *HierarchicalTable) toggleTraversableAtCursor() {
 	if t.cursorIndex.Valid {
-		if n := t.lookup(t.rows[t.cursorIndex.Int].path); n != nil {
-			if recursive {
-				n.Map(func(node *innerTableNode) {
-					node.traversable = traversable
-				})
-			} else {
-				n.traversable = traversable
-			}
-		}
-		t.computeTraversal()
+		n := t.lookup(t.rows[t.cursorIndex.Int].path)
+		t.setTraversable(n, !n.traversable, false)
+	}
+}
+
+func (t *HierarchicalTable) setTraversableAtCursor(traversable bool, recursive bool) {
+	if t.cursorIndex.Valid {
+		n := t.lookup(t.rows[t.cursorIndex.Int].path)
+		t.setTraversable(n, traversable, recursive)
 	}
 }
 
@@ -618,6 +654,8 @@ func (t *HierarchicalTable) Process(ev *tcell.EventKey) {
 		t.verticalScroll(-len(t.rows))
 	case tcell.KeyEnd:
 		t.verticalScroll(len(t.rows))
+	case tcell.KeyTab:
+		t.toggleTraversableAtCursor()
 	case tcell.KeyRune:
 		switch keyRune := ev.Rune(); keyRune {
 		case 'j':
@@ -629,13 +667,13 @@ func (t *HierarchicalTable) Process(ev *tcell.EventKey) {
 		case 'l':
 			t.horizontalScroll(+1)
 		case 'c':
-			t.setTraversable(false, false)
+			t.setTraversableAtCursor(false, false)
 		case 'C', '-':
-			t.setTraversable(false, true)
+			t.setTraversableAtCursor(false, true)
 		case 'o':
-			t.setTraversable(true, false)
+			t.setTraversableAtCursor(true, false)
 		case 'O', '+':
-			t.setTraversable(true, true)
+			t.setTraversableAtCursor(true, true)
 		case '>':
 			t.sortByNextColumn(false)
 		case '<':

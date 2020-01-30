@@ -21,9 +21,11 @@ func setup() (Controller, func(), error) {
 		return Controller{}, nil, err
 	}
 	c := providers.NewCache(nil, nil, utils.PollingStrategy{})
-	conf := ControllerConfiguration{
-		GitStyle: providers.GitStyle{
-			Location: time.UTC,
+	conf := ApplicationConfiguration{
+		controllerConfiguration: controllerConfiguration{
+			GitStyle: providers.GitStyle{
+				Location: time.UTC,
+			},
 		},
 	}
 	controller, err := NewController(&ui, conf, c)
@@ -67,4 +69,3 @@ func TestRunApplication(t *testing.T) {
 		}
 	})
 }
-

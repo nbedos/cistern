@@ -474,23 +474,29 @@ var ErrObsoleteBuild = errors.New("build to save is older than current build in 
 // already stored in cache, it will be overwritten if the build to save is more recent
 // than the build in  If the build to save is older than the build in cache,
 // SavePipeline will return ErrObsoleteBuild.
-func (c *Cache) SavePipeline(p Pipeline) error {
+func (c *Cache) SavePipeline(p Pipeline) (PipelineChanges, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+	var changes PipelineChanges
 
-	existingBuild, exists := c.pipelineByKey[p.Key()]
-	// updatedAt refers to the last update of the build and does not reflect an eventual
-	// update of a job so default to always updating an active build
-	if exists && !p.State.IsActive() && !p.UpdatedAt.After(existingBuild.UpdatedAt) {
-		// Point ref to existingBuild
-		if _, exists := c.pipelineBySha[p.SHA]; !exists {
-			c.pipelineBySha[p.SHA] = make(map[PipelineKey]*Pipeline)
+	if existingBuild, exists := c.pipelineByKey[p.Key()]; exists && existingBuild != nil {
+		changes = p.StatusDiff(*existingBuild)
+
+		// updatedAt refers to the last update of the build and does not reflect an eventual
+		// update of a job so default to always updating an active build
+		if !p.State.IsActive() && !p.UpdatedAt.After(existingBuild.UpdatedAt) {
+			// Point ref to existingBuild
+			if _, exists := c.pipelineBySha[p.SHA]; !exists {
+				c.pipelineBySha[p.SHA] = make(map[PipelineKey]*Pipeline)
+			}
+			if c.pipelineBySha[p.SHA][p.Key()] == existingBuild {
+				return changes, ErrObsoleteBuild
+			}
+			c.pipelineBySha[p.SHA][p.Key()] = existingBuild
+			return changes, nil
 		}
-		if c.pipelineBySha[p.SHA][p.Key()] == existingBuild {
-			return ErrObsoleteBuild
-		}
-		c.pipelineBySha[p.SHA][p.Key()] = existingBuild
-		return nil
+	} else {
+		changes = p.StatusDiff(Pipeline{})
 	}
 
 	c.pipelineByKey[p.Key()] = &p
@@ -500,7 +506,7 @@ func (c *Cache) SavePipeline(p Pipeline) error {
 	}
 	c.pipelineBySha[p.SHA][p.Key()] = &p
 
-	return nil
+	return changes, nil
 }
 
 // Store commit in  If a commit with the same SHA exists, merge
@@ -569,7 +575,7 @@ func (c Cache) Pipelines(ref string) []Pipeline {
 // Poll Provider at increasing interval for information about the CI pipeline identified by the url
 // u. A message is sent on the channel 'updates' each time the cache is updated with new information
 // for this specific pipeline.
-func (c *Cache) monitorPipeline(ctx context.Context, pid string, u string, updates chan<- time.Time) error {
+func (c *Cache) monitorPipeline(ctx context.Context, pid string, u string, updates chan<- PipelineChanges) error {
 	p, exists := c.ciProvidersByID[pid]
 	if !exists {
 		return fmt.Errorf("cache does not contain any CI provider with ID %q", pid)
@@ -591,12 +597,12 @@ func (c *Cache) monitorPipeline(ctx context.Context, pid string, u string, updat
 		pipeline.ProviderHost = p.Host()
 		pipeline.ProviderName = p.Name()
 
-		switch err := c.SavePipeline(pipeline); err {
+		switch changes, err := c.SavePipeline(pipeline); err {
 		case nil:
 			if updates != nil {
 				go func() {
 					select {
-					case updates <- time.Now():
+					case updates <- changes:
 					case <-ctx.Done():
 					}
 				}()
@@ -626,7 +632,7 @@ func (c *Cache) monitorPipeline(ctx context.Context, pid string, u string, updat
 // Ask all providers to monitor the CI pipeline identified by the url u. A message is sent on the
 // channel 'updates' each time the cache is updated with new information for this specific pipeline.
 // If no Provider is able to handle the specified url, ErrUnknownPipelineURL is returned.
-func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, updates chan<- time.Time) error {
+func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, updates chan<- PipelineChanges) error {
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
@@ -749,7 +755,7 @@ func (c *Cache) broadcastMonitorRefStatus(ctx context.Context, repositoryURLs ma
 // updated with new data, a message is sent on the 'updates' channel.
 // This function may return ErrUnknownRepositoryURL if none of the source providers is
 // able to handle 'repositoryURL'.
-func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURLs map[string][]string, ref Ref, updates chan<- time.Time) error {
+func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURLs map[string][]string, ref Ref, updates chan<- PipelineChanges) error {
 	commitc := make(chan Commit)
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
@@ -788,7 +794,7 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURLs map[string]
 				go func() {
 					defer wg.Done()
 					select {
-					case updates <- time.Now():
+					case updates <- PipelineChanges{}:
 						// Do nothing
 					case <-ctx.Done():
 						// Do nothing

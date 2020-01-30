@@ -7,6 +7,7 @@
 * User interface: Implement navigation between git reference
 * User interface: Allow refreshing data, following the current git reference and endless polling ([issue #10](https://github.com/nbedos/cistern/issues/10))
 * User interface: Display durations greater or equal to 60 minutes in hours
+* User interface: Implement automatic collapsing for successful pipelines, stages and job ([issue #18](https://github.com/nbedos/cistern/issues/18)) 
 * Azure: The URL of a stage, job or task now link to corresponding stage, job or task instead of the pipeline  
 
 ### Bug Fix

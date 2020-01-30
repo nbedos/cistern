@@ -205,6 +205,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		table := HierarchicalTable{
 			height:      10,
 			columnWidth: make(map[ColumnID]int),
+			traversable: make(map[nodePath]bool),
 		}
 
 		nodes := []TableNode{
@@ -237,7 +238,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		}
 
 		// Open the first node, one child becomes visible
-		table.setTraversable(true, false)
+		table.setTraversableAtCursor(true, false)
 		expectedPaths = []nodePath{
 			nodePathFromIDs(1),
 			nodePathFromIDs(1, 2),
@@ -254,10 +255,68 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		}
 	})
 
+	t.Run("traversable state of innerNodes must be preserved even if the table is emptied", func(t *testing.T) {
+		table := HierarchicalTable{
+			height:      10,
+			columnWidth: make(map[ColumnID]int),
+			traversable: make(map[nodePath]bool),
+		}
+
+		nodes := []TableNode{
+			testNode{
+				id: 1,
+				children: []*testNode{
+					{
+						id: 2,
+					},
+				},
+			},
+			testNode{
+				id: 3,
+				children: []*testNode{
+					{
+						id: 4,
+					},
+				},
+			},
+		}
+
+		// Load table with innerNodes. Only top-level innerNodes are visible at this point.
+		table.Replace(nodes)
+		expectedPaths := []nodePath{
+			nodePathFromIDs(1),
+			nodePathFromIDs(3),
+		}
+		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
+			t.Fatal(diff)
+		}
+
+		// Open the first node, one child becomes visible
+		table.setTraversableAtCursor(true, false)
+		expectedPaths = []nodePath{
+			nodePathFromIDs(1),
+			nodePathFromIDs(1, 2),
+			nodePathFromIDs(3),
+		}
+		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
+			t.Fatal(diff)
+		}
+
+		// Empty the table
+		table.Replace(nil)
+
+		// Reload the same innerNodes and check that the traversable state was preserved
+		table.Replace(nodes)
+		if diff := nodePaths(expectedPaths).Diff(rowPaths(table)); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
 	t.Run("emptying a table must invalidate both page and cursor indexes", func(t *testing.T) {
 		table := HierarchicalTable{
 			height:      10,
 			columnWidth: make(map[ColumnID]int),
+			traversable: make(map[nodePath]bool),
 		}
 
 		nodes := []TableNode{
@@ -278,6 +337,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		table := HierarchicalTable{
 			height:      10,
 			columnWidth: make(map[ColumnID]int),
+			traversable: make(map[nodePath]bool),
 		}
 
 		table.Replace([]TableNode{
@@ -304,6 +364,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		table := HierarchicalTable{
 			height:      10,
 			columnWidth: make(map[ColumnID]int),
+			traversable: make(map[nodePath]bool),
 		}
 
 		table.Replace([]TableNode{
@@ -332,6 +393,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		table := HierarchicalTable{
 			height:      3,
 			columnWidth: make(map[ColumnID]int),
+			traversable: make(map[nodePath]bool),
 		}
 
 		table.Replace([]TableNode{
@@ -370,6 +432,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		table := HierarchicalTable{
 			height:      4,
 			columnWidth: make(map[ColumnID]int),
+			traversable: make(map[nodePath]bool),
 		}
 
 		table.Replace([]TableNode{
@@ -408,6 +471,7 @@ func TestHierarchicalTable_Replace(t *testing.T) {
 		table := HierarchicalTable{
 			height:      3,
 			columnWidth: make(map[ColumnID]int),
+			traversable: make(map[nodePath]bool),
 		}
 
 		table.Replace([]TableNode{
@@ -479,13 +543,64 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 		},
 	}
 
+	t.Run("collapsing a parent of the node under the cursor must move the cursor to the parent", func(t *testing.T) {
+		table, err := NewHierarchicalTable(defaultConf, nodes, 0, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		table.setTraversableAtCursor(true, true)
+		table.verticalScroll(2)
+		node := table.lookup(nodePathFromIDs(1, 2))
+		table.setTraversable(node, false, true)
+
+		expectedCursorIndex := nullInt{
+			Valid: true,
+			Int:   1,
+		}
+		if diff := cmp.Diff(expectedCursorIndex, table.cursorIndex); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
+	t.Run("collapsing a parent of the node at the top of the page must move the top of the page to the parent", func(t *testing.T) {
+		table, err := NewHierarchicalTable(defaultConf, nodes, 0, 3)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		node := table.lookup(nodePathFromIDs(1))
+		table.setTraversable(node, true, true)
+		node = table.lookup(nodePathFromIDs(4))
+		table.setTraversable(node, true, true)
+		table.verticalScroll(6)
+
+		node = table.lookup(nodePathFromIDs(4))
+		table.setTraversable(node, false, true)
+
+		expectedPageIndex := nullInt{
+			Valid: true,
+			Int:   3,
+		}
+		if diff := cmp.Diff(expectedPageIndex, table.pageIndex); diff != "" {
+			t.Fatal(diff)
+		}
+		expectedCursorIndex := nullInt{
+			Valid: true,
+			Int:   4,
+		}
+		if diff := cmp.Diff(expectedCursorIndex, table.cursorIndex); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+
 	t.Run("opening the first row must make its first-degree children visible", func(t *testing.T) {
 		table, err := NewHierarchicalTable(defaultConf, nodes, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		table.setTraversable(true, false)
+		table.setTraversableAtCursor(true, false)
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
 			nodePathFromIDs(1, 2),
@@ -503,7 +618,7 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.setTraversable(true, true)
+		table.setTraversableAtCursor(true, true)
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
 			nodePathFromIDs(1, 2),
@@ -522,8 +637,8 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.setTraversable(true, true)
-		table.setTraversable(false, true)
+		table.setTraversableAtCursor(true, true)
+		table.setTraversableAtCursor(false, true)
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
 			nodePathFromIDs(4),
@@ -540,9 +655,9 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.setTraversable(true, true)
+		table.setTraversableAtCursor(true, true)
 		table.verticalScroll(1)
-		table.setTraversable(false, true)
+		table.setTraversableAtCursor(false, true)
 		expectedPaths := []nodePath{
 			nodePathFromIDs(1),
 			nodePathFromIDs(1, 2),
@@ -560,9 +675,9 @@ func TestHierarchicalTable_SetTraversable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.setTraversable(true, true)
+		table.setTraversableAtCursor(true, true)
 		table.verticalScroll(2)
-		table.setTraversable(false, true)
+		table.setTraversableAtCursor(false, true)
 
 		expectedCursorIndex := nullInt{
 			Valid: true,
@@ -631,7 +746,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		table.setTraversable(true, true)
+		table.setTraversableAtCursor(true, true)
 		if table.ScrollToNextMatch("2", true) != true {
 			t.Fatal("expected match to be found")
 		}
@@ -666,7 +781,7 @@ func TestHierarchicalTable_ScrollToMatch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		table.setTraversable(true, true)
+		table.setTraversableAtCursor(true, true)
 		table.verticalScroll(1)
 		if table.ScrollToNextMatch("1", true) != true {
 			t.Fatal("expected match to be found")
@@ -739,7 +854,7 @@ func TestHierarchicalTable_Resize(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		table.setTraversable(true, true)
+		table.setTraversableAtCursor(true, true)
 		table.verticalScroll(2)
 		table.Resize(table.width, 0)
 		table.Resize(table.width, 4)
