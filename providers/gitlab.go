@@ -386,11 +386,8 @@ func (c GitLabClient) fetchPipeline(ctx context.Context, slug string, pipelineID
 	}
 
 	pipeline = Pipeline{
-		GitReference: GitReference{
-			SHA:   gitlabPipeline.SHA,
-			Ref:   gitlabPipeline.Ref,
-			IsTag: gitlabPipeline.Tag,
-		},
+		Ref:   gitlabPipeline.Ref,
+		IsTag: gitlabPipeline.Tag,
 		Step: Step{
 			ID:         strconv.Itoa(gitlabPipeline.ID),
 			Type:       StepPipeline,

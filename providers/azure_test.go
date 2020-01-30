@@ -74,11 +74,8 @@ func Setup() (AzurePipelinesClient, func(), error) {
 
 var expectedPipeline = Pipeline{
 	Number: "20191204.3",
-	GitReference: GitReference{
-		SHA:   "5e4d496d63086609cb3c03aa0ee4e032e4b6b08b",
-		Ref:   "azure-pipelines",
-		IsTag: false,
-	},
+	Ref:    "azure-pipelines",
+	IsTag:  false,
 	Step: Step{
 		ID:    "16",
 		Name:  "owner.repo (1)",

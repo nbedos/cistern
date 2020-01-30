@@ -474,7 +474,7 @@ var ErrObsoleteBuild = errors.New("build to save is older than current build in 
 // already stored in cache, it will be overwritten if the build to save is more recent
 // than the build in  If the build to save is older than the build in cache,
 // SavePipeline will return ErrObsoleteBuild.
-func (c *Cache) SavePipeline(p Pipeline) (PipelineChanges, error) {
+func (c *Cache) SavePipeline(sha string, p Pipeline) (PipelineChanges, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	var changes PipelineChanges
@@ -487,13 +487,13 @@ func (c *Cache) SavePipeline(p Pipeline) (PipelineChanges, error) {
 		isNotAfter := p.UpdatedAt.Valid && existingBuild.UpdatedAt.Valid && !p.UpdatedAt.Time.After(existingBuild.UpdatedAt.Time)
 		if !p.State.IsActive() && isNotAfter {
 			// Point ref to existingBuild
-			if _, exists := c.pipelineBySha[p.SHA]; !exists {
-				c.pipelineBySha[p.SHA] = make(map[PipelineKey]*Pipeline)
+			if _, exists := c.pipelineBySha[sha]; !exists {
+				c.pipelineBySha[sha] = make(map[PipelineKey]*Pipeline)
 			}
-			if c.pipelineBySha[p.SHA][p.Key()] == existingBuild {
+			if c.pipelineBySha[sha][p.Key()] == existingBuild {
 				return changes, ErrObsoleteBuild
 			}
-			c.pipelineBySha[p.SHA][p.Key()] = existingBuild
+			c.pipelineBySha[sha][p.Key()] = existingBuild
 			return changes, nil
 		}
 	} else {
@@ -502,10 +502,10 @@ func (c *Cache) SavePipeline(p Pipeline) (PipelineChanges, error) {
 
 	c.pipelineByKey[p.Key()] = &p
 	// Point ref to new build
-	if _, exists := c.pipelineBySha[p.SHA]; !exists {
-		c.pipelineBySha[p.SHA] = make(map[PipelineKey]*Pipeline)
+	if _, exists := c.pipelineBySha[sha]; !exists {
+		c.pipelineBySha[sha] = make(map[PipelineKey]*Pipeline)
 	}
-	c.pipelineBySha[p.SHA][p.Key()] = &p
+	c.pipelineBySha[sha][p.Key()] = &p
 
 	return changes, nil
 }
@@ -576,7 +576,7 @@ func (c Cache) Pipelines(ref string) []Pipeline {
 // Poll Provider at increasing interval for information about the CI pipeline identified by the url
 // u. A message is sent on the channel 'updates' each time the cache is updated with new information
 // for this specific pipeline.
-func (c *Cache) monitorPipeline(ctx context.Context, pid string, u string, updates chan<- PipelineChanges) error {
+func (c *Cache) monitorPipeline(ctx context.Context, sha string, pid string, u string, updates chan<- PipelineChanges) error {
 	p, exists := c.ciProvidersByID[pid]
 	if !exists {
 		return fmt.Errorf("cache does not contain any CI provider with ID %q", pid)
@@ -598,7 +598,7 @@ func (c *Cache) monitorPipeline(ctx context.Context, pid string, u string, updat
 		pipeline.ProviderHost = p.Host()
 		pipeline.ProviderName = p.Name()
 
-		switch changes, err := c.SavePipeline(pipeline); err {
+		switch changes, err := c.SavePipeline(sha, pipeline); err {
 		case nil:
 			if updates != nil {
 				go func() {
@@ -633,7 +633,7 @@ func (c *Cache) monitorPipeline(ctx context.Context, pid string, u string, updat
 // Ask all providers to monitor the CI pipeline identified by the url u. A message is sent on the
 // channel 'updates' each time the cache is updated with new information for this specific pipeline.
 // If no Provider is able to handle the specified url, ErrUnknownPipelineURL is returned.
-func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, updates chan<- PipelineChanges) error {
+func (c *Cache) broadcastMonitorPipeline(ctx context.Context, sha string, u string, updates chan<- PipelineChanges) error {
 	wg := sync.WaitGroup{}
 	errc := make(chan error)
 	ctx, cancel := context.WithCancel(ctx)
@@ -645,7 +645,7 @@ func (c *Cache) broadcastMonitorPipeline(ctx context.Context, u string, updates 
 			// meaning these providers can handle the url they've been given. These calls
 			// will run longer or possibly never return unless their context is canceled or
 			// they encounter an error.
-			if err := c.monitorPipeline(ctx, pid, u, updates); err != nil {
+			if err := c.monitorPipeline(ctx, sha, pid, u, updates); err != nil {
 				if err != ErrUnknownPipelineURL && err != context.Canceled {
 					err = fmt.Errorf("Provider %s: monitorPipeline failed with %v (%s)", pid, err, u)
 				}
@@ -807,7 +807,7 @@ func (c *Cache) MonitorPipelines(ctx context.Context, repositoryURLs map[string]
 					wg.Add(1)
 					go func(u string) {
 						defer wg.Done()
-						err := c.broadcastMonitorPipeline(ctx, u, updates)
+						err := c.broadcastMonitorPipeline(ctx, commit.Sha, u, updates)
 						// Ignore ErrUnknownPipelineURL. This error means that we don't integrate
 						// with the application that created that particular url. No need to report
 						// this up the chain, though it's nice to know our request couldn't be handled.

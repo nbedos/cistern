@@ -46,11 +46,8 @@ func TestTravisClientfetchPipeline(t *testing.T) {
 
 	expectedPipeline := Pipeline{
 		Number: "72",
-		GitReference: GitReference{
-			SHA:   "c824642cc7c3abf8abc2d522b58a345a98b95b9b",
-			Ref:   "feature/travis_improvements",
-			IsTag: false,
-		},
+		Ref:    "feature/travis_improvements",
+		IsTag:  false,
 		Step: Step{
 			ID:    "609256446",
 			Type:  StepPipeline,
