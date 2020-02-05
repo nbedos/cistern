@@ -267,11 +267,8 @@ func (b appVeyorBuild) toCachePipeline(owner string, repository string) (Pipelin
 
 	pipeline := Pipeline{
 		Number: strconv.Itoa(b.Number),
-		GitReference: GitReference{
-			SHA:   b.Sha,
-			Ref:   ref,
-			IsTag: b.IsTag,
-		},
+		Ref:    ref,
+		IsTag:  b.IsTag,
 		Step: Step{
 			ID:    strconv.Itoa(b.ID),
 			Type:  StepPipeline,

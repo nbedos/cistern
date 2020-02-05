@@ -168,6 +168,9 @@ func (b azureBuild) toPipeline() (Pipeline, error) {
 	case strings.HasPrefix(b.SourceBranch, "refs/heads/"):
 		ref = strings.TrimPrefix(b.SourceBranch, "refs/heads/")
 		isTag = false
+	case strings.HasPrefix(b.SourceBranch, "refs/pull/"):
+		ref = strings.TrimPrefix(b.SourceBranch, "refs/")
+		isTag = false
 	case strings.HasPrefix(b.SourceBranch, "refs/tags/"):
 		ref = strings.TrimPrefix(b.SourceBranch, "refs/tags/")
 		isTag = true
@@ -175,11 +178,8 @@ func (b azureBuild) toPipeline() (Pipeline, error) {
 
 	pipeline := Pipeline{
 		Number: b.Number,
-		GitReference: GitReference{
-			SHA:   b.SourceVersion,
-			Ref:   ref,
-			IsTag: isTag,
-		},
+		Ref:    ref,
+		IsTag:  isTag,
 		Step: Step{
 			ID:    strconv.Itoa(b.ID),
 			Name:  b.Definition.Name,

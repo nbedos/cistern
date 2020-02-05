@@ -29,7 +29,7 @@ func TestCache_Save(t *testing.T) {
 				State: Failed,
 			},
 		}
-		if _, err := c.SavePipeline(p); err != nil {
+		if _, err := c.SavePipeline("sha", p); err != nil {
 			t.Fatal(err)
 		}
 		savedPipeline, exists := c.Pipeline(p.Key())
@@ -66,10 +66,10 @@ func TestCache_Save(t *testing.T) {
 	t.Run("existing build must be overwritten if it's older than the current build", func(t *testing.T) {
 		c := NewCache(nil, nil, utils.PollingStrategy{})
 
-		if _, err := c.SavePipeline(oldPipeline); err != nil {
+		if _, err := c.SavePipeline("sha", oldPipeline); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := c.SavePipeline(newPipeline); err != nil {
+		if _, err := c.SavePipeline("sha", newPipeline); err != nil {
 			t.Fatal(err)
 		}
 		savedPipeline, exists := c.Pipeline(oldPipeline.Key())
@@ -85,10 +85,10 @@ func TestCache_Save(t *testing.T) {
 	t.Run("cache.SavePipeline must return ErrObsoleteBuild if the build to save is older than the one in cache", func(t *testing.T) {
 		c := NewCache(nil, nil, utils.PollingStrategy{})
 
-		if _, err := c.SavePipeline(newPipeline); err != nil {
+		if _, err := c.SavePipeline("sha", newPipeline); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := c.SavePipeline(oldPipeline); err != ErrObsoleteBuild {
+		if _, err := c.SavePipeline("sha", oldPipeline); err != ErrObsoleteBuild {
 			t.Fatalf("expected %v but got %v", ErrObsoleteBuild, err)
 		}
 	})
@@ -104,7 +104,7 @@ func TestCache_Pipeline(t *testing.T) {
 				ID: id,
 			},
 		}
-		if _, err := c.SavePipeline(p); err != nil {
+		if _, err := c.SavePipeline("sha", p); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -126,11 +126,9 @@ func TestCache_Pipelines(t *testing.T) {
 
 	pipelines := []Pipeline{
 		{
-			GitReference: GitReference{
-				SHA:   "sha1",
-				Ref:   "ref1",
-				IsTag: false,
-			},
+			Ref:   "ref1",
+			IsTag: false,
+
 			Step: Step{
 				ID: "1",
 
@@ -141,11 +139,8 @@ func TestCache_Pipelines(t *testing.T) {
 			},
 		},
 		{
-			GitReference: GitReference{
-				SHA:   "sha2",
-				Ref:   "ref2",
-				IsTag: false,
-			},
+			Ref:   "ref2",
+			IsTag: false,
 			Step: Step{
 				ID: "1",
 				UpdatedAt: utils.NullTime{
@@ -155,11 +150,9 @@ func TestCache_Pipelines(t *testing.T) {
 			},
 		},
 		{
-			GitReference: GitReference{
-				SHA:   "sha2",
-				Ref:   "ref2",
-				IsTag: false,
-			},
+
+			Ref:   "ref2",
+			IsTag: false,
 			Step: Step{
 				ID: "2",
 				UpdatedAt: utils.NullTime{
@@ -173,7 +166,11 @@ func TestCache_Pipelines(t *testing.T) {
 	c.SaveCommit("ref1", Commit{Sha: "sha1"})
 	c.SaveCommit("ref2", Commit{Sha: "sha2"})
 	for _, p := range pipelines {
-		if _, err := c.SavePipeline(p); err != nil {
+		sha := "sha1"
+		if p.Ref == "ref2" {
+			sha = "sha2"
+		}
+		if _, err := c.SavePipeline(sha, p); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -538,7 +535,7 @@ func TestCache_monitorPipeline(t *testing.T) {
 			MaxInterval:     10 * time.Millisecond,
 		})
 
-		err := c.monitorPipeline(ctx, "ci", "ci.example.com/pipelines/inactive", nil)
+		err := c.monitorPipeline(ctx, "sha", "ci", "ci.example.com/pipelines/inactive", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -559,7 +556,7 @@ func TestCache_monitorPipeline(t *testing.T) {
 			MaxInterval:     10 * time.Millisecond,
 		})
 
-		err := c.monitorPipeline(ctx, "ci", "bad.url.example.com", nil)
+		err := c.monitorPipeline(ctx, "sha", "ci", "bad.url.example.com", nil)
 		if err != ErrUnknownPipelineURL {
 			t.Fatalf("expected %v but got %v", ErrUnknownPipelineURL, err)
 		}
@@ -583,7 +580,7 @@ func TestCache_monitorPipeline(t *testing.T) {
 		}()
 
 		started := time.Now()
-		err := c.monitorPipeline(ctx, "ci", "ci.example.com/pipelines/active", nil)
+		err := c.monitorPipeline(ctx, "sha", "ci", "ci.example.com/pipelines/active", nil)
 		if err != context.Canceled {
 			t.Fatalf("expected %v but got %v", context.Canceled, err)
 		}
@@ -609,7 +606,7 @@ func TestCache_broadcastMonitorPipeline(t *testing.T) {
 			MaxInterval:     10 * time.Millisecond,
 		})
 
-		err := c.broadcastMonitorPipeline(ctx, "ci1.example.com/pipelines/inactive", nil)
+		err := c.broadcastMonitorPipeline(ctx, "sha", "ci1.example.com/pipelines/inactive", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -632,7 +629,7 @@ func TestCache_broadcastMonitorPipeline(t *testing.T) {
 			MaxInterval:     10 * time.Millisecond,
 		})
 
-		err := c.broadcastMonitorPipeline(ctx, "bad.url.example.com", nil)
+		err := c.broadcastMonitorPipeline(ctx, "sha", "bad.url.example.com", nil)
 		if err != ErrUnknownPipelineURL {
 			t.Fatalf("expected %v but got %v", ErrUnknownPipelineURL, err)
 		}
@@ -658,7 +655,7 @@ func TestCache_broadcastMonitorPipeline(t *testing.T) {
 		}()
 
 		started := time.Now()
-		err := c.broadcastMonitorPipeline(ctx, "ci1.example.com/pipelines/active", nil)
+		err := c.broadcastMonitorPipeline(ctx, "sha", "ci1.example.com/pipelines/active", nil)
 		if err != context.Canceled {
 			t.Fatalf("expected %v but got %v", context.Canceled, err)
 		}

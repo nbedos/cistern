@@ -432,18 +432,13 @@ func (s Step) Compare(t tui.TableNode, id tui.ColumnID, i interface{}) int {
 	}
 }
 
-type GitReference struct {
-	SHA   string
-	Ref   string
-	IsTag bool
-}
-
 type Pipeline struct {
 	Number       string
 	providerID   string
 	ProviderHost string
 	ProviderName string
-	GitReference
+	Ref          string
+	IsTag        bool
 	Step
 }
 

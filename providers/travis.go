@@ -62,11 +62,8 @@ type travisBuild struct {
 func (b travisBuild) toPipeline(webURL string) (pipeline Pipeline, err error) {
 	pipeline = Pipeline{
 		Number: b.Number,
-		GitReference: GitReference{
-			SHA:   b.Commit.Sha,
-			Ref:   "",
-			IsTag: b.Tag.Name != "",
-		},
+		Ref:    "",
+		IsTag:  b.Tag.Name != "",
 		Step: Step{
 			ID:    strconv.Itoa(b.ID),
 			State: fromTravisState(b.State),

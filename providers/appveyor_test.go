@@ -95,11 +95,8 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 
 	expectedBuild := Pipeline{
 		Number: "42",
-		GitReference: GitReference{
-			SHA:   "fd4c4ae5a4005e38c66566e2480087072620e9de",
-			Ref:   "feature/appveyor",
-			IsTag: false,
-		},
+		Ref:    "feature/appveyor",
+		IsTag:  false,
 		Step: Step{
 			ID:    "42",
 			State: "failed",

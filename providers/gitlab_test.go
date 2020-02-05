@@ -130,10 +130,7 @@ func TestGitLabClient_BuildFromURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectedPipeline := Pipeline{
-		GitReference: GitReference{
-			SHA: "6645b9ba15963e480be7763d68d9c275760d555e",
-			Ref: "master",
-		},
+		Ref: "master",
 		Step: Step{
 			ID:           "103230300",
 			Name:         "",

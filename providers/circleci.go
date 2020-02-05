@@ -297,11 +297,8 @@ type circleCIBuild struct {
 
 func (b circleCIBuild) toPipeline() (Pipeline, error) {
 	pipeline := Pipeline{
-		GitReference: GitReference{
-			SHA:   b.Sha,
-			Ref:   "",
-			IsTag: false,
-		},
+		Ref:   "",
+		IsTag: false,
 		Step: Step{
 			ID:    strconv.Itoa(b.ID),
 			Name:  b.Workflows.JobName,
@@ -322,7 +319,7 @@ func (b circleCIBuild) toPipeline() (Pipeline, error) {
 	}
 
 	var err error
-	if pipeline.CreatedAt, err =utils.NullTimeFromString(b.CreatedAt); err != nil {
+	if pipeline.CreatedAt, err = utils.NullTimeFromString(b.CreatedAt); err != nil {
 		return pipeline, err
 	}
 	if pipeline.StartedAt, err = utils.NullTimeFromString(b.StartedAt); err != nil {

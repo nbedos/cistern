@@ -84,16 +84,13 @@ func TestCircleCIClient_BuildFromURL(t *testing.T) {
 
 	expectedPipeline := Pipeline{
 		Number: "",
-		GitReference: GitReference{
-			SHA:   "210b32c023c9c9668d7e0098bec24e64cfd37bd3",
-			Ref:   "master",
-			IsTag: false,
-		},
+		Ref:    "master",
+		IsTag:  false,
 		Step: Step{
-			ID:        "36",
-			Name:      "build",
-			Type:      StepJob,
-			State:     Passed,
+			ID:    "36",
+			Name:  "build",
+			Type:  StepJob,
+			State: Passed,
 			CreatedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 21, 14, 40, 27, 911000000, time.UTC),
@@ -184,7 +181,7 @@ func TestCircleCIClient_Log(t *testing.T) {
 	}
 }
 
-func TestCircleCIBuild_NullCreationDate(t *testing.T){
+func TestCircleCIBuild_NullCreationDate(t *testing.T) {
 	// Regression test for https://github.com/nbedos/cistern/issues/24
 	p, err := circleCIBuild{}.toPipeline()
 	if err != nil {
