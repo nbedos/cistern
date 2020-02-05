@@ -37,11 +37,14 @@ func TestAppVeyorJob_ToCacheJob(t *testing.T) {
 	}
 
 	expectedJob := Step{
-		ID:        "id",
-		Type:      StepJob,
-		State:     "passed",
-		Name:      "name",
-		CreatedAt: time.Date(2019, 11, 23, 12, 24, 26, 918187100, time.UTC),
+		ID:    "id",
+		Type:  StepJob,
+		State: "passed",
+		Name:  "name",
+		CreatedAt: utils.NullTime{
+			Valid: true,
+			Time:  time.Date(2019, 11, 23, 12, 24, 26, 918187100, time.UTC),
+		},
 		StartedAt: utils.NullTime{
 			Valid: true,
 			Time:  time.Date(2019, 11, 23, 12, 24, 31, 814573500, time.UTC),
@@ -100,7 +103,10 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 		Step: Step{
 			ID:    "42",
 			State: "failed",
-			CreatedAt: time.Date(2019, 11, 23, 12, 24, 25, 590025800, time.UTC),
+			CreatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 23, 12, 24, 25, 590025800, time.UTC),
+			},
 			StartedAt: utils.NullTime{
 				Valid: true,
 				Time:  time.Date(2019, 11, 23, 12, 24, 31, 814573500, time.UTC),
@@ -109,7 +115,10 @@ func TestAppVeyorBuild_ToCacheBuild(t *testing.T) {
 				Valid: true,
 				Time:  time.Date(2019, 11, 23, 12, 24, 34, 564672400, time.UTC),
 			},
-			UpdatedAt: time.Date(2019, 11, 23, 12, 24, 34, 564672400, time.UTC),
+			UpdatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 23, 12, 24, 34, 564672400, time.UTC),
+			},
 			Duration: utils.NullDuration{
 				Valid:    true,
 				Duration: 2750098900 * time.Nanosecond,

@@ -279,7 +279,7 @@ func (b appVeyorBuild) toCachePipeline(owner string, repository string) (Pipelin
 		},
 	}
 	var err error
-	pipeline.CreatedAt, err = time.Parse(time.RFC3339, b.CreatedAt)
+	pipeline.CreatedAt, err = utils.NullTimeFromString(b.CreatedAt)
 	if err != nil {
 		return pipeline, err
 	}
@@ -291,17 +291,17 @@ func (b appVeyorBuild) toCachePipeline(owner string, repository string) (Pipelin
 	if err != nil {
 		return pipeline, err
 	}
-	if pipeline.UpdatedAt, err = time.Parse(time.RFC3339, b.UpdatedAt); err != nil {
+
+	if pipeline.UpdatedAt, err = utils.NullTimeFromString(b.UpdatedAt); err != nil {
+		return pipeline, err
+	}
+	if !pipeline.UpdatedAt.Valid {
 		// Best effort since it sometimes happens that updatedAt is null but another date is
 		// available
-		nullUpdateAt := utils.MinNullTime(
-			utils.NullTime{Time: pipeline.CreatedAt, Valid: true},
+		pipeline.UpdatedAt = utils.MaxNullTime(
+			pipeline.CreatedAt,
 			pipeline.StartedAt,
 			pipeline.FinishedAt)
-		if !nullUpdateAt.Valid {
-			return pipeline, err
-		}
-		pipeline.UpdatedAt = nullUpdateAt.Time
 	}
 
 	pipeline.Duration = utils.NullSub(pipeline.FinishedAt, pipeline.StartedAt)
@@ -349,7 +349,7 @@ func (j appVeyorJob) toCacheStep(id string, buildURL string) (Step, error) {
 	}
 
 	var err error
-	step.CreatedAt, err = time.Parse(time.RFC3339, j.CreatedAt)
+	step.CreatedAt, err = utils.NullTimeFromString(j.CreatedAt)
 	if err != nil {
 		return step, err
 	}

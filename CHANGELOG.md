@@ -13,6 +13,7 @@
 ### Bug Fix
 
 * GitLab: Add support for custom SSH host ([issue #20](https://github.com/nbedos/cistern/issues/20))
+* CircleCI: Fix crash due to missing build creation date ([issue #24](https://github.com/nbedos/cistern/issues/24))
 
 ### Chores
 

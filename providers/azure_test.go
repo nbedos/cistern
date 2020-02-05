@@ -80,11 +80,14 @@ var expectedPipeline = Pipeline{
 		IsTag: false,
 	},
 	Step: Step{
-		ID:        "16",
-		Name:      "owner.repo (1)",
-		Type:      StepPipeline,
-		State:     Failed,
-		CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+		ID:    "16",
+		Name:  "owner.repo (1)",
+		Type:  StepPipeline,
+		State: Failed,
+		CreatedAt: utils.NullTime{
+			Valid: true,
+			Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+		},
 		StartedAt: utils.NullTime{
 			Valid: true,
 			Time:  time.Date(2019, 12, 4, 13, 9, 52, 764105000, time.UTC),
@@ -93,7 +96,10 @@ var expectedPipeline = Pipeline{
 			Valid: true,
 			Time:  time.Date(2019, 12, 4, 13, 11, 34, 339701300, time.UTC),
 		},
-		UpdatedAt: time.Date(2019, 12, 4, 13, 11, 34, 487000000, time.UTC),
+		UpdatedAt: utils.NullTime{
+			Valid: true,
+			Time:  time.Date(2019, 12, 4, 13, 11, 34, 487000000, time.UTC),
+		},
 		Duration: utils.NullDuration{
 			Valid:    true,
 			Duration: time.Minute + 41*time.Second + 575596300*time.Nanosecond,
@@ -104,11 +110,14 @@ var expectedPipeline = Pipeline{
 		},
 		Children: []Step{
 			{
-				ID:        "8bfbeaae-4c8e-5f12-f154-edd305817000",
-				Type:      StepStage,
-				Name:      "tests",
-				State:     "failed",
-				CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+				ID:    "8bfbeaae-4c8e-5f12-f154-edd305817000",
+				Type:  StepStage,
+				Name:  "tests",
+				State: "failed",
+				CreatedAt: utils.NullTime{
+					Valid: true,
+					Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+				},
 				StartedAt: utils.NullTime{
 					Valid: true,
 					Time:  time.Date(2019, 12, 4, 13, 9, 56, 653333300, time.UTC),
@@ -127,11 +136,14 @@ var expectedPipeline = Pipeline{
 				},
 				Children: []Step{
 					{
-						ID:        "a1fe9f00-6aac-5c3d-c3c6-290a6d3ec2ef",
-						Type:      StepJob,
-						State:     "failed",
-						Name:      "Ubuntu_16_04",
-						CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+						ID:    "a1fe9f00-6aac-5c3d-c3c6-290a6d3ec2ef",
+						Type:  StepJob,
+						State: "failed",
+						Name:  "Ubuntu_16_04",
+						CreatedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+						},
 						StartedAt: utils.NullTime{
 							Valid: true,
 							Time:  time.Date(2019, 12, 4, 13, 10, 0, 713333300, time.UTC),
@@ -150,11 +162,14 @@ var expectedPipeline = Pipeline{
 						},
 					},
 					{
-						ID:        "e305bc7f-849a-5981-f9f4-d079b0b7f451",
-						Type:      StepJob,
-						State:     "failed",
-						Name:      "Ubuntu_18_04",
-						CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+						ID:    "e305bc7f-849a-5981-f9f4-d079b0b7f451",
+						Type:  StepJob,
+						State: "failed",
+						Name:  "Ubuntu_18_04",
+						CreatedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+						},
 						StartedAt: utils.NullTime{
 							Valid: true,
 							Time:  time.Date(2019, 12, 4, 13, 9, 56, 653333300, time.UTC),
@@ -173,11 +188,14 @@ var expectedPipeline = Pipeline{
 						},
 					},
 					{
-						ID:        "aa83c9de-d200-5148-7d44-5e08a0dd6659",
-						Type:      StepJob,
-						State:     "failed",
-						Name:      "macoOS_10_14",
-						CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+						ID:    "aa83c9de-d200-5148-7d44-5e08a0dd6659",
+						Type:  StepJob,
+						State: "failed",
+						Name:  "macoOS_10_14",
+						CreatedAt: utils.NullTime{
+							Valid: true,
+							Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+						},
 						StartedAt: utils.NullTime{
 							Valid: true,
 							Time:  time.Date(2019, 12, 4, 13, 9, 59, 943333300, time.UTC),
@@ -196,11 +214,14 @@ var expectedPipeline = Pipeline{
 						},
 						Children: []Step{
 							{
-								ID:        "fd63e659-60cf-51c7-a63d-0111af4550dd",
-								Name:      "Set up the Go workspace",
-								Type:      StepTask,
-								State:     "passed",
-								CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+								ID:    "fd63e659-60cf-51c7-a63d-0111af4550dd",
+								Name:  "Set up the Go workspace",
+								Type:  StepTask,
+								State: "passed",
+								CreatedAt: utils.NullTime{
+									Valid: true,
+									Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+								},
 								StartedAt: utils.NullTime{
 									Valid: true,
 									Time:  time.Date(2019, 12, 4, 13, 10, 3, 153333300, time.UTC),
@@ -219,11 +240,14 @@ var expectedPipeline = Pipeline{
 								},
 							},
 							{
-								ID:        "bebceb1b-138c-57de-594c-688f96e7a793",
-								Name:      "Build",
-								Type:      StepTask,
-								State:     "failed",
-								CreatedAt: time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+								ID:    "bebceb1b-138c-57de-594c-688f96e7a793",
+								Name:  "Build",
+								Type:  StepTask,
+								State: "failed",
+								CreatedAt: utils.NullTime{
+									Valid: true,
+									Time:  time.Date(2019, 12, 4, 13, 9, 34, 734161200, time.UTC),
+								},
 								StartedAt: utils.NullTime{
 									Valid: true,
 									Time:  time.Date(2019, 12, 4, 13, 10, 3, 870000000, time.UTC),

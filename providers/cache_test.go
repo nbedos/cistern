@@ -44,16 +44,22 @@ func TestCache_Save(t *testing.T) {
 
 	oldPipeline := Pipeline{
 		Step: Step{
-			ID:        "42",
-			State:     Failed,
-			UpdatedAt: time.Date(2019, 11, 24, 14, 52, 0, 0, time.UTC),
+			ID:    "42",
+			State: Failed,
+			UpdatedAt: utils.NullTime{
+				Valid: true,
+				Time:  time.Date(2019, 11, 24, 14, 52, 0, 0, time.UTC),
+			},
 		},
 	}
 	newPipeline := Pipeline{
 		Step: Step{
-			ID:        "42",
-			State:     Passed,
-			UpdatedAt: oldPipeline.UpdatedAt.Add(time.Second),
+			ID:    "42",
+			State: Passed,
+			UpdatedAt: utils.NullTime{
+				Valid: true,
+				Time:  oldPipeline.UpdatedAt.Time.Add(time.Second),
+			},
 		},
 	}
 
@@ -128,7 +134,10 @@ func TestCache_Pipelines(t *testing.T) {
 			Step: Step{
 				ID: "1",
 
-				UpdatedAt: time.Date(2019, 12, 7, 0, 0, 0, 0, time.UTC),
+				UpdatedAt: utils.NullTime{
+					Valid: true,
+					Time:  time.Date(2019, 12, 7, 0, 0, 0, 0, time.UTC),
+				},
 			},
 		},
 		{
@@ -138,8 +147,11 @@ func TestCache_Pipelines(t *testing.T) {
 				IsTag: false,
 			},
 			Step: Step{
-				ID:        "1",
-				UpdatedAt: time.Date(2019, 12, 8, 0, 0, 0, 0, time.UTC),
+				ID: "1",
+				UpdatedAt: utils.NullTime{
+					Valid: true,
+					Time:  time.Date(2019, 12, 8, 0, 0, 0, 0, time.UTC),
+				},
 			},
 		},
 		{
@@ -149,8 +161,11 @@ func TestCache_Pipelines(t *testing.T) {
 				IsTag: false,
 			},
 			Step: Step{
-				ID:        "2",
-				UpdatedAt: time.Date(2019, 12, 9, 0, 0, 0, 0, time.UTC),
+				ID: "2",
+				UpdatedAt: utils.NullTime{
+					Valid: true,
+					Time:  time.Date(2019, 12, 9, 0, 0, 0, 0, time.UTC),
+				},
 			},
 		},
 	}
@@ -227,7 +242,6 @@ func createRepository(t *testing.T, remotes []config.RemoteConfig) (string, stri
 
 	return tmpDir, sha.String()
 }
-
 
 func TestRemotes(t *testing.T) {
 	t.Run("invalid path", func(t *testing.T) {

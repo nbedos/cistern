@@ -193,7 +193,7 @@ func (b azureBuild) toPipeline() (Pipeline, error) {
 	}
 
 	var err error
-	pipeline.CreatedAt, err = time.Parse(time.RFC3339, b.QueueTime)
+	pipeline.CreatedAt, err = utils.NullTimeFromString(b.QueueTime)
 	if err != nil {
 		return Pipeline{}, err
 	}
@@ -205,7 +205,7 @@ func (b azureBuild) toPipeline() (Pipeline, error) {
 	if err != nil {
 		return Pipeline{}, err
 	}
-	if pipeline.UpdatedAt, err = time.Parse(time.RFC3339, b.LastChangedDate); err != nil {
+	if pipeline.UpdatedAt, err = utils.NullTimeFromString(b.LastChangedDate); err != nil {
 		return Pipeline{}, err
 	}
 	pipeline.Duration = utils.NullSub(pipeline.FinishedAt, pipeline.StartedAt)

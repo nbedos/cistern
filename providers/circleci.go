@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -323,7 +322,7 @@ func (b circleCIBuild) toPipeline() (Pipeline, error) {
 	}
 
 	var err error
-	if pipeline.CreatedAt, err = time.Parse(time.RFC3339, b.CreatedAt); err != nil {
+	if pipeline.CreatedAt, err =utils.NullTimeFromString(b.CreatedAt); err != nil {
 		return pipeline, err
 	}
 	if pipeline.StartedAt, err = utils.NullTimeFromString(b.StartedAt); err != nil {
@@ -333,14 +332,10 @@ func (b circleCIBuild) toPipeline() (Pipeline, error) {
 		return pipeline, err
 	}
 
-	updatedAt := utils.MaxNullTime(
-		utils.NullTime{Time: pipeline.CreatedAt, Valid: true},
+	pipeline.UpdatedAt = utils.MaxNullTime(
+		pipeline.CreatedAt,
 		pipeline.FinishedAt,
 		pipeline.StartedAt)
-	if !updatedAt.Valid {
-		return pipeline, errors.New("updatedAt attribute cannot be null")
-	}
-	pipeline.UpdatedAt = updatedAt.Time
 
 	if pipeline.IsTag = b.Tag != ""; pipeline.IsTag {
 		pipeline.Ref = b.Tag
