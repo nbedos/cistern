@@ -1,3 +1,5 @@
+**Note: As of June 2020 I do not have time to maintain this repository anymore and I've thus made it read-only.**
+
 # cistern
 A top-like utility for Unix to monitor Continuous Integration pipelines from
 the command line. Current integrations include GitLab, Azure DevOps, Travis CI,
